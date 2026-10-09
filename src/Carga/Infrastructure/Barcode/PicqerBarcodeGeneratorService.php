@@ -6,6 +6,7 @@ namespace Courier\Carga\Infrastructure\Barcode;
 
 use Courier\Carga\Domain\BarcodeGeneratorInterface;
 use Courier\Carga\Domain\ValueObject\TrackingNumero;
+use Courier\Shared\Infrastructure\FuenteTtf;
 use Picqer\Barcode\BarcodeGeneratorPNG;
 use RuntimeException;
 
@@ -17,8 +18,6 @@ final class PicqerBarcodeGeneratorService implements BarcodeGeneratorInterface
     private const ALTO_PX = 260;
     private const MARGEN = 30;
 
-    private const FONT_BOLD = 'C:\\Windows\\Fonts\\arialbd.ttf';
-    private const FONT_REGULAR = 'C:\\Windows\\Fonts\\arial.ttf';
 
     public function __construct(private readonly string $publicPath)
     {
@@ -59,8 +58,8 @@ final class PicqerBarcodeGeneratorService implements BarcodeGeneratorInterface
         $anchoMax = self::ANCHO_PX - (self::MARGEN * 2);
         $y = 18;
 
-        $y = $this->dibujarTexto($lienzo, 'LAN IMPORT - EXPORT S.A.', $y, 18, $negro, self::FONT_REGULAR, $anchoMax);
-        $y = $this->dibujarTexto($lienzo, 'CODIGO DE CARGA (TRACKING)', $y + 4, 15, $negro, self::FONT_REGULAR, $anchoMax);
+        $y = $this->dibujarTexto($lienzo, 'LAN IMPORT - EXPORT S.A.', $y, 18, $negro, false, $anchoMax);
+        $y = $this->dibujarTexto($lienzo, 'CODIGO DE CARGA (TRACKING)', $y + 4, 15, $negro, false, $anchoMax);
         $y += 14;
 
         $generator = new BarcodeGeneratorPNG();
@@ -80,14 +79,14 @@ final class PicqerBarcodeGeneratorService implements BarcodeGeneratorInterface
             $y += $altoFinal + 10;
         }
 
-        $this->dibujarTexto($lienzo, $numero, $y, 24, $negro, self::FONT_BOLD, $anchoMax);
+        $this->dibujarTexto($lienzo, $numero, $y, 24, $negro, true, $anchoMax);
 
         return $lienzo;
     }
 
-    private function dibujarTexto($lienzo, string $texto, int $yTop, int $tamano, int $color, string $fontPathPreferida, int $anchoMax): int
+    private function dibujarTexto($lienzo, string $texto, int $yTop, int $tamano, int $color, bool $negrita, int $anchoMax): int
     {
-        $fuente = is_file($fontPathPreferida) ? $fontPathPreferida : null;
+        $fuente = FuenteTtf::resolver($negrita);
 
         if ($fuente === null) {
             $fuenteGd = min(5, max(1, (int) round($tamano / 6)));

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Courier\Lpn\Infrastructure\Barcode;
 
 use Courier\Lpn\Domain\LpnBarcodeGeneratorInterface;
+use Courier\Shared\Infrastructure\FuenteTtf;
 use Picqer\Barcode\BarcodeGeneratorPNG;
 use RuntimeException;
 
@@ -16,14 +17,6 @@ final class LpnBarcodeGeneratorService implements LpnBarcodeGeneratorInterface
     private const ANCHO_PX = 800;
     private const ALTO_PX = 600;
     private const MARGEN = 30;
-
-    private const FONTS_BOLD = [
-        'C:\\Windows\\Fonts\\arialbd.ttf',
-    ];
-
-    private const FONTS_REGULAR = [
-        'C:\\Windows\\Fonts\\arial.ttf',
-    ];
 
     public function __construct(private readonly string $publicPath)
     {
@@ -131,7 +124,7 @@ final class LpnBarcodeGeneratorService implements LpnBarcodeGeneratorInterface
      */
     private function dibujarBloqueAjustado($lienzo, array $lineas, int $yInicio, int $yFin, int $anchoMax, int $color): void
     {
-        $fuentes = [$this->resolverFuente(true), $this->resolverFuente(false)];
+        $fuentes = [FuenteTtf::resolver(true), FuenteTtf::resolver(false)];
 
         if (in_array(null, $fuentes, true)) {
             $y = $yInicio;
@@ -146,6 +139,7 @@ final class LpnBarcodeGeneratorService implements LpnBarcodeGeneratorInterface
         $separacion = 0.18;
         $base = 160.0;
         $medidas = [];
+        $altoTotal = 0;
 
         for ($escala = 1.0; $escala >= 0.05; $escala -= 0.02) {
             $medidas = [];
@@ -211,7 +205,7 @@ final class LpnBarcodeGeneratorService implements LpnBarcodeGeneratorInterface
         int $anchoMax,
         int $tamanoMin,
     ): int {
-        $fuente = $this->resolverFuente($negrita);
+        $fuente = FuenteTtf::resolver($negrita);
 
         if ($fuente === null) {
             return $this->dibujarTextoFallback($lienzo, $texto, $yTop, $tamano, $color, $negrita);
@@ -252,25 +246,6 @@ final class LpnBarcodeGeneratorService implements LpnBarcodeGeneratorInterface
         }
 
         return $yTop + imagefontheight($fuenteGd) + 8;
-    }
-
-    private function resolverFuente(bool $negrita): ?string
-    {
-        static $cache = [];
-
-        if (isset($cache[(int) $negrita])) {
-            return $cache[(int) $negrita] ?: null;
-        }
-
-        foreach ($negrita ? self::FONTS_BOLD : self::FONTS_REGULAR as $candidato) {
-            if (is_file($candidato)) {
-                return $cache[(int) $negrita] = $candidato;
-            }
-        }
-
-        $cache[(int) $negrita] = '';
-
-        return null;
     }
 
     /** Dibuja el codigo de barras y su texto al pie de la etiqueta; devuelve el y superior de las barras. */

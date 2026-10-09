@@ -1,0 +1,3 @@
+Fuentes para las etiquetas LPN (opcional).
+Copie aqui bold.ttf y regular.ttf para usar una fuente propia;
+si no existen se usa Arial (Windows) o DejaVu/Liberation (Linux).
