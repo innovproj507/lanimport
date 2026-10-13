@@ -27,12 +27,13 @@ $routes->get('/dashboard', 'DashboardController::index', ['filter' => 'auth']);
 // Portal de cliente — requiere sesion + rol cliente
 $routes->get('/portal', 'PortalController::index', ['filter' => ['auth', 'role:cliente']]);
 
-// Tracking — requiere sesion (cualquier rol, salvo recepcion)
-$routes->get('/tracking', 'TrackingController::showLookupForm', ['filter' => $sinRecepcion]);
-$routes->post('/tracking/buscar', 'TrackingController::lookup', ['filter' => $sinRecepcion]);
+// Tracking — requiere sesion (cualquier rol, salvo recepcion y bodega)
+$rastreoFilter = ['auth', 'role:cliente,aduanero,operaciones,gerente,admin'];
+$routes->get('/tracking', 'TrackingController::showLookupForm', ['filter' => $rastreoFilter]);
+$routes->post('/tracking/buscar', 'TrackingController::lookup', ['filter' => $rastreoFilter]);
 
-// Paises — requiere sesion + rol gerente/admin (igual que $soloGerente en WebRoutes.php)
-$routes->group('paises', ['filter' => ['auth', 'role:gerente,admin']], static function ($routes) {
+// Paises — solo Owner (rol admin): es parte de Configuracion
+$routes->group('paises', ['filter' => ['auth', 'role:admin']], static function ($routes) {
     $routes->get('/', 'PaisController::index');
     $routes->get('buscar', 'PaisController::buscar');
     $routes->get('nuevo', 'PaisController::showCreateForm');
@@ -105,7 +106,7 @@ $routes->post('cargas/(:segment)/editar', 'CargaController::update/$1', ['filter
 $routes->post('cargas/(:segment)/reenviar-correo', 'CargaController::reenviarCorreo/$1', ['filter' => ['auth', 'role:operaciones,gerente,admin']]);
 $routes->post('cargas/(:segment)/lpns/generar', 'CargaController::generarLpns/$1', ['filter' => $bodegaFilter]);
 $routes->post('cargas/(:segment)/lpns/eliminar', 'CargaController::eliminarLpns/$1', ['filter' => ['auth', 'role:gerente,admin']]);
-$routes->post('lpn/plantilla-etiqueta', 'LpnController::guardarPlantillaEtiqueta', ['filter' => ['auth', 'role:gerente,admin']]);
+$routes->post('lpn/plantilla-etiqueta', 'LpnController::guardarPlantillaEtiqueta', ['filter' => ['auth', 'role:admin']]);
 // Actas de recepcion: las ve el personal interno; las llenan bodega/admin (con o sin carga
 // registrada) y las corrigen bodega/gerente/admin (la regla fina esta en ActaRecepcion).
 $recepcionFilter = ['auth', 'role:recepcion,operaciones,bodega,gerente,admin'];
@@ -140,11 +141,11 @@ $routes->get('reempaques/(:segment)', 'ReempaqueController::show/$1', ['filter' 
 $routes->post('reempaques/(:segment)/completar', 'ReempaqueController::completar/$1', ['filter' => $bodegaFilter]);
 $routes->post('reempaques/(:segment)/cancelar', 'ReempaqueController::cancelar/$1', ['filter' => $bodegaFilter]);
 
-// Impresoras — requiere sesion + rol operaciones/bodega/gerente/admin
-$routes->get('impresoras', 'ImpresoraController::index', ['filter' => $bodegaFilter]);
+// Impresoras — trafico/gerencia/owner (bodega no configura impresoras)
+$routes->get('impresoras', 'ImpresoraController::index', ['filter' => ['auth', 'role:operaciones,gerente,admin']]);
 
-// Usuarios — requiere sesion + rol gerente/admin (igual que $soloGerente en WebRoutes.php)
-$routes->group('usuarios', ['filter' => ['auth', 'role:gerente,admin']], static function ($routes) {
+// Usuarios — solo Owner (rol admin): es parte de Configuracion
+$routes->group('usuarios', ['filter' => ['auth', 'role:admin']], static function ($routes) {
     $routes->get('/', 'UsuarioController::index');
     $routes->get('buscar', 'UsuarioController::buscar');
     $routes->get('nuevo', 'UsuarioController::showCreateForm');
@@ -155,9 +156,9 @@ $routes->group('usuarios', ['filter' => ['auth', 'role:gerente,admin']], static 
     $routes->post('(:segment)/desactivar', 'UsuarioController::desactivar/$1');
 });
 
-// Configuracion del sistema — requiere sesion + rol gerente/admin (igual que Usuarios/Paises).
+// Configuracion del sistema — solo Owner (rol admin).
 // Impresoras queda fuera del grupo: es por estacion y la usa tambien bodega.
-$routes->group('configuracion', ['filter' => ['auth', 'role:gerente,admin']], static function ($routes) {
+$routes->group('configuracion', ['filter' => ['auth', 'role:admin']], static function ($routes) {
     $routes->get('/', 'ConfiguracionController::index');
     $routes->get('correo', 'ConfiguracionController::showCorreo');
     $routes->post('correo', 'ConfiguracionController::guardarCorreo');
@@ -169,8 +170,8 @@ $routes->group('configuracion', ['filter' => ['auth', 'role:gerente,admin']], st
     $routes->get('etiqueta-lpn', 'ConfiguracionController::showEtiquetaLpn');
 });
 
-// Reportes —requiere sesion + rol operaciones/gerente/admin (igual que $gestionRoles en WebRoutes.php)
-$routes->get('reportes', 'ReporteController::index', ['filter' => ['auth', 'role:operaciones,gerente,admin']]);
+// Reportes — gerencia y owner (trafico no)
+$routes->get('reportes', 'ReporteController::index', ['filter' => ['auth', 'role:gerente,admin']]);
 
 // API (JWT, sin sesion de navegador) — igual que interfaces/Api/Router/ApiRoutes.php
 $routes->group('api/v1', static function ($routes) {

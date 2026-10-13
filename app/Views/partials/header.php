@@ -10,11 +10,16 @@ $rolActual = $_SESSION['usuario_rol'] ?? null;
 $nombreActual = $_SESSION['usuario_nombre'] ?? null;
 $puedeIngresar = in_array($rolActual, ['operaciones', 'bodega', 'gerente', 'admin'], true);
 $puedeGestionar = in_array($rolActual, ['operaciones', 'gerente', 'admin'], true);
-$esGerente = in_array($rolActual, ['gerente', 'admin'], true);
 $esAdminOGerente = in_array($rolActual, ['gerente', 'admin'], true);
+// Configuracion (usuarios, paises, correo, empresa...) es solo del Owner (rol admin).
+$esOwner = $rolActual === 'admin';
+$puedeVerReportes = in_array($rolActual, ['gerente', 'admin'], true);
+// Bodega solo opera carga (ingreso, recepcion, inventario, salidas, reempaque): sin dashboard ni rastreo.
+$esBodega = $rolActual === 'bodega';
 // El rol recepcion solo ve Recepcion de Carga (sin dashboard, rastreo ni buscador).
 $esRecepcion = $rolActual === 'recepcion';
-$inicio = $esRecepcion ? '/recepciones' : '/dashboard';
+$inicio = match (true) { $esRecepcion => '/recepciones', $esBodega => '/cargas/ingreso', default => '/dashboard' };
+$rolEtiqueta = \Courier\Auth\Domain\Rol::tryFrom((string) $rolActual)?->label() ?? (string) $rolActual;
 
 $pageTitle = $pageTitle ?? 'Courier';
 $pageSubtitle = $pageSubtitle ?? '';
@@ -64,9 +69,11 @@ require_once __DIR__ . '/view_helpers.php';
                 </div>
             </div>
             <?php else: ?>
+            <?php if (!$esBodega): ?>
             <div class="space-y-1">
                 <?= nav_item('/dashboard', 'home', 'Dashboard', $currentPath, false, 'text-sky-400') ?>
             </div>
+            <?php endif; ?>
 
             <div>
                 <p class="px-3 mb-2 text-[11px] font-semibold text-white/40 uppercase tracking-wider">Gestion de Carga</p>
@@ -78,7 +85,9 @@ require_once __DIR__ . '/view_helpers.php';
                         <?= nav_item('/salidas/historial', 'truck', 'Salidas', $currentPath, false, 'text-orange-400') ?>
                         <?= nav_item('/reempaques', 'box', 'Reempaque', $currentPath, false, 'text-violet-400') ?>
                     <?php endif; ?>
-                    <?= nav_item('/tracking', 'search', 'Rastreo', $currentPath, false, 'text-cyan-400') ?>
+                    <?php if (!$esBodega): ?>
+                        <?= nav_item('/tracking', 'search', 'Rastreo', $currentPath, false, 'text-cyan-400') ?>
+                    <?php endif; ?>
                 </div>
             </div>
 
@@ -91,16 +100,18 @@ require_once __DIR__ . '/view_helpers.php';
                     <?= nav_item('/proveedores', 'truck', 'Proveedores', $currentPath, false, 'text-lime-400') ?>
                     <?= nav_item('/ubicaciones', 'box', 'Ubicaciones', $currentPath, false, 'text-teal-400') ?>
                     <?= nav_item('/facturas', 'receipt', 'Facturas', $currentPath, true) ?>
-                    <?= nav_item('/reportes', 'chart', 'Reportes', $currentPath, false, 'text-rose-400') ?>
+                    <?php if ($puedeVerReportes): ?>
+                        <?= nav_item('/reportes', 'chart', 'Reportes', $currentPath, false, 'text-rose-400') ?>
+                    <?php endif; ?>
                 </div>
             </div>
             <?php endif; ?>
 
-            <?php if ($puedeIngresar): ?>
+            <?php if ($puedeGestionar): ?>
             <div>
                 <p class="px-3 mb-2 text-[11px] font-semibold text-white/40 uppercase tracking-wider">Configuracion</p>
                 <div class="space-y-1">
-                    <?php if ($esGerente): ?>
+                    <?php if ($esOwner): ?>
                         <?php
                         // Usuarios, Paises, Impresoras y los ajustes se abren desde las tarjetas de /configuracion.
                         $enConfiguracion = (bool) preg_match('#^/(configuracion|usuarios|paises|impresoras)(/|$)#', $currentPath);
@@ -127,8 +138,8 @@ require_once __DIR__ . '/view_helpers.php';
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" /></svg>
             </button>
 
-            <?php if ($esRecepcion): ?>
-                <a href="/recepciones" class="text-white font-semibold truncate lg:hidden">LAN Import</a>
+            <?php if ($esRecepcion || $esBodega): ?>
+                <a href="<?= $inicio ?>" class="text-white font-semibold truncate lg:hidden">LAN Import</a>
             <?php else: ?>
             <form method="post" action="/tracking/buscar" class="hidden md:flex flex-1 max-w-md items-center bg-white rounded-full pl-4 pr-1.5 py-1 shadow-inner">
                 <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
@@ -168,7 +179,7 @@ require_once __DIR__ . '/view_helpers.php';
                     </div>
                 </div>
 
-                <?php if ($esGerente): ?>
+                <?php if ($esOwner): ?>
                     <a href="/configuracion" title="Configuracion"
                        class="w-10 h-10 rounded-lg flex items-center justify-center text-white/80 hover:text-white hover:bg-white/10 transition">
                         <?= icon_small('cog', 'w-6 h-6') ?>
@@ -188,16 +199,16 @@ require_once __DIR__ . '/view_helpers.php';
                             </span>
                             <span class="hidden sm:block text-left text-sm leading-tight">
                                 <span class="block font-medium text-white"><?= htmlspecialchars($nombreActual) ?></span>
-                                <span class="block text-amber-300 text-xs"><?= htmlspecialchars(ucfirst((string) $rolActual)) ?></span>
+                                <span class="block text-amber-300 text-xs"><?= htmlspecialchars($rolEtiqueta) ?></span>
                             </span>
                             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="hidden sm:block w-4 h-4 text-white/70"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" /></svg>
                         </button>
                         <div data-dropdown-menu class="hidden absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-xl border border-slate-200 z-50 overflow-hidden">
                             <div class="px-4 py-3 border-b border-slate-100">
                                 <p class="text-sm font-semibold text-black"><?= htmlspecialchars($nombreActual) ?></p>
-                                <p class="text-xs text-zinc-500">Rol: <?= htmlspecialchars(ucfirst((string) $rolActual)) ?></p>
+                                <p class="text-xs text-zinc-500">Rol: <?= htmlspecialchars($rolEtiqueta) ?></p>
                             </div>
-                            <?php if ($esGerente): ?>
+                            <?php if ($esOwner): ?>
                                 <a href="/configuracion" class="flex items-center gap-2 px-4 py-2.5 text-sm text-zinc-700 hover:bg-slate-50">
                                     <?= icon_small('cog', 'w-4 h-4 text-zinc-500') ?> Configuracion
                                 </a>

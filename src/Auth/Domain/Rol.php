@@ -15,6 +15,20 @@ enum Rol: string
     /** Solo Recepcion de Carga (llenar, corregir e imprimir actas de recepcion). */
     case RECEPCION = 'recepcion';
 
+    /** Nombre que ve el usuario (el valor interno se conserva por compatibilidad con la BD y la API). */
+    public function label(): string
+    {
+        return match ($this) {
+            self::CLIENTE => 'Cliente',
+            self::ADUANERO => 'Aduanero',
+            self::OPERACIONES => 'Trafico',
+            self::BODEGA => 'Bodega',
+            self::GERENTE => 'Gerencia',
+            self::ADMIN => 'Owner',
+            self::RECEPCION => 'Recepcion',
+        };
+    }
+
     /** @return array<int, self> */
     public static function all(): array
     {

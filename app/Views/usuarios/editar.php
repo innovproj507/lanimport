@@ -32,7 +32,7 @@ require __DIR__ . '/../partials/header.php';
         <select name="rol" required class="w-full rounded-lg border border-zinc-300 bg-white text-black px-3 py-2 focus:ring-2 focus:ring-amber-400 focus:outline-none">
             <?php foreach (\Courier\Auth\Domain\Rol::all() as $rolOpcion): ?>
                 <option value="<?= htmlspecialchars($rolOpcion->value) ?>" <?= $rolOpcion === $usuario->rol() ? 'selected' : '' ?>>
-                    <?= htmlspecialchars(ucfirst($rolOpcion->value)) ?>
+                    <?= htmlspecialchars($rolOpcion->label()) ?>
                 </option>
             <?php endforeach; ?>
         </select>

@@ -34,7 +34,7 @@ require __DIR__ . '/../partials/header.php';
         <span class="w-8 h-8 rounded-full text-white flex items-center justify-center shrink-0 <?= $estiloAviso[2] ?>"><?= icon_small($estiloAviso[1]) ?></span>
         <div class="flex-1 text-sm pt-1.5">
             <?= htmlspecialchars($aviso['texto']) ?>
-            <?php if ($aviso['tipo'] === 'error' && $esAdminOGerente): ?>
+            <?php if ($aviso['tipo'] === 'error' && $esOwner): ?>
                 <a href="/configuracion/correo" class="underline font-medium ml-1">Revisar configuracion de correo</a>
             <?php endif; ?>
         </div>
@@ -135,7 +135,7 @@ require __DIR__ . '/../partials/header.php';
         </ol>
     </div>
 
-    <?php if ($esAdminOGerente): ?>
+    <?php if ($esOwner): ?>
     <div class="bg-white rounded-xl shadow p-6">
         <?php $volver = "/cargas/" . $view->cargaId; require __DIR__ . "/../lpn/_plantilla_etiqueta.php"; ?>
     </div>

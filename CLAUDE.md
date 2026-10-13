@@ -43,7 +43,14 @@ This is the single composition root, a copy of `../lan/bootstrap/app.php`. It bu
 
 ### Web layer (session-based)
 
-- Routes are explicit in `app/Config/Routes.php`, with no auto-routing. Access control is declared per route through filters: `auth` (session required) and `role:a,b,...`. The role groups are `gerente,admin` (management), `operaciones,gerente,admin`, and the "bodega" group `operaciones,bodega,gerente,admin`. Filter classes are in `app/Filters`, and their aliases are in `app/Config/Filters.php`.
+- Routes are explicit in `app/Config/Routes.php`, with no auto-routing. Access control is declared per route through filters: `auth` (session required) and `role:a,b,...`. Filter classes are in `app/Filters`, and their aliases are in `app/Config/Filters.php`.
+- Roles have internal values plus user-facing names (`Rol::label()`): `admin` = Owner, `gerente` = Gerencia, `operaciones` = Trafico, `bodega`, `recepcion`, `aduanero`, `cliente`.
+  - Owner is the only role with Configuracion (usuarios, paises, correo, empresa, notificaciones, etiqueta LPN).
+  - Gerencia = everything else, plus Reportes, deleting LPNs and correcting actas.
+  - Trafico = all operations, without Reportes or those two actions.
+  - Bodega = only ingreso, recepcion, inventario, salidas and reempaque; it has no dashboard or rastreo, and `DashboardController` redirects it to `/cargas/ingreso`.
+  - Recepcion = only actas de recepcion.
+  - Menu visibility in `partials/header.php` must match the route filters.
 - Auth state uses **native PHP `$_SESSION`** through `Courier\Auth\Infrastructure\Security\SessionManager` (`usuario_id`, `usuario_rol`), not CI's session service. CSRF uses the custom `App\Libraries\Csrf`: forms post a hidden `_csrf` field, and controllers call `Csrf::verify($this->request->getPost('_csrf'))`. CI's global `csrf` filter is off.
 - Views are plain PHP templates. They `require __DIR__ . '/../partials/header.php'` and `footer.php` (or `header_cliente.php` for the client portal), and use helpers from `partials/view_helpers.php` (`nav_item`, `badge`, `icon_button`, ...).
 - List and search pattern used by the CRUD screens (paises, clientes, aduaneros, proveedores, ubicaciones, usuarios, cargas):

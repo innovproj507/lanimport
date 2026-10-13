@@ -2,8 +2,8 @@
 require_once __DIR__ . '/../partials/view_helpers.php';
 $pageTitle = 'Impresoras';
 $pageSubtitle = 'Configura que impresora usa este equipo para etiquetas';
-// Solo gerente/admin tienen la pagina de Configuracion a la que volver.
-$backHref = in_array($_SESSION['usuario_rol'] ?? null, ['gerente', 'admin'], true) ? '/configuracion' : null;
+// Solo el Owner (admin) tiene la pagina de Configuracion a la que volver.
+$backHref = ($_SESSION['usuario_rol'] ?? null) === 'admin' ? '/configuracion' : null;
 require __DIR__ . '/../partials/header.php';
 ?>
 

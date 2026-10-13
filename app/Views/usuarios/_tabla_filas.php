@@ -11,7 +11,7 @@ if (empty($usuarios)):
     <tr class="border-b border-slate-200">
         <td class="py-2 pr-4 font-medium text-black"><?= htmlspecialchars($usuario->nombre()) ?></td>
         <td class="py-2 pr-4 text-zinc-700"><?= htmlspecialchars((string) $usuario->email()) ?></td>
-        <td class="py-2 pr-4 text-zinc-700"><?= htmlspecialchars(ucfirst($usuario->rol()->value)) ?></td>
+        <td class="py-2 pr-4 text-zinc-700"><?= htmlspecialchars($usuario->rol()->label()) ?></td>
         <td class="py-2 pr-4"><?= $usuario->activo() ? badge('Activo', 'emerald') : badge('Inactivo', 'red') ?></td>
         <td class="py-2 text-right space-x-1 whitespace-nowrap">
             <?= icon_button('/usuarios/' . $usuario->id() . '/editar', 'pencil', 'Editar', 'violet') ?>
