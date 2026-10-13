@@ -100,6 +100,12 @@ $routes->get('cargas', 'CargaController::redirectToIngreso', ['filter' => $bodeg
 $routes->get('cargas/ingreso', 'CargaController::showIngresoForm', ['filter' => $bodegaFilter]);
 $routes->post('cargas', 'CargaController::store', ['filter' => $bodegaFilter]);
 $routes->get('cargas/buscar', 'CargaController::buscar', ['filter' => $bodegaFilter]);
+// Carga masiva por Excel/CSV — solo gerencia y owner. Va antes de cargas/(:segment).
+$masivaFilter = ['auth', 'role:gerente,admin'];
+$routes->get('cargas/masiva', 'CargaMasivaController::index', ['filter' => $masivaFilter]);
+$routes->get('cargas/masiva/plantilla', 'CargaMasivaController::plantilla', ['filter' => $masivaFilter]);
+$routes->post('cargas/masiva/previsualizar', 'CargaMasivaController::previsualizar', ['filter' => $masivaFilter]);
+$routes->post('cargas/masiva/confirmar', 'CargaMasivaController::confirmar', ['filter' => $masivaFilter]);
 $routes->get('cargas/(:segment)', 'CargaController::showDetalle/$1', ['filter' => $sinRecepcion]);
 $routes->get('cargas/(:segment)/editar', 'CargaController::showEditForm/$1', ['filter' => $bodegaFilter]);
 $routes->post('cargas/(:segment)/editar', 'CargaController::update/$1', ['filter' => $bodegaFilter]);
@@ -193,6 +199,13 @@ $routes->group('api/v1', static function ($routes) {
     ]);
     $routes->get('tracking/(:segment)', 'Api\TrackingApiController::byNumero/$1', [
         'filter' => ['ratelimit:tracking_numero', 'jwt'],
+    ]);
+
+    // Rastreo para la web publica (weblan): clave compartida X-Api-Key, sin sesion ni JWT.
+    // Limite alto porque todas las consultas llegan desde el servidor de la web; la web
+    // limita a su vez por visitante.
+    $routes->get('publico/rastreo/(:segment)', 'Api\RastreoPublicoApiController::show/$1', [
+        'filter' => 'ratelimit:rastreo_publico,300,60',
     ]);
 
     $routes->get('lpn/(:segment)/genealogy', 'Api\GenealogiaApiController::show/$1', [

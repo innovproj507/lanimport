@@ -20,6 +20,10 @@ final class ActaRecepcion extends AggregateRoot
 {
     public const TIPOS_MERCANCIA = ['cajas', 'saco', 'bultos'];
 
+    /** Origen: la lleno bodega al recibir, o la genero la carga masiva (mercancia ya en bodega). */
+    public const ORIGEN_MANUAL = 'manual';
+    public const ORIGEN_CARGA_MASIVA = 'carga_masiva';
+
     /** Roles que pueden llenar el acta por primera vez. */
     private const ROLES_REGISTRAR = [Rol::RECEPCION, Rol::BODEGA, Rol::ADMIN];
 
@@ -48,7 +52,60 @@ final class ActaRecepcion extends AggregateRoot
         private ?string $actualizadoPorUsuarioId,
         private readonly DateTimeImmutable $createdAt,
         private DateTimeImmutable $updatedAt,
+        private readonly string $origen = self::ORIGEN_MANUAL,
     ) {
+    }
+
+    /**
+     * Acta generada al subir cargas por Excel cuya mercancia ya estaba en bodega.
+     * No hay entrega fisica que registrar: se deja constancia de quien subio el
+     * archivo (verificador) y del total de bultos declarado.
+     */
+    public static function generarPorCargaMasiva(
+        Uuid $id,
+        string $cargaId,
+        string $clienteId,
+        ?string $marca,
+        int $totalBultos,
+        string $nombreArchivo,
+        string $usuarioId,
+    ): self {
+        $total = max(1, $totalBultos);
+        $ahora = new DateTimeImmutable();
+
+        return new self(
+            $id,
+            null,
+            $cargaId,
+            $clienteId,
+            $marca,
+            null,
+            null,
+            null,
+            $total,
+            0,
+            $total,
+            [],
+            "Generada automaticamente por carga masiva (archivo {$nombreArchivo}). La mercancia ya se encontraba en bodega.",
+            'Carga masiva',
+            'N/A',
+            $usuarioId,
+            $ahora,
+            null,
+            $ahora,
+            $ahora,
+            self::ORIGEN_CARGA_MASIVA,
+        );
+    }
+
+    public function origen(): string
+    {
+        return $this->origen;
+    }
+
+    public function esCargaMasiva(): bool
+    {
+        return $this->origen === self::ORIGEN_CARGA_MASIVA;
     }
 
     public static function puedeRegistrar(?Rol $rol): bool

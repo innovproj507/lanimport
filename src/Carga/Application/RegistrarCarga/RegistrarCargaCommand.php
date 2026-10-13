@@ -29,6 +29,8 @@ final class RegistrarCargaCommand implements CommandInterface
         public readonly ?string $notas = null,
         public readonly ?string $facturaProveedorNombre = null,
         public readonly ?string $facturaProveedorRuta = null,
+        // false en la carga masiva cuando no se quiere avisar a cada cliente por correo.
+        public readonly bool $notificarCliente = true,
     ) {
     }
 }

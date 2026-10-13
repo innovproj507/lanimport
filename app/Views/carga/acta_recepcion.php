@@ -94,9 +94,15 @@ $tipoLabels = ['cajas' => 'Cajas', 'saco' => 'Saco', 'bultos' => 'Bultos'];
     </div>
 <?php endif; ?>
 
+<?php if ($acta !== null && $acta->esCargaMasiva()): ?>
+    <div class="bg-indigo-50 border border-indigo-200 text-indigo-800 text-sm rounded-xl px-4 py-3 mb-4 max-w-4xl">
+        <strong>Generada por carga masiva.</strong> La mercancia ya estaba en bodega cuando se subio el archivo, por eso no tiene chofer, placa ni cedula de quien entrego.
+    </div>
+<?php endif; ?>
+
 <?php if ($acta !== null): ?>
     <p class="text-xs text-zinc-500 mb-4 max-w-4xl">
-        Recibida y verificada por <strong><?= htmlspecialchars($verificadoPor ?? '—') ?></strong>
+        <?= $acta->esCargaMasiva() ? 'Registrada por' : 'Recibida y verificada por' ?> <strong><?= htmlspecialchars($verificadoPor ?? '—') ?></strong>
         el <?= htmlspecialchars($acta->fechaRecepcion()->format('d/m/Y H:i')) ?>.
         <?php if ($acta->actualizadoPorUsuarioId() !== null): ?>
             Ultima correccion: <?= htmlspecialchars($actualizadoPor ?? '—') ?>, <?= htmlspecialchars($acta->updatedAt()->format('d/m/Y H:i')) ?>.

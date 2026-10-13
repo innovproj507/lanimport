@@ -86,6 +86,9 @@ $tipos = $acta->tiposMercancia();
             <?php if ($empresa->telefono): ?>TEL. <?= $e($empresa->telefono) ?><?php endif; ?>
         </p>
         <h1>ACTA DE RECEPCION DE CARGA</h1>
+        <?php if ($acta->esCargaMasiva()): ?>
+            <p style="margin-top:6px;font-size:11px;">(Generada por carga masiva: la mercancia ya se encontraba en bodega)</p>
+        <?php endif; ?>
     </div>
 
     <div class="fila">

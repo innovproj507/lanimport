@@ -64,6 +64,14 @@ This is the single composition root, a copy of `../lan/bootstrap/app.php`. It bu
 - Controllers live in `app/Controllers/Api` and extend `BaseApiController`. They return `success()`/`error()` envelopes and map exceptions to HTTP codes in `fromException()`: 422 validation, 404 not found, 409 invalid state transition, 401, 429.
 - Filters: `jwt` (`JwtAuthFilter`) verifies the bearer token and puts the claims in `Services::apiAuthContext()`; `apirole:...` checks the role; `ratelimit:key[,max,window]` applies a rate limit.
 
+### Carga masiva (Excel/CSV)
+
+- `/cargas/masiva` is restricted to gerente and admin.
+- Flow: upload, then preview, then confirm. The validated plan lives in `$_SESSION['carga_masiva']` between preview and confirm.
+- `Carga/Application/ImportarCargas/PrepararImportacionCargas` validates and groups the rows by `referencia`, without writing anything.
+- `ImportarCargasHandler` registers each carga through `RegistrarCargaHandler`, one by one, so a failure does not stop the rest. It auto-creates missing proveedores (`PROV-####`), can skip the client email (`RegistrarCargaCommand::$notificarCliente`), and optionally generates the acta with `ActaRecepcion::generarPorCargaMasiva` (`origen = carga_masiva`).
+- `.xlsx` files are read and written with ZipArchive and XML (`Carga/Infrastructure/Importacion`); there is no PhpSpreadsheet dependency.
+
 ### Label printing
 
 Barcode and label images are generated server-side into `public/` (`PicqerBarcodeGeneratorService`, `LpnBarcodeGeneratorService`). Uploaded documents are also stored under `public/uploads`. Physical printing goes through a separate local "Agente de Impresion LAN" at `http://localhost:9898`, which `public/assets/js/local-print.js` calls (source in `../lan/herramientas/`).

@@ -18,6 +18,10 @@ $pageTitle = 'Ingreso de Carga';
 $pageSubtitle = 'Cargas ingresadas al sistema';
 $headerActions = '<button type="button" id="btn-nuevo-ingreso" class="inline-flex items-center gap-2 bg-amber-500 text-black rounded-lg px-4 py-2 text-sm font-medium hover:bg-amber-400 transition">'
     . icon_small('plus') . '<span>Nuevo Ingreso</span></button>';
+// Carga masiva por Excel: solo gerencia y owner (igual que el filtro de la ruta).
+if (in_array($_SESSION['usuario_rol'] ?? null, ['gerente', 'admin'], true)) {
+    $headerActions = header_button('/cargas/masiva', 'receipt', 'Carga masiva', 'indigo') . $headerActions;
+}
 require __DIR__ . '/../partials/header.php';
 ?>
 

@@ -98,7 +98,7 @@ final class RegistrarCargaHandler implements CommandHandlerInterface
             return $etiquetaUrl;
         });
 
-        $notificacion = $this->notificarCliente($carga, $detalle);
+        $notificacion = $command->notificarCliente ? $this->notificarCliente($carga, $detalle) : null;
 
         return new RegistrarCargaResult(
             $carga->id(),

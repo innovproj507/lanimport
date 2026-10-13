@@ -43,6 +43,10 @@ use Courier\Carga\Application\BuscarCargas\BuscarCargasHandler;
 use Courier\Carga\Application\ConsultarTrackingPorContenedor\ConsultarTrackingPorContenedorHandler;
 use Courier\Carga\Application\ConsultarTrackingPorNumero\ConsultarTrackingPorNumeroHandler;
 use Courier\Carga\Application\GuardarActaRecepcion\GuardarActaRecepcionHandler;
+use Courier\Carga\Application\ImportarCargas\ImportarCargasHandler;
+use Courier\Carga\Application\ImportarCargas\PrepararImportacionCargas;
+use Courier\Carga\Infrastructure\Importacion\EscritorXlsx;
+use Courier\Carga\Infrastructure\Importacion\LectorHojaCalculo;
 use Courier\Carga\Application\ListarCargas\ListarCargasHandler;
 use Courier\Carga\Application\VincularActaRecepcion\VincularActaRecepcionHandler;
 use Courier\Carga\Application\ListarCargasPorCliente\ListarCargasPorClienteHandler;
@@ -403,6 +407,20 @@ $container->set(GuardarActaRecepcionHandler::class, fn (Container $c) => new Gua
 ));
 $container->set(VincularActaRecepcionHandler::class, fn (Container $c) => new VincularActaRecepcionHandler(
     $c->get(CargaRepositoryInterface::class),
+    $c->get(ActaRecepcionRepositoryInterface::class),
+));
+
+// Carga masiva (Excel/CSV)
+$container->set(LectorHojaCalculo::class, fn () => new LectorHojaCalculo());
+$container->set(EscritorXlsx::class, fn () => new EscritorXlsx());
+$container->set(PrepararImportacionCargas::class, fn (Container $c) => new PrepararImportacionCargas(
+    $c->get(ClienteRepositoryInterface::class),
+    $c->get(ProveedorRepositoryInterface::class),
+    $c->get(AduaneroRepositoryInterface::class),
+));
+$container->set(ImportarCargasHandler::class, fn (Container $c) => new ImportarCargasHandler(
+    $c->get(RegistrarCargaHandler::class),
+    $c->get(ProveedorRepositoryInterface::class),
     $c->get(ActaRecepcionRepositoryInterface::class),
 ));
 

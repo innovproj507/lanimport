@@ -20,11 +20,11 @@ final class PdoActaRecepcionRepository implements ActaRecepcionRepositoryInterfa
     {
         $stmt = $this->connection->prepare(
             'INSERT INTO cargas_actas_recepcion (
-                id, carga_id, cliente_id, marca, empresa_transporte, chofer_nombre, placa, cantidad_bultos, cantidad_rollos,
+                id, carga_id, cliente_id, marca, origen, empresa_transporte, chofer_nombre, placa, cantidad_bultos, cantidad_rollos,
                 total_recibido, tipos_mercancia, descripcion_mercancia, entregado_por, entregado_por_cedula,
                 verificado_por_usuario_id, fecha_recepcion, actualizado_por_usuario_id, created_at, updated_at
              ) VALUES (
-                :id, :carga_id, :cliente_id, :marca, :empresa_transporte, :chofer_nombre, :placa, :cantidad_bultos, :cantidad_rollos,
+                :id, :carga_id, :cliente_id, :marca, :origen, :empresa_transporte, :chofer_nombre, :placa, :cantidad_bultos, :cantidad_rollos,
                 :total_recibido, :tipos_mercancia, :descripcion_mercancia, :entregado_por, :entregado_por_cedula,
                 :verificado_por_usuario_id, :fecha_recepcion, :actualizado_por_usuario_id, :created_at, :updated_at
              )
@@ -53,6 +53,7 @@ final class PdoActaRecepcionRepository implements ActaRecepcionRepositoryInterfa
             ':carga_id' => $acta->cargaId(),
             ':cliente_id' => $acta->clienteId(),
             ':marca' => $acta->marca(),
+            ':origen' => $acta->origen(),
             ':empresa_transporte' => $acta->empresaTransporte(),
             ':chofer_nombre' => $acta->choferNombre(),
             ':placa' => $acta->placa(),
@@ -197,6 +198,7 @@ final class PdoActaRecepcionRepository implements ActaRecepcionRepositoryInterfa
             $row['actualizado_por_usuario_id'] !== null ? (string) $row['actualizado_por_usuario_id'] : null,
             new DateTimeImmutable((string) $row['created_at']),
             new DateTimeImmutable((string) $row['updated_at']),
+            (string) ($row['origen'] ?? ActaRecepcion::ORIGEN_MANUAL),
         );
     }
 }
