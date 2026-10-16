@@ -1,3 +1,4 @@
-Fuentes para las etiquetas LPN (opcional).
-Copie aqui bold.ttf y regular.ttf para usar una fuente propia;
-si no existen se usa Arial (Windows) o DejaVu/Liberation (Linux).
+Fuentes para las etiquetas (cargas y LPN): bold.ttf y regular.ttf = DejaVu Sans
+(licencia libre, https://dejavu-fonts.github.io/License.html).
+Van en el proyecto porque en el hosting (Plesk) PHP no puede leer /usr/share/fonts
+(open_basedir) y sin fuente TTF las etiquetas salen con la fuente basica, diminuta.

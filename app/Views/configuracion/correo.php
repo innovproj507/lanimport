@@ -53,7 +53,7 @@ $inputClass = 'w-full rounded-lg border border-zinc-300 bg-white text-black px-3
     <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
         <div>
             <label class="block text-sm font-medium text-zinc-700 mb-1">Usuario</label>
-            <input type="text" name="usuario" placeholder="Vacio si el servidor no pide autenticacion" value="<?= htmlspecialchars($valor('usuario', $smtp->usuario)) ?>" class="<?= $inputClass ?>">
+            <input type="text" name="usuario" autocomplete="off" data-lpignore="true" placeholder="Vacio si el servidor no pide autenticacion" value="<?= htmlspecialchars($valor('usuario', $smtp->usuario)) ?>" class="<?= $inputClass ?>">
         </div>
         <div>
             <label class="block text-sm font-medium text-zinc-700 mb-1">Contrasena</label>
@@ -71,11 +71,11 @@ $inputClass = 'w-full rounded-lg border border-zinc-300 bg-white text-black px-3
     <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
         <div>
             <label class="block text-sm font-medium text-zinc-700 mb-1">Correo del remitente</label>
-            <input type="email" name="remitente_email" required value="<?= htmlspecialchars($valor('remitente_email', $smtp->remitenteEmail)) ?>" class="<?= $inputClass ?>">
+            <input type="email" name="remitente_email" autocomplete="off" data-lpignore="true" required value="<?= htmlspecialchars($valor('remitente_email', $smtp->remitenteEmail)) ?>" class="<?= $inputClass ?>">
         </div>
         <div>
             <label class="block text-sm font-medium text-zinc-700 mb-1">Nombre del remitente</label>
-            <input type="text" name="remitente_nombre" required value="<?= htmlspecialchars($valor('remitente_nombre', $smtp->remitenteNombre)) ?>" class="<?= $inputClass ?>">
+            <input type="text" name="remitente_nombre" autocomplete="organization" data-lpignore="true" required value="<?= htmlspecialchars($valor('remitente_nombre', $smtp->remitenteNombre)) ?>" class="<?= $inputClass ?>">
         </div>
     </div>
 
