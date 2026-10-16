@@ -7,11 +7,22 @@ $backHref = ($_SESSION['usuario_rol'] ?? null) === 'admin' ? '/configuracion' : 
 require __DIR__ . '/../partials/header.php';
 ?>
 
-<div id="agente-sin-conexion" class="hidden bg-amber-500/10 text-amber-700 text-sm rounded-lg px-4 py-3 mb-4 border border-amber-500/30 max-w-2xl">
-    No se detecto el <strong>Agente de Impresion LAN</strong> corriendo en este equipo. Es un servicio propio
-    del sistema (sin programas de terceros) que permite imprimir directamente a las impresoras de este equipo
-    desde el navegador. Revisa <code>herramientas/agente-impresion/LEEME.md</code> en el repositorio para instalarlo,
-    o pide al equipo de sistemas que lo instale en esta estacion, luego recarga esta pagina.
+<div id="agente-sin-conexion" class="hidden bg-amber-500/10 text-amber-800 text-sm rounded-lg px-4 py-4 mb-4 border border-amber-500/30 max-w-2xl space-y-3">
+    <p>
+        No se detecto el <strong>Agente de Impresion LAN</strong> en este equipo. Es un programa pequeno del
+        sistema que conecta el navegador con las impresoras instaladas en esta computadora (Windows).
+    </p>
+    <ol class="list-decimal pl-5 space-y-1">
+        <li>Descargue el agente con el boton de abajo y descomprima el archivo ZIP.</li>
+        <li>De <strong>doble clic en <code>Instalar.bat</code></strong>. Si Windows muestra "Windows protegio su PC",
+            elija <em>Mas informacion</em> &rsaquo; <em>Ejecutar de todas formas</em>. No necesita administrador.</li>
+        <li>Recargue esta pagina, elija la impresora de etiquetas y pulse <strong>Guardar</strong>.</li>
+    </ol>
+    <p class="text-xs">Si ya esta instalado y sigue sin conectar: permita al sitio el acceso a la red local (candado de la barra de direcciones &rsaquo; Configuracion del sitio).</p>
+    <a href="/descargas/AgenteImpresionLAN.zip" download
+       class="inline-flex items-center gap-2 bg-amber-500 text-black rounded-lg px-4 py-2 font-medium hover:bg-amber-400 transition">
+        <?= icon_small('printer') ?><span>Descargar agente (Windows)</span>
+    </a>
 </div>
 
 <div id="agente-error" class="hidden bg-red-500/10 text-red-600 text-sm rounded-lg px-4 py-3 mb-4 border border-red-500/30 max-w-2xl"></div>
@@ -49,6 +60,8 @@ require __DIR__ . '/../partials/header.php';
         Esta configuracion se guarda solo en este navegador/equipo. Cada estacion de trabajo debe
         configurar su propia impresora la primera vez que la use. Los documentos (facturas/reportes)
         se siguen imprimiendo con el dialogo normal del navegador, donde puedes elegir cualquier impresora.
+        Para otra computadora: <a href="/descargas/AgenteImpresionLAN.zip" download class="text-blue-700 underline">descargar el agente de impresion</a>
+        y dar doble clic en <code>Instalar.bat</code>.
     </p>
 </div>
 
