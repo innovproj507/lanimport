@@ -6,8 +6,6 @@ namespace Courier\Carga\Application\ImportarCargas;
 
 use Courier\Carga\Application\RegistrarCarga\RegistrarCargaCommand;
 use Courier\Carga\Application\RegistrarCarga\RegistrarCargaHandler;
-use Courier\Carga\Domain\ActaRecepcion;
-use Courier\Carga\Domain\ActaRecepcionRepositoryInterface;
 use Courier\Proveedor\Domain\Proveedor;
 use Courier\Proveedor\Domain\ProveedorRepositoryInterface;
 use Courier\Shared\Application\CommandHandlerInterface;
@@ -25,7 +23,6 @@ final class ImportarCargasHandler implements CommandHandlerInterface
     public function __construct(
         private readonly RegistrarCargaHandler $registrarCarga,
         private readonly ProveedorRepositoryInterface $proveedores,
-        private readonly ActaRecepcionRepositoryInterface $actas,
     ) {
     }
 
@@ -88,27 +85,12 @@ final class ImportarCargasHandler implements CommandHandlerInterface
                     $command->notificarClientes,
                 ));
 
-                $acta = null;
-                if ($command->generarActa) {
-                    $acta = ActaRecepcion::generarPorCargaMasiva(
-                        Uuid::generate(),
-                        $resultado->cargaId,
-                        $carga['clienteId'],
-                        $carga['marcas'] !== '' ? $carga['marcas'] : null,
-                        (int) round((float) $carga['bultos']),
-                        $command->nombreArchivo,
-                        $command->usuarioId,
-                    );
-                    $this->actas->save($acta);
-                }
-
                 $creadas[] = [
                     'referencia' => $carga['referencia'],
                     'cargaId' => $resultado->cargaId,
                     'tracking' => $resultado->trackingNumero,
                     'cliente' => $carga['clienteNombre'],
                     'bultos' => $carga['bultos'],
-                    'acta' => $acta !== null,
                     'correo' => $resultado->correoEstado,
                 ];
             } catch (Throwable $e) {

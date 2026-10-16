@@ -53,4 +53,22 @@ abstract class BaseController extends Controller
     {
         return Services::courierContainer();
     }
+
+    /**
+     * Mensaje de un solo uso para la siguiente pagina (patron POST/redirect/GET),
+     * guardado en la sesion nativa. Se muestra con partials/_flash.php.
+     */
+    protected function flash(string $tipo, string $texto): void
+    {
+        $_SESSION['flash'] = ['tipo' => $tipo, 'texto' => $texto];
+    }
+
+    /** @return array{tipo: string, texto: string}|null */
+    protected function tomarFlash(): ?array
+    {
+        $flash = $_SESSION['flash'] ?? null;
+        unset($_SESSION['flash']);
+
+        return $flash;
+    }
 }

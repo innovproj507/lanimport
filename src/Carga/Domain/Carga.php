@@ -6,6 +6,7 @@ namespace Courier\Carga\Domain;
 
 use Courier\Carga\Domain\ValueObject\Aduanero;
 use Courier\Carga\Domain\ValueObject\Contenedor;
+use Courier\Carga\Domain\ValueObject\DatosEntrega;
 use Courier\Carga\Domain\ValueObject\DetalleAereo;
 use Courier\Carga\Domain\ValueObject\DetalleFreight;
 use Courier\Carga\Domain\ValueObject\DetalleMaritimo;
@@ -24,6 +25,9 @@ final class Carga extends AggregateRoot
 
     /** @var array<int, LineaCarga> */
     private array $lineas = [];
+
+    /** Formulario de entrega (transporte, chofer, quien entrega); opcional. */
+    private ?DatosEntrega $datosEntrega = null;
 
     private function __construct(
         private readonly Uuid $id,
@@ -144,6 +148,17 @@ final class Carga extends AggregateRoot
     }
 
     /** @param array<int, LineaCarga> $lineas */
+    public function datosEntrega(): ?DatosEntrega
+    {
+        return $this->datosEntrega;
+    }
+
+    /** Registra o corrige los datos de entrega (null = sin datos). */
+    public function asignarDatosEntrega(?DatosEntrega $datosEntrega): void
+    {
+        $this->datosEntrega = $datosEntrega !== null && !$datosEntrega->estaVacia() ? $datosEntrega : null;
+    }
+
     public function actualizarDatos(
         string $clienteId,
         string $proveedor,

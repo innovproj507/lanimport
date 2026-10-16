@@ -19,4 +19,9 @@ interface AduaneroRepositoryInterface
     public function searchPaginado(string $term, int $page, int $perPage): array;
 
     public function existsIdentificador(string $identificador): bool;
+
+    /** @return array<string, int> donde se usa (solo lo que tiene registros), ej. ['cargas' => 3] */
+    public function referencias(string $id): array;
+
+    public function delete(string $id): void;
 }

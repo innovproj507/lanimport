@@ -7,6 +7,8 @@ namespace App\Controllers;
 use App\Libraries\Csrf;
 use CodeIgniter\HTTP\RedirectResponse;
 use CodeIgniter\HTTP\ResponseInterface;
+use Courier\Aduanero\Application\ListarAduaneros\ListarAduanerosHandler;
+use Courier\Aduanero\Application\ListarAduaneros\ListarAduanerosQuery;
 use Courier\Carga\Application\ListarCargasPorCliente\ListarCargasPorClienteHandler;
 use Courier\Carga\Application\ListarCargasPorCliente\ListarCargasPorClienteQuery;
 use Courier\Cliente\Application\ActualizarCliente\ActualizarClienteCommand;
@@ -17,6 +19,11 @@ use Courier\Cliente\Application\BuscarClientes\BuscarClientesHandler;
 use Courier\Cliente\Application\BuscarClientes\BuscarClientesQuery;
 use Courier\Cliente\Application\DesactivarCliente\DesactivarClienteCommand;
 use Courier\Cliente\Application\DesactivarCliente\DesactivarClienteHandler;
+use Courier\Cliente\Application\EliminarCliente\EliminarClienteCommand;
+use Courier\Cliente\Application\EliminarCliente\EliminarClienteHandler;
+use Courier\Cliente\Application\ReactivarCliente\ReactivarClienteCommand;
+use Courier\Cliente\Application\ReactivarCliente\ReactivarClienteHandler;
+use Courier\Shared\Domain\Exception\NotFoundException;
 use Courier\Cliente\Application\ListarClientesPendientes\ListarClientesPendientesHandler;
 use Courier\Cliente\Application\ListarClientesPendientes\ListarClientesPendientesQuery;
 use Courier\Cliente\Application\RechazarCliente\RechazarClienteCommand;
@@ -48,8 +55,10 @@ final class ClienteController extends BaseController
             'perPage' => $resultado->perPage,
             'totalPages' => $resultado->totalPages(),
             'pendientes' => $pendientes,
+            'nombresAduaneros' => $this->nombresAduaneros(),
             'paises' => $paises,
             'error' => null,
+            'flash' => $this->tomarFlash(),
         ]);
     }
 
@@ -61,7 +70,7 @@ final class ClienteController extends BaseController
 
         $resultado = $this->container()->get(BuscarClientesHandler::class)->handle(new BuscarClientesQuery($termino, $page, $perPage));
 
-        $html = view('clientes/_tabla_filas', ['clientes' => $resultado->items], ['debug' => false]);
+        $html = view('clientes/_tabla_filas', ['clientes' => $resultado->items, 'nombresAduaneros' => $this->nombresAduaneros()], ['debug' => false]);
         $paginacion = view('clientes/_paginacion', [
             'total' => $resultado->total,
             'page' => $resultado->page,
@@ -70,6 +79,24 @@ final class ClienteController extends BaseController
         ], ['debug' => false]);
 
         return $this->response->setJSON(['html' => $html, 'paginacion' => $paginacion]);
+    }
+
+    /** @return array<int, \Courier\Aduanero\Domain\Aduanero> */
+    private function aduanerosActivos(): array
+    {
+        return $this->container()->get(ListarAduanerosHandler::class)->handle(new ListarAduanerosQuery());
+    }
+
+    /** @return array<string, string> identificador => nombre, para la columna Aduanero del listado */
+    private function nombresAduaneros(): array
+    {
+        $nombres = [];
+
+        foreach ($this->aduanerosActivos() as $aduanero) {
+            $nombres[$aduanero->identificador()] = $aduanero->nombre();
+        }
+
+        return $nombres;
     }
 
     private function perPageDesdeRequest(): int
@@ -83,7 +110,7 @@ final class ClienteController extends BaseController
     {
         $paises = $this->container()->get(ListarPaisesHandler::class)->handle(new ListarPaisesQuery());
 
-        return view('clientes/nuevo', ['error' => null, 'paises' => $paises]);
+        return view('clientes/nuevo', ['aduaneros' => $this->aduanerosActivos(), 'error' => null, 'paises' => $paises]);
     }
 
     public function store(): RedirectResponse|string
@@ -91,7 +118,7 @@ final class ClienteController extends BaseController
         $paises = $this->container()->get(ListarPaisesHandler::class)->handle(new ListarPaisesQuery());
 
         if (!Csrf::verify($this->request->getPost('_csrf'))) {
-            return view('clientes/nuevo', ['error' => 'Sesion expirada, por favor intente de nuevo.', 'paises' => $paises]);
+            return view('clientes/nuevo', ['aduaneros' => $this->aduanerosActivos(), 'error' => 'Sesion expirada, por favor intente de nuevo.', 'paises' => $paises]);
         }
 
         try {
@@ -103,20 +130,21 @@ final class ClienteController extends BaseController
                 $this->request->getPost('apellido') !== '' ? (string) $this->request->getPost('apellido') : null,
                 $this->request->getPost('empresa') !== '' ? (string) $this->request->getPost('empresa') : null,
                 $this->request->getPost('pais') !== '' ? (string) $this->request->getPost('pais') : null,
+                (string) $this->request->getPost('aduanero_identificador'),
             );
 
             $this->container()->get(RegistrarClienteHandler::class)->handle($command);
 
             return redirect()->to('/clientes');
         } catch (ValidationException $e) {
-            return view('clientes/nuevo', ['error' => $e->getMessage(), 'paises' => $paises]);
+            return view('clientes/nuevo', ['aduaneros' => $this->aduanerosActivos(), 'error' => $e->getMessage(), 'paises' => $paises]);
         }
     }
 
     public function storeRapido(): ResponseInterface
     {
         if (!Csrf::verify($this->request->getPost('_csrf'))) {
-            return $this->response->setStatusCode(419)->setJSON([
+            return $this->response->setStatusCode(419, 'Page Expired')->setJSON([
                 'success' => false,
                 'message' => 'Sesion expirada, por favor recargue la pagina.',
             ]);
@@ -131,6 +159,7 @@ final class ClienteController extends BaseController
                 null,
                 $this->request->getPost('empresa') !== '' ? (string) $this->request->getPost('empresa') : null,
                 $this->request->getPost('pais') !== '' ? (string) $this->request->getPost('pais') : null,
+                (string) $this->request->getPost('aduanero_identificador'),
             );
 
             $result = $this->container()->get(RegistrarClienteHandler::class)->handle($command);
@@ -186,7 +215,7 @@ final class ClienteController extends BaseController
 
         $paises = $this->container()->get(ListarPaisesHandler::class)->handle(new ListarPaisesQuery());
 
-        return view('clientes/editar', ['cliente' => $cliente, 'paises' => $paises, 'error' => null]);
+        return view('clientes/editar', ['aduaneros' => $this->aduanerosActivos(), 'cliente' => $cliente, 'paises' => $paises, 'error' => null]);
     }
 
     public function update(string $id): RedirectResponse|string
@@ -213,6 +242,7 @@ final class ClienteController extends BaseController
                 $this->request->getPost('apellido') !== '' ? (string) $this->request->getPost('apellido') : null,
                 $this->request->getPost('empresa') !== '' ? (string) $this->request->getPost('empresa') : null,
                 $this->request->getPost('pais') !== '' ? (string) $this->request->getPost('pais') : null,
+                (string) $this->request->getPost('aduanero_identificador'),
             );
 
             $this->container()->get(ActualizarClienteHandler::class)->handle($command);
@@ -221,17 +251,49 @@ final class ClienteController extends BaseController
         } catch (ValidationException $e) {
             $paises = $this->container()->get(ListarPaisesHandler::class)->handle(new ListarPaisesQuery());
 
-            return view('clientes/editar', ['cliente' => $cliente, 'paises' => $paises, 'error' => $e->getMessage()]);
+            return view('clientes/editar', ['aduaneros' => $this->aduanerosActivos(), 'cliente' => $cliente, 'paises' => $paises, 'error' => $e->getMessage()]);
         }
     }
 
+    /** Elimina solo si el cliente nunca se uso; si tiene historial avisa que se desactive (gerencia/owner). */
     public function delete(string $id): RedirectResponse
     {
-        if (!Csrf::verify($this->request->getPost('_csrf'))) {
-            return redirect()->to('/clientes');
+        if (Csrf::verify($this->request->getPost('_csrf'))) {
+            try {
+                $nombre = $this->container()->get(EliminarClienteHandler::class)->handle(new EliminarClienteCommand($id));
+                $this->flash('ok', "Cliente {$nombre} eliminado.");
+            } catch (ValidationException|NotFoundException $e) {
+                $this->flash('error', $e->getMessage());
+            }
         }
 
-        $this->container()->get(DesactivarClienteHandler::class)->handle(new DesactivarClienteCommand($id));
+        return redirect()->to('/clientes');
+    }
+
+    public function desactivar(string $id): RedirectResponse
+    {
+        if (Csrf::verify($this->request->getPost('_csrf'))) {
+            try {
+                $this->container()->get(DesactivarClienteHandler::class)->handle(new DesactivarClienteCommand($id));
+                $this->flash('ok', 'Cliente desactivado: ya no aparece en Ingreso de Carga ni Salidas.');
+            } catch (NotFoundException $e) {
+                $this->flash('error', $e->getMessage());
+            }
+        }
+
+        return redirect()->to('/clientes');
+    }
+
+    public function activar(string $id): RedirectResponse
+    {
+        if (Csrf::verify($this->request->getPost('_csrf'))) {
+            try {
+                $this->container()->get(ReactivarClienteHandler::class)->handle(new ReactivarClienteCommand($id));
+                $this->flash('ok', 'Cliente activado.');
+            } catch (NotFoundException $e) {
+                $this->flash('error', $e->getMessage());
+            }
+        }
 
         return redirect()->to('/clientes');
     }

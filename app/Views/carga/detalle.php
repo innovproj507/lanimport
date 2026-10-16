@@ -4,14 +4,15 @@ use App\Libraries\Csrf;
 /** @var bool $lpnsGenerados */
 /** @var \Courier\Lpn\Domain\EtiquetaLpnConfig $etiquetaConfig */
 /** @var string|null $error */
-/** @var bool $tieneActaRecepcion */
+/** @var \Courier\Carga\Domain\ValueObject\DatosEntrega|null $entrega */
+/** @var string|null $registradoPor */
 /** @var array<int, array{destinatario: string, asunto: string, estado: string, error: ?string, fecha: string}> $correos */
 /** @var array{tipo: string, texto: string}|null $aviso */
 require_once __DIR__ . '/../partials/view_helpers.php';
 $pageTitle = 'Carga registrada';
 $pageSubtitle = 'Tracking: ' . $view->trackingNumero;
 $backHref = '/cargas/ingreso';
-$headerActions = header_button('/cargas/' . $view->cargaId . '/acta-recepcion', 'receipt', $tieneActaRecepcion ? 'Acta de recepcion' : 'Acta de recepcion (pendiente)', $tieneActaRecepcion ? 'emerald' : 'blue')
+$headerActions = header_button('/cargas/' . $view->cargaId . '/comprobante', 'printer', 'Imprimir comprobante', 'blue')
     . header_button('/cargas/' . $view->cargaId . '/editar', 'pencil', 'Editar', 'amber');
 require __DIR__ . '/../partials/header.php';
 ?>
@@ -117,6 +118,27 @@ require __DIR__ . '/../partials/header.php';
                 </a>
             </p>
         <?php endif; ?>
+
+        <div class="pt-3 border-t border-slate-200">
+            <p class="text-sm font-medium text-black mb-1 flex items-center gap-2"><?= icon_small('truck', 'w-4 h-4 text-zinc-500') ?> Datos de entrega</p>
+            <?php if ($entrega === null): ?>
+                <p class="text-xs text-zinc-500">Sin datos de entrega. Puede agregarlos en <a href="/cargas/<?= htmlspecialchars($view->cargaId) ?>/editar" class="text-amber-600 hover:underline">Editar</a>.</p>
+            <?php else: ?>
+                <dl class="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+                    <?php foreach ([
+                        'Empresa' => $entrega->empresaTransporte,
+                        'Chofer' => $entrega->chofer,
+                        'Placa' => $entrega->placa,
+                        'Entregado por' => $entrega->entregadoPor,
+                        'Cedula' => $entrega->cedula,
+                        'Mercancia' => $entrega->tiposMercanciaTexto(),
+                    ] as $etiqueta => $valor): ?>
+                        <dt class="text-zinc-500"><?= $etiqueta ?></dt><dd class="text-black"><?= htmlspecialchars($valor !== null && $valor !== '' ? $valor : '—') ?></dd>
+                    <?php endforeach; ?>
+                </dl>
+            <?php endif; ?>
+            <p class="text-xs text-zinc-500 mt-1">Verificado por: <?= htmlspecialchars($registradoPor ?? '—') ?></p>
+        </div>
 
         <h2 class="font-semibold text-black pt-4 border-t border-slate-200 flex items-center gap-2"><?= icon_small('clock', 'w-4 h-4 text-zinc-500') ?> Historial</h2>
         <ol class="space-y-3">

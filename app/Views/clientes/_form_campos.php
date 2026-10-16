@@ -3,6 +3,8 @@
 /** @var array<int, \Courier\Pais\Domain\Pais> $paises */
 $cliente = $cliente ?? null;
 $paises = $paises ?? [];
+/** @var array<int, \Courier\Aduanero\Domain\Aduanero> $aduaneros */
+$aduaneros = $aduaneros ?? [];
 ?>
 <div class="grid grid-cols-2 gap-4">
     <div>
@@ -46,4 +48,20 @@ $paises = $paises ?? [];
             </option>
         <?php endforeach; ?>
     </select>
+</div>
+<div>
+    <label class="block text-sm font-medium text-zinc-700 mb-1">Aduanero asignado (opcional)</label>
+    <?php $aduaneroActual = $cliente?->aduaneroIdentificador(); $aduaneroEnLista = false; ?>
+    <select name="aduanero_identificador" class="w-full rounded-lg border border-zinc-300 bg-white text-black px-3 py-2 focus:ring-2 focus:ring-amber-400 focus:outline-none">
+        <option value="">Sin aduanero asignado</option>
+        <?php foreach ($aduaneros as $aduanero): $aduaneroEnLista = $aduaneroEnLista || $aduanero->identificador() === $aduaneroActual; ?>
+            <option value="<?= htmlspecialchars($aduanero->identificador()) ?>" <?= $aduanero->identificador() === $aduaneroActual ? 'selected' : '' ?>>
+                <?= htmlspecialchars($aduanero->nombre()) ?>
+            </option>
+        <?php endforeach; ?>
+        <?php if ($aduaneroActual !== null && !$aduaneroEnLista): ?>
+            <option value="<?= htmlspecialchars($aduaneroActual) ?>" selected><?= htmlspecialchars($aduaneroActual) ?> (inactivo)</option>
+        <?php endif; ?>
+    </select>
+    <p class="text-xs text-zinc-500 mt-1">Se propone automaticamente en Ingreso de Carga al elegir este cliente.</p>
 </div>

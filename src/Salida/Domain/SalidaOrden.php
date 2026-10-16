@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Courier\Salida\Domain;
 
+use Courier\Salida\Domain\ValueObject\DatosEmbarque;
 use Courier\Shared\Domain\AggregateRoot;
 use Courier\Shared\Domain\Exception\ValidationException;
 use Courier\Shared\Domain\ValueObject\Uuid;
@@ -23,7 +24,48 @@ final class SalidaOrden extends AggregateRoot
         private array $lineas,
         private ?string $codigo = null,
         private ?int $secuencia = null,
+        // Consecutivo DO por ano: lo asigna el repositorio al insertar.
+        private ?int $doAnio = null,
+        private ?int $doNumero = null,
+        private ?DatosEmbarque $embarque = null,
     ) {
+    }
+
+    /** Contenedor, sello, naviera, barco, fechas y destino; se puede completar o corregir mientras no este cancelada. */
+    public function actualizarEmbarque(DatosEmbarque $embarque): void
+    {
+        if ($this->estado === EstadoSalidaOrden::CANCELADA) {
+            throw new ValidationException('No se pueden modificar los datos de embarque de una salida cancelada.');
+        }
+
+        $this->embarque = $embarque;
+    }
+
+    public function embarque(): DatosEmbarque
+    {
+        return $this->embarque ?? DatosEmbarque::vacio();
+    }
+
+    public function doAnio(): ?int
+    {
+        return $this->doAnio;
+    }
+
+    public function doNumero(): ?int
+    {
+        return $this->doNumero;
+    }
+
+    /** "DO.193" (sin ano), como en los documentos. */
+    public function numeroDo(): string
+    {
+        return $this->doNumero !== null ? 'DO.' . $this->doNumero : (string) $this->codigo;
+    }
+
+    /** "DO.193 / 2026": el consecutivo reinicia cada ano, el ano evita confusiones. */
+    public function etiquetaDo(): string
+    {
+        return $this->doNumero !== null ? "DO.{$this->doNumero} / {$this->doAnio}" : (string) $this->codigo;
     }
 
     /** @param array<int, SalidaLinea> $lineas */

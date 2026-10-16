@@ -14,6 +14,7 @@ use CodeIgniter\Filters\PerformanceMetrics;
 use CodeIgniter\Filters\SecureHeaders;
 use App\Filters\ApiRoleFilter;
 use App\Filters\AuthFilter;
+use App\Filters\CsrfHeaderFilter;
 use App\Filters\JwtAuthFilter;
 use App\Filters\RateLimitFilter;
 use App\Filters\RoleFilter;
@@ -44,6 +45,7 @@ class Filters extends BaseFilters
         'jwt'           => JwtAuthFilter::class,
         'apirole'       => ApiRoleFilter::class,
         'ratelimit'     => RateLimitFilter::class,
+        'csrfheader'    => CsrfHeaderFilter::class,
     ];
 
     /**

@@ -41,6 +41,7 @@ final class RegistrarClienteHandler implements CommandHandlerInterface
             $command->empresa,
             $command->pais,
         );
+        $cliente->asignarAduanero($command->aduaneroIdentificador);
 
         $this->clientes->save($cliente);
 

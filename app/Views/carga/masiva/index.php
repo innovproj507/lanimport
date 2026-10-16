@@ -36,26 +36,6 @@ require __DIR__ . '/../../partials/header.php';
                    class="block w-full text-sm text-zinc-700 file:mr-3 file:rounded-lg file:border-0 file:bg-amber-500 file:px-4 file:py-2 file:text-sm file:font-medium file:text-black hover:file:bg-amber-400">
         </div>
 
-        <fieldset>
-            <legend class="block text-sm font-medium text-zinc-700 mb-2">Acta de recepcion — ¿la mercancia ya esta fisicamente en bodega?</legend>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <label class="flex items-start gap-3 border border-zinc-300 rounded-xl p-4 cursor-pointer has-[:checked]:border-amber-400 has-[:checked]:bg-amber-50">
-                    <input type="radio" name="acta" value="en_bodega" required class="mt-1 text-amber-500 focus:ring-amber-400">
-                    <span>
-                        <span class="block text-sm font-semibold text-black">Si, ya esta en bodega</span>
-                        <span class="block text-xs text-zinc-500 mt-1">Se genera el acta automaticamente para cada carga, marcada "Generada por carga masiva". No quedan pendientes para bodega.</span>
-                    </span>
-                </label>
-                <label class="flex items-start gap-3 border border-zinc-300 rounded-xl p-4 cursor-pointer has-[:checked]:border-amber-400 has-[:checked]:bg-amber-50">
-                    <input type="radio" name="acta" value="pendiente" required class="mt-1 text-amber-500 focus:ring-amber-400">
-                    <span>
-                        <span class="block text-sm font-semibold text-black">No, todavia no llega</span>
-                        <span class="block text-xs text-zinc-500 mt-1">Las cargas quedan en "Cargas registradas sin acta" y bodega llena el acta real (chofer, placa, cedula) cuando llegue.</span>
-                    </span>
-                </label>
-            </div>
-        </fieldset>
-
         <label class="flex items-start gap-3">
             <input type="checkbox" name="notificar" value="1" class="mt-1 rounded border-zinc-300 text-amber-500 focus:ring-amber-400">
             <span>

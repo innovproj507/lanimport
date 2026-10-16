@@ -3,7 +3,6 @@ use App\Libraries\Csrf;
 /** @var string $token */
 /** @var array{cargas: array<int, array<string, mixed>>, totalFilas: int, proveedoresNuevos: array<int, string>} $plan */
 /** @var string $archivo */
-/** @var string $acta */
 /** @var bool $notificar */
 require_once __DIR__ . '/../../partials/view_helpers.php';
 $pageTitle = 'Revisar carga masiva';
@@ -25,7 +24,6 @@ $num = static fn (float $n): string => rtrim(rtrim(number_format($n, 2, '.', ','
 </div>
 
 <div class="bg-white rounded-2xl shadow-sm p-4 sm:p-5 mb-6 text-sm text-zinc-700 space-y-1">
-    <p><strong>Acta de recepcion:</strong> <?= $acta === 'en_bodega' ? 'se generara automaticamente (la mercancia ya esta en bodega).' : 'no se genera; bodega la llenara al recibir.' ?></p>
     <p><strong>Correo a los clientes:</strong> <?= $notificar ? 'si se enviara el aviso a cada cliente.' : 'no se enviara.' ?></p>
     <?php if ($plan['proveedoresNuevos'] !== []): ?>
         <p><strong>Proveedores nuevos que se crearan:</strong> <?= htmlspecialchars(implode(', ', $plan['proveedoresNuevos'])) ?></p>

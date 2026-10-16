@@ -89,7 +89,7 @@ final class ProveedorController extends BaseController
     public function storeRapido(): ResponseInterface
     {
         if (!Csrf::verify($this->request->getPost('_csrf'))) {
-            return $this->response->setStatusCode(419)->setJSON([
+            return $this->response->setStatusCode(419, 'Page Expired')->setJSON([
                 'success' => false,
                 'message' => 'Sesion expirada, por favor recargue la pagina.',
             ]);

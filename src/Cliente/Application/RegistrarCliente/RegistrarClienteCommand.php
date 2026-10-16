@@ -16,6 +16,7 @@ final class RegistrarClienteCommand implements CommandInterface
         public readonly ?string $apellido = null,
         public readonly ?string $empresa = null,
         public readonly ?string $pais = null,
+        public readonly ?string $aduaneroIdentificador = null,
     ) {
     }
 }

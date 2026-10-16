@@ -218,6 +218,8 @@ $lineas = $carga->lineas();
         </div>
     </div>
 
+    <?php $entrega = $carga->datosEntrega(); require __DIR__ . '/_datos_entrega.php'; ?>
+
     <div class="bg-white rounded-xl shadow-sm p-6">
         <?= card_header('shield', 'Aduana y contenedor', 'amber') ?>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-3">

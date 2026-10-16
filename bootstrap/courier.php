@@ -20,6 +20,18 @@ use Courier\Aduanero\Application\ListarAduaneros\ListarAduanerosHandler;
 use Courier\Aduanero\Application\RegistrarAduanero\RegistrarAduaneroHandler;
 use Courier\Aduanero\Domain\AduaneroRepositoryInterface;
 use Courier\Aduanero\Infrastructure\Persistence\PdoAduaneroRepository;
+use Courier\Salida\Application\ActualizarEmbarqueSalida\ActualizarEmbarqueSalidaHandler;
+use Courier\Naviera\Application\ActualizarNaviera\ActualizarNavieraHandler;
+use Courier\Naviera\Application\EliminarNaviera\EliminarNavieraHandler;
+use Courier\Cliente\Application\EliminarCliente\EliminarClienteHandler;
+use Courier\Cliente\Application\ReactivarCliente\ReactivarClienteHandler;
+use Courier\Aduanero\Application\CambiarEstadoAduanero\CambiarEstadoAduaneroHandler;
+use Courier\Aduanero\Application\EliminarAduanero\EliminarAduaneroHandler;
+use Courier\Naviera\Application\BuscarNavieras\BuscarNavierasHandler;
+use Courier\Naviera\Application\ListarNavieras\ListarNavierasHandler;
+use Courier\Naviera\Application\RegistrarNaviera\RegistrarNavieraHandler;
+use Courier\Naviera\Domain\NavieraRepositoryInterface;
+use Courier\Naviera\Infrastructure\Persistence\PdoNavieraRepository;
 use Courier\Proveedor\Application\ActualizarProveedor\ActualizarProveedorHandler;
 use Courier\Proveedor\Application\BuscarProveedores\BuscarProveedoresHandler;
 use Courier\Proveedor\Application\ListarProveedores\ListarProveedoresHandler;
@@ -42,22 +54,18 @@ use Courier\Carga\Application\ActualizarEstadoCarga\ActualizarEstadoCargaHandler
 use Courier\Carga\Application\BuscarCargas\BuscarCargasHandler;
 use Courier\Carga\Application\ConsultarTrackingPorContenedor\ConsultarTrackingPorContenedorHandler;
 use Courier\Carga\Application\ConsultarTrackingPorNumero\ConsultarTrackingPorNumeroHandler;
-use Courier\Carga\Application\GuardarActaRecepcion\GuardarActaRecepcionHandler;
 use Courier\Carga\Application\ImportarCargas\ImportarCargasHandler;
 use Courier\Carga\Application\ImportarCargas\PrepararImportacionCargas;
 use Courier\Carga\Infrastructure\Importacion\EscritorXlsx;
 use Courier\Carga\Infrastructure\Importacion\LectorHojaCalculo;
 use Courier\Carga\Application\ListarCargas\ListarCargasHandler;
-use Courier\Carga\Application\VincularActaRecepcion\VincularActaRecepcionHandler;
 use Courier\Carga\Application\ListarCargasPorCliente\ListarCargasPorClienteHandler;
 use Courier\Carga\Application\RegistrarCarga\RegistrarCargaHandler;
-use Courier\Carga\Domain\ActaRecepcionRepositoryInterface;
 use Courier\Carga\Domain\BarcodeGeneratorInterface;
 use Courier\Carga\Domain\CargaRepositoryInterface;
 use Courier\Carga\Domain\TrackingNumeroGeneratorInterface;
 use Courier\Carga\Infrastructure\Barcode\PicqerBarcodeGeneratorService;
 use Courier\Carga\Infrastructure\Generator\UuidTrackingNumeroGenerator;
-use Courier\Carga\Infrastructure\Persistence\PdoActaRecepcionRepository;
 use Courier\Carga\Infrastructure\Persistence\PdoCargaRepository;
 use Courier\Carga\Infrastructure\Persistence\PdoEtiquetaRepository;
 use Courier\Carga\Infrastructure\Persistence\PdoHistorialEstadoRepository;
@@ -245,6 +253,10 @@ $container->set(BuscarUbicacionesHandler::class, fn (Container $c) => new Buscar
 
 // Salida
 $container->set(SalidaOrdenRepositoryInterface::class, fn (Container $c) => new PdoSalidaOrdenRepository($c->get(PDO::class)));
+$container->set(ActualizarEmbarqueSalidaHandler::class, fn (Container $c) => new ActualizarEmbarqueSalidaHandler(
+    $c->get(SalidaOrdenRepositoryInterface::class),
+    $c->get(NavieraRepositoryInterface::class),
+));
 
 $container->set(CrearOrdenSalidaHandler::class, fn (Container $c) => new CrearOrdenSalidaHandler(
     $c->get(LpnRepositoryInterface::class),
@@ -302,6 +314,12 @@ $container->set(ListarClientesPendientesHandler::class, fn (Container $c) => new
 $container->set(BuscarClientesHandler::class, fn (Container $c) => new BuscarClientesHandler($c->get(ClienteRepositoryInterface::class)));
 $container->set(ActualizarClienteHandler::class, fn (Container $c) => new ActualizarClienteHandler($c->get(ClienteRepositoryInterface::class)));
 $container->set(DesactivarClienteHandler::class, fn (Container $c) => new DesactivarClienteHandler($c->get(ClienteRepositoryInterface::class)));
+$container->set(ReactivarClienteHandler::class, fn (Container $c) => new ReactivarClienteHandler($c->get(ClienteRepositoryInterface::class)));
+$container->set(EliminarClienteHandler::class, fn (Container $c) => new EliminarClienteHandler(
+    $c->get(ClienteRepositoryInterface::class),
+    $c->get(UsuarioRepositoryInterface::class),
+    $c->get(UnitOfWork::class),
+));
 $container->set(RechazarClienteHandler::class, fn (Container $c) => new RechazarClienteHandler($c->get(ClienteRepositoryInterface::class)));
 
 $container->set(SolicitarRegistroClienteHandler::class, fn (Container $c) => new SolicitarRegistroClienteHandler(
@@ -325,6 +343,12 @@ $container->set(RegistrarAduaneroHandler::class, fn (Container $c) => new Regist
 $container->set(ListarAduanerosHandler::class, fn (Container $c) => new ListarAduanerosHandler($c->get(AduaneroRepositoryInterface::class)));
 $container->set(ActualizarAduaneroHandler::class, fn (Container $c) => new ActualizarAduaneroHandler($c->get(AduaneroRepositoryInterface::class)));
 $container->set(BuscarAduanerosHandler::class, fn (Container $c) => new BuscarAduanerosHandler($c->get(AduaneroRepositoryInterface::class)));
+$container->set(CambiarEstadoAduaneroHandler::class, fn (Container $c) => new CambiarEstadoAduaneroHandler($c->get(AduaneroRepositoryInterface::class)));
+$container->set(EliminarAduaneroHandler::class, fn (Container $c) => new EliminarAduaneroHandler(
+    $c->get(AduaneroRepositoryInterface::class),
+    $c->get(UsuarioRepositoryInterface::class),
+    $c->get(UnitOfWork::class),
+));
 
 // Proveedor
 $container->set(ProveedorRepositoryInterface::class, fn (Container $c) => new PdoProveedorRepository($c->get(PDO::class)));
@@ -332,6 +356,14 @@ $container->set(RegistrarProveedorHandler::class, fn (Container $c) => new Regis
 $container->set(ListarProveedoresHandler::class, fn (Container $c) => new ListarProveedoresHandler($c->get(ProveedorRepositoryInterface::class)));
 $container->set(ActualizarProveedorHandler::class, fn (Container $c) => new ActualizarProveedorHandler($c->get(ProveedorRepositoryInterface::class)));
 $container->set(BuscarProveedoresHandler::class, fn (Container $c) => new BuscarProveedoresHandler($c->get(ProveedorRepositoryInterface::class)));
+
+// Naviera
+$container->set(NavieraRepositoryInterface::class, fn (Container $c) => new PdoNavieraRepository($c->get(PDO::class)));
+$container->set(RegistrarNavieraHandler::class, fn (Container $c) => new RegistrarNavieraHandler($c->get(NavieraRepositoryInterface::class)));
+$container->set(ActualizarNavieraHandler::class, fn (Container $c) => new ActualizarNavieraHandler($c->get(NavieraRepositoryInterface::class)));
+$container->set(BuscarNavierasHandler::class, fn (Container $c) => new BuscarNavierasHandler($c->get(NavieraRepositoryInterface::class)));
+$container->set(ListarNavierasHandler::class, fn (Container $c) => new ListarNavierasHandler($c->get(NavieraRepositoryInterface::class)));
+$container->set(EliminarNavieraHandler::class, fn (Container $c) => new EliminarNavieraHandler($c->get(NavieraRepositoryInterface::class)));
 
 // Pais
 $container->set(PaisRepositoryInterface::class, fn (Container $c) => new PdoPaisRepository($c->get(PDO::class)));
@@ -399,16 +431,6 @@ $container->set(ListarCargasPorClienteHandler::class, fn (Container $c) => new L
 $container->set(ListarCargasHandler::class, fn (Container $c) => new ListarCargasHandler($c->get(CargaRepositoryInterface::class)));
 $container->set(BuscarCargasHandler::class, fn (Container $c) => new BuscarCargasHandler($c->get(CargaRepositoryInterface::class)));
 $container->set(ActualizarDatosCargaHandler::class, fn (Container $c) => new ActualizarDatosCargaHandler($c->get(CargaRepositoryInterface::class)));
-$container->set(ActaRecepcionRepositoryInterface::class, fn (Container $c) => new PdoActaRecepcionRepository($c->get(PDO::class)));
-$container->set(GuardarActaRecepcionHandler::class, fn (Container $c) => new GuardarActaRecepcionHandler(
-    $c->get(CargaRepositoryInterface::class),
-    $c->get(ActaRecepcionRepositoryInterface::class),
-    $c->get(ClienteRepositoryInterface::class),
-));
-$container->set(VincularActaRecepcionHandler::class, fn (Container $c) => new VincularActaRecepcionHandler(
-    $c->get(CargaRepositoryInterface::class),
-    $c->get(ActaRecepcionRepositoryInterface::class),
-));
 
 // Carga masiva (Excel/CSV)
 $container->set(LectorHojaCalculo::class, fn () => new LectorHojaCalculo());
@@ -421,7 +443,6 @@ $container->set(PrepararImportacionCargas::class, fn (Container $c) => new Prepa
 $container->set(ImportarCargasHandler::class, fn (Container $c) => new ImportarCargasHandler(
     $c->get(RegistrarCargaHandler::class),
     $c->get(ProveedorRepositoryInterface::class),
-    $c->get(ActaRecepcionRepositoryInterface::class),
 ));
 
 // Factura

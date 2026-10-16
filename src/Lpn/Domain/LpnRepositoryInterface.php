@@ -24,4 +24,12 @@ interface LpnRepositoryInterface
      * @return array<int, Lpn>
      */
     public function search(array $filtros): array;
+
+    /**
+     * Avance de recepcion por carga: solo cargas con al menos un LPN todavia "En recepcion"
+     * (o solo la carga indicada). Mas antiguas primero.
+     *
+     * @return array<int, array{cargaId: string, tracking: string, cliente: string, marca: ?string, fechaIngreso: string, total: int, recibidos: int}>
+     */
+    public function resumenRecepcion(?string $cargaId = null): array;
 }

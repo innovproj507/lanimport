@@ -8,7 +8,7 @@ use Courier\Shared\Domain\Exception\ValidationException;
 use Courier\Shared\Domain\ValueObject\EmailAddress;
 
 /**
- * Datos de la empresa que aparecen en documentos impresos (acta de
+ * Datos de la empresa que aparecen en documentos impresos (comprobante de
  * recepcion, etc.).
  */
 final class DatosEmpresa

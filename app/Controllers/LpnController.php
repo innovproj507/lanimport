@@ -17,6 +17,7 @@ use Courier\Lpn\Application\ListarLpnsPorCarga\ListarLpnsPorCargaHandler;
 use Courier\Lpn\Application\ListarLpnsPorCarga\ListarLpnsPorCargaQuery;
 use Courier\Lpn\Application\ListarUbicaciones\ListarUbicacionesHandler;
 use Courier\Lpn\Application\ListarUbicaciones\ListarUbicacionesQuery;
+use Courier\Lpn\Domain\LpnRepositoryInterface;
 use Courier\Shared\Domain\Exception\NotFoundException;
 use Courier\Shared\Domain\Exception\ValidationException;
 
@@ -50,10 +51,33 @@ final class LpnController extends BaseController
         ]);
     }
 
+    /** Pantalla "Recepcion" de bodega: escanear cualquier LPN y ver las cargas que faltan por recibir. */
+    public function recepcionGeneral(): string
+    {
+        $ubicaciones = $this->container()->get(ListarUbicacionesHandler::class)->handle(new ListarUbicacionesQuery());
+
+        return view('lpn/recepcion_general', [
+            'pendientes' => $this->container()->get(LpnRepositoryInterface::class)->resumenRecepcion(),
+            'ubicaciones' => $ubicaciones,
+        ]);
+    }
+
+    /** Escaneo general: el LPN puede ser de cualquier carga. */
+    public function escanearRecepcion(): ResponseInterface
+    {
+        return $this->confirmar(null);
+    }
+
+    /** Escaneo desde la pantalla de una carga: el LPN debe ser de esa carga. */
     public function confirmarRecepcion(string $id): ResponseInterface
     {
+        return $this->confirmar($id);
+    }
+
+    private function confirmar(?string $cargaId): ResponseInterface
+    {
         if (!Csrf::verify($this->request->getPost('_csrf'))) {
-            return $this->response->setStatusCode(419)->setJSON([
+            return $this->response->setStatusCode(419, 'Page Expired')->setJSON([
                 'success' => false,
                 'message' => 'Sesion expirada, por favor recargue la pagina.',
             ]);
@@ -69,13 +93,18 @@ final class LpnController extends BaseController
                 (string) $this->request->getPost('codigo'),
                 $ubicacionId !== '' ? $ubicacionId : null,
                 (string) $sessionManager->currentUsuarioId(),
+                $cargaId,
             );
 
             $lpn = $this->container()->get(ConfirmarRecepcionLpnHandler::class)->handle($command);
+            $progreso = $lpn->cargaId() !== null
+                ? ($this->container()->get(LpnRepositoryInterface::class)->resumenRecepcion($lpn->cargaId())[0] ?? null)
+                : null;
 
             return $this->response->setJSON([
                 'success' => true,
                 'lpn' => ['codigo' => $lpn->codigo(), 'estado' => $lpn->estado()->value, 'estadoLabel' => $lpn->estado()->label()],
+                'progreso' => $progreso,
             ]);
         } catch (NotFoundException|ValidationException $e) {
             return $this->response->setStatusCode(422)->setJSON([

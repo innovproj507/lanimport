@@ -230,12 +230,12 @@ final class PdoResumenDashboardRepository
     }
 
     /** @return array{total: int, items: array<int, array{id: string, trackingNumero: string, clienteNombre: string, fecha: string}>} */
-    public function cargasSinActaRecepcion(int $limite = 5): array
+    /** Cargas que siguen en bodega, las de ingreso mas antiguo primero (las que mas esperan). */
+    public function cargasMasAntiguasEnBodega(int $limite = 5): array
     {
-        $desde = 'FROM cargas ca
+        $desde = "FROM cargas ca
                   JOIN clientes c ON c.id = ca.cliente_id
-                  LEFT JOIN cargas_actas_recepcion a ON a.carga_id = ca.id
-                  WHERE a.id IS NULL AND ca.estado NOT IN (\'entregado\')';
+                  WHERE ca.estado = 'en_bodega'";
 
         $total = (int) $this->connection->query("SELECT COUNT(*) {$desde}")->fetchColumn();
         $stmt = $this->connection->query(

@@ -22,25 +22,7 @@ final class AlertasMenu
             $pdo = Services::courierContainer()->get(PDO::class);
             $alertas = [];
 
-            if (in_array($rol, ['recepcion', 'operaciones', 'bodega', 'gerente', 'admin'], true)) {
-                $sinActa = (int) $pdo->query(
-                    "SELECT COUNT(*) FROM cargas ca
-                     LEFT JOIN cargas_actas_recepcion a ON a.carga_id = ca.id
-                     WHERE a.id IS NULL AND ca.estado <> 'entregado'"
-                )->fetchColumn();
-
-                if ($sinActa > 0) {
-                    $alertas[] = ['texto' => 'Cargas sin acta de recepcion', 'total' => $sinActa, 'href' => '/recepciones'];
-                }
-            }
-
             if (in_array($rol, ['operaciones', 'gerente', 'admin'], true)) {
-                $actasSinCarga = (int) $pdo->query('SELECT COUNT(*) FROM cargas_actas_recepcion WHERE carga_id IS NULL')->fetchColumn();
-
-                if ($actasSinCarga > 0) {
-                    $alertas[] = ['texto' => 'Mercancia recibida sin carga registrada', 'total' => $actasSinCarga, 'href' => '/recepciones'];
-                }
-
                 // Cargas cuyo ultimo correo al cliente fallo (si luego se reenvio bien, ya no cuenta).
                 $fallidos = $pdo->query(
                     "SELECT n.carga_id FROM notificaciones n

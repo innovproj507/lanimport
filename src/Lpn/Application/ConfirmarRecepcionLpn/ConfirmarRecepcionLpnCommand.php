@@ -12,6 +12,8 @@ final class ConfirmarRecepcionLpnCommand implements CommandInterface
         public readonly string $codigoEscaneado,
         public readonly ?string $ubicacionId,
         public readonly string $usuarioId,
+        // Desde la pantalla de una carga: el LPN debe ser de esa carga. null = escaneo general de bodega.
+        public readonly ?string $cargaId = null,
     ) {
     }
 }

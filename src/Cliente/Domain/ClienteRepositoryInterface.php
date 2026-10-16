@@ -30,4 +30,10 @@ interface ClienteRepositoryInterface
     public function existsEmail(string $email): bool;
 
     public function existsEmailExcluding(string $email, string $excludeId): bool;
+
+    /** @return array<string, int> donde se usa (solo lo que tiene registros), ej. ['cargas' => 3, 'salidas' => 1] */
+    public function referencias(string $id): array;
+
+    /** Borra el cliente y sus documentos de registro. */
+    public function delete(string $id): void;
 }

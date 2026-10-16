@@ -32,6 +32,12 @@ final class Aduanero extends AggregateRoot
         $this->pais = $pais;
     }
 
+    /** Inactivo = no se ofrece al registrar cargas/salidas; se conserva para el historial. */
+    public function cambiarEstado(bool $activo): void
+    {
+        $this->activo = $activo;
+    }
+
     public function id(): string
     {
         return (string) $this->id;

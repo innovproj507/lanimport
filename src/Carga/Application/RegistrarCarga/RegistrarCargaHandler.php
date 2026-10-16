@@ -12,6 +12,7 @@ use Courier\Carga\Domain\TipoServicio;
 use Courier\Carga\Domain\TrackingNumeroGeneratorInterface;
 use Courier\Carga\Domain\ValueObject\Aduanero;
 use Courier\Carga\Domain\ValueObject\Contenedor;
+use Courier\Carga\Domain\ValueObject\DatosEntrega;
 use Courier\Carga\Domain\ValueObject\DetalleAereo;
 use Courier\Carga\Domain\ValueObject\DetalleFreight;
 use Courier\Carga\Domain\ValueObject\DetalleMaritimo;
@@ -84,6 +85,7 @@ final class RegistrarCargaHandler implements CommandHandlerInterface
         );
 
         $carga->cambiarEstado(CargaStatus::EN_BODEGA, $command->registradoPorUsuarioId, 'Ingreso fisico a bodega');
+        $carga->asignarDatosEntrega(DatosEntrega::desdeArreglo($command->datosEntrega ?? []));
 
         $etiquetaUrl = $this->unitOfWork->run(function () use ($carga) {
             $this->cargas->save($carga);

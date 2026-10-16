@@ -31,6 +31,8 @@ final class RegistrarCargaCommand implements CommandInterface
         public readonly ?string $facturaProveedorRuta = null,
         // false en la carga masiva cuando no se quiere avisar a cada cliente por correo.
         public readonly bool $notificarCliente = true,
+        // Formulario de entrega: ver DatosEntrega::desdeArreglo() (claves empresaTransporte, chofer...).
+        public readonly ?array $datosEntrega = null,
     ) {
     }
 }

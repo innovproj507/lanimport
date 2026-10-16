@@ -85,12 +85,6 @@ final class CargaMasivaController extends BaseController
             return view('carga/masiva/index', ['error' => 'Sesion expirada, por favor intente de nuevo.']);
         }
 
-        $acta = (string) $this->request->getPost('acta');
-
-        if (!in_array($acta, ['en_bodega', 'pendiente'], true)) {
-            return view('carga/masiva/index', ['error' => 'Indique si la mercancia ya esta en bodega o todavia no llega.']);
-        }
-
         $archivo = $_FILES['archivo'] ?? null;
 
         if ($archivo === null || $archivo['error'] === UPLOAD_ERR_NO_FILE) {
@@ -117,7 +111,6 @@ final class CargaMasivaController extends BaseController
             'token' => $token,
             'plan' => $plan,
             'archivo' => basename((string) $archivo['name']),
-            'acta' => $acta,
             'notificar' => $this->request->getPost('notificar') !== null,
         ];
 
@@ -138,7 +131,6 @@ final class CargaMasivaController extends BaseController
 
         $resultado = $this->container()->get(ImportarCargasHandler::class)->handle(new ImportarCargasCommand(
             $datos['plan']['cargas'],
-            $datos['acta'] === 'en_bodega',
             (bool) $datos['notificar'],
             $datos['archivo'],
             (string) $this->container()->get(SessionManager::class)->currentUsuarioId(),
@@ -147,7 +139,6 @@ final class CargaMasivaController extends BaseController
         return view('carga/masiva/resultado', [
             'resultado' => $resultado,
             'archivo' => $datos['archivo'],
-            'acta' => $datos['acta'],
             'notificar' => (bool) $datos['notificar'],
         ]);
     }

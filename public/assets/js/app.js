@@ -70,6 +70,10 @@ function crearBuscadorSelector(config) {
         }
 
         ocultarResultados();
+
+        if (config.alSeleccionar) {
+            config.alSeleccionar(item);
+        }
     }
 
     function buscar() {
@@ -147,10 +151,25 @@ function crearBuscadorSelector(config) {
             items.push(item);
             seleccionar(item);
         },
+        // Selecciona el item cuyo valor coincide (p.ej. el aduanero asignado al cliente).
+        seleccionarPorValor: function (valor) {
+            var item = items.find(function (i) { return config.valor(i) === valor; });
+
+            if (item) {
+                seleccionar(item);
+            }
+
+            return !!item;
+        },
+        valorActual: function () {
+            return idHidden.value;
+        },
     };
 }
 
 document.addEventListener('DOMContentLoaded', function () {
+    var aduaneroPropuesto = null;
+
     window.ClientePicker = crearBuscadorSelector({
         pickerId: 'cliente-picker',
         inputId: 'cliente-buscar',
@@ -160,6 +179,20 @@ document.addEventListener('DOMContentLoaded', function () {
         dataScriptId: 'clientes-data',
         formId: 'form-ingreso-carga',
         valor: function (cliente) { return cliente.id; },
+        // Propone el aduanero asignado al cliente, salvo que ya se haya elegido otro a mano.
+        alSeleccionar: function (cliente) {
+            var aduanero = window.AduaneroPicker;
+
+            if (!aduanero || !cliente.aduanero) {
+                return;
+            }
+
+            if (aduanero.valorActual() === '' || aduanero.valorActual() === aduaneroPropuesto) {
+                if (aduanero.seleccionarPorValor(cliente.aduanero)) {
+                    aduaneroPropuesto = cliente.aduanero;
+                }
+            }
+        },
         etiqueta: function (cliente) {
             var partes = [];
 
@@ -253,15 +286,159 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 });
 
+/**
+ * Escaneo de recepcion de LPNs (pantalla general /recepcion y la de cada carga).
+ * El lector de codigo de barras escribe el codigo y manda Enter; el LPN pasa a "Disponible".
+ * La URL viene en data-url del input; la cola evita perder lecturas si se escanea muy rapido.
+ */
 document.addEventListener('DOMContentLoaded', function () {
     var scanInput = document.getElementById('lpn-scan-input');
     var ubicacionSelect = document.getElementById('lpn-ubicacion-select');
     var mensaje = document.getElementById('lpn-scan-mensaje');
+    var historial = document.getElementById('lpn-scan-historial');
     var csrfInput = document.getElementById('lpn-csrf');
-    var cargaIdInput = document.getElementById('lpn-carga-id');
 
-    if (!scanInput || !ubicacionSelect || !csrfInput || !cargaIdInput) {
+    if (!scanInput || !ubicacionSelect || !csrfInput || !scanInput.getAttribute('data-url')) {
         return;
+    }
+
+    var url = scanInput.getAttribute('data-url');
+    var cola = [];
+    var enviando = false;
+    var audio = null;
+
+    function pitido(ok) {
+        try {
+            audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+            var osc = audio.createOscillator();
+            var gain = audio.createGain();
+            osc.frequency.value = ok ? 880 : 220;
+            gain.gain.value = 0.15;
+            osc.connect(gain);
+            gain.connect(audio.destination);
+            osc.start();
+            osc.stop(audio.currentTime + (ok ? 0.12 : 0.4));
+        } catch (e) {
+            // Sin audio disponible: solo el mensaje en pantalla.
+        }
+    }
+
+    function mostrar(texto, ok) {
+        if (!mensaje) {
+            return;
+        }
+
+        mensaje.textContent = texto;
+        mensaje.className = 'mt-4 rounded-lg px-4 py-3 text-base font-medium '
+            + (ok ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-700');
+    }
+
+    function anotar(texto, ok) {
+        if (!historial) {
+            return;
+        }
+
+        var li = document.createElement('li');
+        li.className = ok ? 'text-emerald-700' : 'text-red-600';
+        li.textContent = new Date().toLocaleTimeString() + ' — ' + texto;
+        historial.insertBefore(li, historial.firstChild);
+
+        while (historial.children.length > 8) {
+            historial.removeChild(historial.lastChild);
+        }
+    }
+
+    function actualizarFilaLpn(lpn) {
+        var fila = document.querySelector('#lpn-tbody tr[data-codigo="' + lpn.codigo + '"]');
+
+        if (!fila) {
+            return;
+        }
+
+        fila.querySelector('.lpn-estado-cell').innerHTML =
+            '<span class="px-2 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">' + lpn.estadoLabel + '</span>';
+        fila.querySelector('.lpn-ubicacion-cell').textContent =
+            ubicacionSelect.value !== '' ? ubicacionSelect.options[ubicacionSelect.selectedIndex].text : '—';
+    }
+
+    function actualizarProgreso(progreso) {
+        if (!progreso) {
+            return;
+        }
+
+        var recibidosCarga = document.getElementById('lpn-recibidos-carga');
+
+        if (recibidosCarga) {
+            recibidosCarga.textContent = progreso.recibidos;
+        }
+
+        var fila = document.querySelector('tr[data-carga-id="' + progreso.cargaId + '"]');
+
+        if (fila) {
+            fila.querySelector('.lpn-progreso-barra').style.width = Math.round(progreso.recibidos * 100 / progreso.total) + '%';
+            fila.querySelector('.lpn-progreso-texto').textContent = progreso.recibidos + ' / ' + progreso.total;
+
+            if (progreso.recibidos >= progreso.total) {
+                fila.classList.add('bg-emerald-50');
+            }
+        }
+
+        var porRecibir = document.getElementById('lpn-por-recibir');
+
+        if (porRecibir && Number(porRecibir.textContent) > 0) {
+            porRecibir.textContent = Number(porRecibir.textContent) - 1;
+        }
+    }
+
+    function siguiente() {
+        if (enviando || cola.length === 0) {
+            return;
+        }
+
+        enviando = true;
+        var codigo = cola.shift();
+        var body = new URLSearchParams();
+        body.set('_csrf', csrfInput.value);
+        body.set('codigo', codigo);
+        body.set('ubicacion_id', ubicacionSelect.value);
+
+        fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: body.toString(),
+        })
+            .then(function (response) { return response.json(); })
+            .then(function (data) {
+                if (!data.success) {
+                    mostrar(data.message, false);
+                    anotar(data.message, false);
+                    pitido(false);
+                    return;
+                }
+
+                actualizarFilaLpn(data.lpn);
+                actualizarProgreso(data.progreso);
+
+                var texto = data.lpn.codigo + ' recibido: ' + data.lpn.estadoLabel;
+
+                if (data.progreso) {
+                    texto += ' — ' + data.progreso.tracking + ' (' + data.progreso.cliente + '): '
+                        + data.progreso.recibidos + ' de ' + data.progreso.total
+                        + (data.progreso.recibidos >= data.progreso.total ? '. Carga completa.' : '');
+                }
+
+                mostrar(texto, true);
+                anotar(texto, true);
+                pitido(true);
+            })
+            .catch(function () {
+                mostrar('Error de conexion con ' + codigo + ', escanee de nuevo.', false);
+                pitido(false);
+            })
+            .then(function () {
+                enviando = false;
+                siguiente();
+            });
     }
 
     scanInput.addEventListener('keydown', function (event) {
@@ -271,47 +448,17 @@ document.addEventListener('DOMContentLoaded', function () {
 
         event.preventDefault();
         var codigo = scanInput.value.trim();
-
-        if (codigo === '') {
-            return;
-        }
-
-        var body = new URLSearchParams();
-        body.set('_csrf', csrfInput.value);
-        body.set('codigo', codigo);
-        body.set('ubicacion_id', ubicacionSelect.value);
-
-        fetch('/cargas/' + cargaIdInput.value + '/recepcion/confirmar', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: body.toString(),
-        })
-            .then(function (response) { return response.json(); })
-            .then(function (data) {
-                if (!data.success) {
-                    mensaje.textContent = data.message;
-                    mensaje.className = 'text-sm text-red-600';
-                    return;
-                }
-
-                var fila = document.querySelector('#lpn-tbody tr[data-codigo="' + data.lpn.codigo + '"]');
-
-                if (fila) {
-                    fila.querySelector('.lpn-estado-cell').innerHTML =
-                        '<span class="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">' + data.lpn.estadoLabel + '</span>';
-                    fila.querySelector('.lpn-ubicacion-cell').textContent =
-                        ubicacionSelect.options[ubicacionSelect.selectedIndex].text;
-                }
-
-                mensaje.textContent = 'LPN ' + data.lpn.codigo + ' confirmado.';
-                mensaje.className = 'text-sm text-green-600';
-            })
-            .catch(function () {
-                mensaje.textContent = 'Error de conexion, intenta de nuevo.';
-                mensaje.className = 'text-sm text-red-600';
-            });
-
         scanInput.value = '';
+        scanInput.focus();
+
+        if (codigo !== '') {
+            cola.push(codigo);
+            siguiente();
+        }
+    });
+
+    // Si el operador toca otra parte de la pantalla, el siguiente escaneo debe seguir llegando al campo.
+    ubicacionSelect.addEventListener('change', function () {
         scanInput.focus();
     });
 });
@@ -482,6 +629,15 @@ document.addEventListener('DOMContentLoaded', function () {
         paginacionId: 'proveedores-paginacion',
         botonClase: '.proveedores-pagina-btn',
         url: '/proveedores/buscar'
+    });
+
+    initBusquedaPaginada({
+        inputId: 'buscar-navieras',
+        perPageId: 'navieras-per-page',
+        tbodyId: 'navieras-tbody',
+        paginacionId: 'navieras-paginacion',
+        botonClase: '.navieras-pagina-btn',
+        url: '/navieras/buscar'
     });
 
     initBusquedaPaginada({

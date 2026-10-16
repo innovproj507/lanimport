@@ -31,7 +31,7 @@ The app is served by Laragon with DocumentRoot at `public/`. There is no JS/CSS 
 
 ### Domain: `src/<Contexto>/{Domain,Application,Infrastructure}`
 
-These are hexagonal/DDD bounded contexts (`Auth`, `Carga`, `Cliente`, `Lpn`, `Salida`, `Reempaque`, `Factura`, `Notificacion`, `Reporte`, `Aduanero`, `Proveedor`, `Pais`, plus `Shared`).
+These are hexagonal/DDD bounded contexts (`Auth`, `Carga`, `Cliente`, `Lpn`, `Salida`, `Reempaque`, `Factura`, `Notificacion`, `Reporte`, `Aduanero`, `Proveedor`, `Pais`, `Naviera`, `Configuracion`, plus `Shared`).
 - **Application** has one folder per use case, named `VerboSustantivo/`. Each holds a `*Command`/`*Query` DTO and a `*Handler` (`handle()` implementing `Shared/Application` interfaces), and sometimes a `*Result`.
 - **Infrastructure/Persistence** holds `Pdo*Repository` classes: raw PDO with prepared statements, no ORM. CI's Model/Query Builder is not used.
 - Writes that touch several repositories go through `UnitOfWork::run(callable)` (a PDO transaction). `RegistrarCargaHandler` is the canonical example.
@@ -44,12 +44,11 @@ This is the single composition root, a copy of `../lan/bootstrap/app.php`. It bu
 ### Web layer (session-based)
 
 - Routes are explicit in `app/Config/Routes.php`, with no auto-routing. Access control is declared per route through filters: `auth` (session required) and `role:a,b,...`. Filter classes are in `app/Filters`, and their aliases are in `app/Config/Filters.php`.
-- Roles have internal values plus user-facing names (`Rol::label()`): `admin` = Owner, `gerente` = Gerencia, `operaciones` = Trafico, `bodega`, `recepcion`, `aduanero`, `cliente`.
+- Roles have internal values plus user-facing names (`Rol::label()`): `admin` = Owner, `gerente` = Gerencia, `operaciones` = Trafico, `bodega`, `aduanero`, `cliente`.
   - Owner is the only role with Configuracion (usuarios, paises, correo, empresa, notificaciones, etiqueta LPN).
-  - Gerencia = everything else, plus Reportes, deleting LPNs and correcting actas.
+  - Gerencia = everything else, plus Reportes and deleting LPNs.
   - Trafico = all operations, without Reportes or those two actions.
-  - Bodega = only ingreso, recepcion, inventario, salidas and reempaque; it has no dashboard or rastreo, and `DashboardController` redirects it to `/cargas/ingreso`.
-  - Recepcion = only actas de recepcion.
+  - Bodega = only recepcion, ingreso, inventario, salidas and reempaque; it has no dashboard or rastreo, and `DashboardController` redirects it to the mobile app at `/bodega`.
   - Menu visibility in `partials/header.php` must match the route filters.
 - Auth state uses **native PHP `$_SESSION`** through `Courier\Auth\Infrastructure\Security\SessionManager` (`usuario_id`, `usuario_rol`), not CI's session service. CSRF uses the custom `App\Libraries\Csrf`: forms post a hidden `_csrf` field, and controllers call `Csrf::verify($this->request->getPost('_csrf'))`. CI's global `csrf` filter is off.
 - Views are plain PHP templates. They `require __DIR__ . '/../partials/header.php'` and `footer.php` (or `header_cliente.php` for the client portal), and use helpers from `partials/view_helpers.php` (`nav_item`, `badge`, `icon_button`, ...).
@@ -64,12 +63,38 @@ This is the single composition root, a copy of `../lan/bootstrap/app.php`. It bu
 - Controllers live in `app/Controllers/Api` and extend `BaseApiController`. They return `success()`/`error()` envelopes and map exceptions to HTTP codes in `fromException()`: 422 validation, 404 not found, 409 invalid state transition, 401, 429.
 - Filters: `jwt` (`JwtAuthFilter`) verifies the bearer token and puts the claims in `Services::apiAuthContext()`; `apirole:...` checks the role; `ratelimit:key[,max,window]` applies a rate limit.
 
+### App movil de bodega (`/bodega`)
+
+- Warehouse staff use PDAs/tablets with a PWA served by the same app at `/bodega` (`BodegaAppController`, view `bodega/app.php`, static files in `public/assets/bodega/`, no build step). It uses the normal web session, so there is no separate login, no JWT and no CORS.
+- Its JSON endpoints are `bodega/api/*` in `Api\BodegaApiController` (recepcion, LPN lookup, salidas). They reuse the same use cases as the web screens `/recepcion` and `/salidas`. POSTs send the CSRF token in the `X-CSRF-Token` header, checked by the `csrfheader` filter.
+- `AuthFilter` answers 401 JSON (instead of redirecting to `/login`) when the request sends `Accept: application/json`.
+- The service worker is served from `/bodega/sw.js` with `Service-Worker-Allowed: /bodega`, and it only caches `/assets/bodega/*`. Bump `VERSION` in `public/assets/bodega/sw.js` when those files change.
+- Scanned codes go through `ConfirmarRecepcionLpnHandler::normalizarCodigo()`, because keyboard-wedge scanners with a Spanish layout type `-` as `'`.
+
+### Datos de entrega (formerly "actas de recepcion")
+
+The paper delivery form (empresa de transporte, chofer, placa, entregado por, cedula, tipo de mercancia) is part of the carga itself: the `Carga\Domain\ValueObject\DatosEntrega` value object is stored in the `entrega_*` columns of `cargas` and filled in the "Datos de entrega" section of the Ingreso/Editar forms (`carga/_datos_entrega.php`). "Verificado por" is the user who registered the carga. `GET /cargas/{id}/comprobante` prints the signable comprobante. The former actas module, its table and the `recepcion` role were removed (migration 053).
+
+### Aduanero asignado al cliente
+
+`clientes.aduanero_identificador` (migration 056, FK to `aduaneros.identificador`) is the client's usual aduanero. It is edited in the client form, shown in the client list, and pre-selected in Ingreso de Carga when the client is picked (`alSeleccionar` in `app.js`), unless the user already chose another one.
+
+### Salidas: embarque y manifiesto
+
+- Each `SalidaOrden` gets a DO consecutive per year (`do_anio` + `do_numero`, shown as "DO.193 / 2026").
+  - `PdoSalidaOrdenRepository::insert()` assigns it with `SELECT ... FOR UPDATE` inside the UnitOfWork.
+  - The number restarts every year, and a unique key on (`do_anio`, `do_numero`) prevents duplicates.
+- Shipment data (contenedor, sello, naviera from the `navieras` catalog, barco, fecha de cargue, ETD, destino) is the `Salida\Domain\ValueObject\DatosEmbarque` value object. It is editable until the order is cancelled.
+- `GET /salidas/{id}/manifiesto` prints the manifest with one row per carga.
+  - Kilos, m3 and valor come from `carga_lineas` and are prorated when only part of a carga's LPNs ship.
+  - Line peso and valor are line totals; `cubicaje_p3` is per piece.
+
 ### Carga masiva (Excel/CSV)
 
 - `/cargas/masiva` is restricted to gerente and admin.
 - Flow: upload, then preview, then confirm. The validated plan lives in `$_SESSION['carga_masiva']` between preview and confirm.
 - `Carga/Application/ImportarCargas/PrepararImportacionCargas` validates and groups the rows by `referencia`, without writing anything.
-- `ImportarCargasHandler` registers each carga through `RegistrarCargaHandler`, one by one, so a failure does not stop the rest. It auto-creates missing proveedores (`PROV-####`), can skip the client email (`RegistrarCargaCommand::$notificarCliente`), and optionally generates the acta with `ActaRecepcion::generarPorCargaMasiva` (`origen = carga_masiva`).
+- `ImportarCargasHandler` registers each carga through `RegistrarCargaHandler`, one by one, so a failure does not stop the rest. It auto-creates missing proveedores (`PROV-####`), and can skip the client email (`RegistrarCargaCommand::$notificarCliente`).
 - `.xlsx` files are read and written with ZipArchive and XML (`Carga/Infrastructure/Importacion`); there is no PhpSpreadsheet dependency.
 
 ### Label printing

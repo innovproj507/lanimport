@@ -14,6 +14,8 @@ $headerActions = '<button type="button" id="btn-nuevo-cliente" class="inline-fle
 require __DIR__ . '/../partials/header.php';
 ?>
 
+<?php require __DIR__ . '/../partials/_flash.php'; ?>
+
 <?php if (!empty($pendientes)): ?>
 <div class="bg-white rounded-xl shadow-sm p-6 mb-6">
     <h2 class="text-sm font-semibold text-amber-600 uppercase tracking-wide mb-4 flex items-center gap-2"><?= icon_small('clock', 'w-4 h-4') ?> Nuevos registros (<?= count($pendientes) ?>)</h2>
@@ -76,6 +78,7 @@ require __DIR__ . '/../partials/header.php';
                 <th class="py-2 pr-4">Email</th>
                 <th class="py-2 pr-4">Telefono</th>
                 <th class="py-2 pr-4">Empresa</th>
+                <th class="py-2 pr-4">Aduanero</th>
                 <th class="py-2 pr-4">Estado</th>
                 <th class="py-2 text-right">Acciones</th>
             </tr>

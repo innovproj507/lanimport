@@ -27,7 +27,21 @@ final class Cliente extends AggregateRoot
         private readonly DateTimeImmutable $createdAt,
         private ?string $codigo = null,
         private ?int $secuencia = null,
+        // Identificador del aduanero que se propone en Ingreso de Carga para este cliente.
+        private ?string $aduaneroIdentificador = null,
     ) {
+    }
+
+    public function asignarAduanero(?string $aduaneroIdentificador): void
+    {
+        $this->aduaneroIdentificador = $aduaneroIdentificador !== null && trim($aduaneroIdentificador) !== ''
+            ? trim($aduaneroIdentificador)
+            : null;
+    }
+
+    public function aduaneroIdentificador(): ?string
+    {
+        return $this->aduaneroIdentificador;
     }
 
     public static function registrar(

@@ -7,6 +7,7 @@ namespace Courier\Carga\Application\ActualizarDatosCarga;
 use Courier\Carga\Domain\CargaRepositoryInterface;
 use Courier\Carga\Domain\ValueObject\Aduanero;
 use Courier\Carga\Domain\ValueObject\Contenedor;
+use Courier\Carga\Domain\ValueObject\DatosEntrega;
 use Courier\Carga\Domain\ValueObject\LineaCarga;
 use Courier\Shared\Application\CommandHandlerInterface;
 use Courier\Shared\Application\CommandInterface;
@@ -58,6 +59,10 @@ final class ActualizarDatosCargaHandler implements CommandHandlerInterface
             $command->facturaProveedorNombre,
             $command->facturaProveedorRuta,
         );
+
+        if ($command->datosEntrega !== null) {
+            $carga->asignarDatosEntrega(DatosEntrega::desdeArreglo($command->datosEntrega));
+        }
 
         $this->cargas->save($carga);
 

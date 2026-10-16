@@ -14,11 +14,9 @@ $esAdminOGerente = in_array($rolActual, ['gerente', 'admin'], true);
 // Configuracion (usuarios, paises, correo, empresa...) es solo del Owner (rol admin).
 $esOwner = $rolActual === 'admin';
 $puedeVerReportes = in_array($rolActual, ['gerente', 'admin'], true);
-// Bodega solo opera carga (ingreso, recepcion, inventario, salidas, reempaque): sin dashboard ni rastreo.
+// Bodega solo opera carga (ingreso, inventario, salidas, reempaque): sin dashboard ni rastreo.
 $esBodega = $rolActual === 'bodega';
-// El rol recepcion solo ve Recepcion de Carga (sin dashboard, rastreo ni buscador).
-$esRecepcion = $rolActual === 'recepcion';
-$inicio = match (true) { $esRecepcion => '/recepciones', $esBodega => '/cargas/ingreso', default => '/dashboard' };
+$inicio = $esBodega ? '/cargas/ingreso' : '/dashboard';
 $rolEtiqueta = \Courier\Auth\Domain\Rol::tryFrom((string) $rolActual)?->label() ?? (string) $rolActual;
 
 $pageTitle = $pageTitle ?? 'Courier';
@@ -61,14 +59,6 @@ require_once __DIR__ . '/view_helpers.php';
         </div>
 
         <nav class="flex-1 overflow-y-auto px-3 py-4 space-y-5">
-            <?php if ($esRecepcion): ?>
-            <div>
-                <p class="px-3 mb-2 text-[11px] font-semibold text-white/40 uppercase tracking-wider">Bodega</p>
-                <div class="space-y-1">
-                    <?= nav_item('/recepciones', 'receipt', 'Recepcion de Carga', $currentPath, false, 'text-red-400') ?>
-                </div>
-            </div>
-            <?php else: ?>
             <?php if (!$esBodega): ?>
             <div class="space-y-1">
                 <?= nav_item('/dashboard', 'home', 'Dashboard', $currentPath, false, 'text-sky-400') ?>
@@ -80,7 +70,8 @@ require_once __DIR__ . '/view_helpers.php';
                 <div class="space-y-1">
                     <?php if ($puedeIngresar): ?>
                         <?= nav_item('/cargas/ingreso', 'box', 'Ingreso de Carga', $currentPath, false, 'text-amber-400') ?>
-                        <?= nav_item('/recepciones', 'receipt', 'Recepcion de Carga', $currentPath, false, 'text-red-400') ?>
+                        <?= nav_item('/recepcion', 'scan', 'Recepcion', $currentPath, false, 'text-lime-400') ?>
+                        <?= nav_item('/bodega', 'scan', 'App movil de bodega', $currentPath, false, 'text-lime-300') ?>
                         <?= nav_item('/inventario', 'box', 'Inventario', $currentPath, false, 'text-emerald-400') ?>
                         <?= nav_item('/salidas/historial', 'truck', 'Salidas', $currentPath, false, 'text-orange-400') ?>
                         <?= nav_item('/reempaques', 'box', 'Reempaque', $currentPath, false, 'text-violet-400') ?>
@@ -98,6 +89,7 @@ require_once __DIR__ . '/view_helpers.php';
                     <?= nav_item('/clientes', 'users', 'Clientes', $currentPath, false, 'text-pink-400') ?>
                     <?= nav_item('/aduaneros', 'shield', 'Aduaneros', $currentPath, false, 'text-yellow-400') ?>
                     <?= nav_item('/proveedores', 'truck', 'Proveedores', $currentPath, false, 'text-lime-400') ?>
+                    <?= nav_item('/navieras', 'globe', 'Navieras', $currentPath, false, 'text-blue-400') ?>
                     <?= nav_item('/ubicaciones', 'box', 'Ubicaciones', $currentPath, false, 'text-teal-400') ?>
                     <?= nav_item('/facturas', 'receipt', 'Facturas', $currentPath, true) ?>
                     <?php if ($puedeVerReportes): ?>
@@ -123,7 +115,6 @@ require_once __DIR__ . '/view_helpers.php';
                 </div>
             </div>
             <?php endif; ?>
-            <?php endif; /* fin menu completo (no recepcion) */ ?>
         </nav>
 
         <div class="px-4 py-3 border-t border-white/10 text-[11px] text-white/40">
@@ -138,7 +129,7 @@ require_once __DIR__ . '/view_helpers.php';
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" /></svg>
             </button>
 
-            <?php if ($esRecepcion || $esBodega): ?>
+            <?php if ($esBodega): ?>
                 <a href="<?= $inicio ?>" class="text-white font-semibold truncate lg:hidden">LAN Import</a>
             <?php else: ?>
             <form method="post" action="/tracking/buscar" class="hidden md:flex flex-1 max-w-md items-center bg-white rounded-full pl-4 pr-1.5 py-1 shadow-inner">

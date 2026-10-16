@@ -176,6 +176,35 @@ final class PdoLpnRepository implements LpnRepositoryInterface
         return array_map(fn (array $row) => $this->hydrate($row), $stmt->fetchAll());
     }
 
+    public function resumenRecepcion(?string $cargaId = null): array
+    {
+        $sql = "SELECT c.id, c.tracking_numero, c.fecha_ingreso,
+                       TRIM(CONCAT(cl.nombre, ' ', COALESCE(cl.apellido, ''))) AS cliente,
+                       MAX(l.marca) AS marca,
+                       COUNT(*) AS total,
+                       SUM(l.estado <> 'receiving') AS recibidos
+                FROM lpns l
+                JOIN cargas c ON c.id = l.carga_id
+                LEFT JOIN clientes cl ON cl.id = c.cliente_id"
+            . ($cargaId !== null ? ' WHERE c.id = :carga_id' : '')
+            . " GROUP BY c.id, c.tracking_numero, c.fecha_ingreso, cl.nombre, cl.apellido"
+            . ($cargaId !== null ? '' : " HAVING SUM(l.estado = 'receiving') > 0")
+            . ' ORDER BY c.fecha_ingreso ASC, c.tracking_numero ASC';
+
+        $stmt = $this->connection->prepare($sql);
+        $stmt->execute($cargaId !== null ? [':carga_id' => $cargaId] : []);
+
+        return array_map(static fn (array $row) => [
+            'cargaId' => (string) $row['id'],
+            'tracking' => (string) $row['tracking_numero'],
+            'cliente' => (string) $row['cliente'],
+            'marca' => $row['marca'] !== null ? (string) $row['marca'] : null,
+            'fechaIngreso' => (string) $row['fecha_ingreso'],
+            'total' => (int) $row['total'],
+            'recibidos' => (int) $row['recibidos'],
+        ], $stmt->fetchAll());
+    }
+
     /** @param array<string, mixed> $row */
     private function hydrate(array $row): Lpn
     {

@@ -16,6 +16,10 @@ use Courier\Aduanero\Application\RegistrarAduanero\RegistrarAduaneroHandler;
 use Courier\Aduanero\Domain\AduaneroRepositoryInterface;
 use Courier\Pais\Application\ListarPaises\ListarPaisesHandler;
 use Courier\Pais\Application\ListarPaises\ListarPaisesQuery;
+use Courier\Aduanero\Application\CambiarEstadoAduanero\CambiarEstadoAduaneroCommand;
+use Courier\Aduanero\Application\CambiarEstadoAduanero\CambiarEstadoAduaneroHandler;
+use Courier\Aduanero\Application\EliminarAduanero\EliminarAduaneroCommand;
+use Courier\Aduanero\Application\EliminarAduanero\EliminarAduaneroHandler;
 use Courier\Shared\Domain\Exception\NotFoundException;
 use Courier\Shared\Domain\Exception\ValidationException;
 
@@ -34,7 +38,47 @@ final class AduaneroController extends BaseController
             'page' => $resultado->page,
             'perPage' => $resultado->perPage,
             'totalPages' => $resultado->totalPages(),
+            'flash' => $this->tomarFlash(),
         ]);
+    }
+
+    /** Elimina solo si el aduanero nunca se uso; si tiene historial avisa que se desactive (gerencia/owner). */
+    public function eliminar(string $id): RedirectResponse
+    {
+        if (Csrf::verify($this->request->getPost('_csrf'))) {
+            try {
+                $nombre = $this->container()->get(EliminarAduaneroHandler::class)->handle(new EliminarAduaneroCommand($id));
+                $this->flash('ok', "Aduanero {$nombre} eliminado.");
+            } catch (ValidationException|NotFoundException $e) {
+                $this->flash('error', $e->getMessage());
+            }
+        }
+
+        return redirect()->to('/aduaneros');
+    }
+
+    public function activar(string $id): RedirectResponse
+    {
+        return $this->cambiarEstado($id, true);
+    }
+
+    public function desactivar(string $id): RedirectResponse
+    {
+        return $this->cambiarEstado($id, false);
+    }
+
+    private function cambiarEstado(string $id, bool $activo): RedirectResponse
+    {
+        if (Csrf::verify($this->request->getPost('_csrf'))) {
+            try {
+                $this->container()->get(CambiarEstadoAduaneroHandler::class)->handle(new CambiarEstadoAduaneroCommand($id, $activo));
+                $this->flash('ok', $activo ? 'Aduanero activado.' : 'Aduanero desactivado: ya no aparece en Ingreso de Carga ni Salidas.');
+            } catch (NotFoundException $e) {
+                $this->flash('error', $e->getMessage());
+            }
+        }
+
+        return redirect()->to('/aduaneros');
     }
 
     public function buscar(): ResponseInterface

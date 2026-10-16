@@ -85,25 +85,31 @@ foreach ($clientes as $c) {
         <table class="w-full text-sm">
             <thead>
                 <tr class="text-left text-xs text-zinc-500 uppercase border-b border-slate-200">
-                    <th class="py-2 pr-4">Codigo</th>
+                    <th class="py-2 pr-4">DO</th>
                     <th class="py-2 pr-4">Cliente</th>
+                    <th class="py-2 pr-4">Contenedor</th>
+                    <th class="py-2 pr-4">Naviera</th>
                     <th class="py-2 pr-4">Estado</th>
                     <th class="py-2 pr-4">Creada</th>
-                    <th class="py-2">Confirmada</th>
+                    <th class="py-2 pr-4">Confirmada</th>
+                    <th class="py-2"></th>
                 </tr>
             </thead>
             <tbody>
                 <?php foreach ($ordenes as $orden): ?>
                     <tr class="border-b border-slate-200">
-                        <td class="py-2 pr-4 font-mono font-medium text-black">
+                        <td class="py-2 pr-4 font-medium text-black whitespace-nowrap">
                             <a href="/salidas/<?= htmlspecialchars($orden->id()) ?>" class="text-amber-600 hover:underline">
-                                <?= htmlspecialchars((string) $orden->codigo()) ?>
+                                <?= htmlspecialchars($orden->etiquetaDo()) ?>
                             </a>
                         </td>
                         <td class="py-2 pr-4 text-zinc-700"><?= htmlspecialchars($mapaClientes[$orden->clienteId()] ?? '—') ?></td>
+                        <td class="py-2 pr-4 font-mono text-zinc-700"><?= htmlspecialchars($orden->embarque()->contenedorFormateado() ?? '—') ?></td>
+                        <td class="py-2 pr-4 text-zinc-700"><?= htmlspecialchars($orden->embarque()->navieraNombre ?? '—') ?></td>
                         <td class="py-2 pr-4"><?= badge($orden->estado()->label(), $estadoColores[$orden->estado()->value] ?? 'slate') ?></td>
                         <td class="py-2 pr-4 text-zinc-700"><?= htmlspecialchars($orden->createdAt()->format('Y-m-d H:i')) ?></td>
-                        <td class="py-2 text-zinc-700"><?= htmlspecialchars($orden->confirmedAt()?->format('Y-m-d H:i') ?? '—') ?></td>
+                        <td class="py-2 pr-4 text-zinc-700"><?= htmlspecialchars($orden->confirmedAt()?->format('Y-m-d H:i') ?? '—') ?></td>
+                        <td class="py-2 text-right"><?= icon_button('/salidas/' . $orden->id() . '/manifiesto', 'printer', 'Imprimir manifiesto', 'slate') ?></td>
                     </tr>
                 <?php endforeach; ?>
             </tbody>

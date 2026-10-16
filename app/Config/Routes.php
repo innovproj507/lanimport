@@ -18,16 +18,13 @@ $routes->post('/forgot-password', 'AuthController::forgotPassword');
 $routes->get('/reset-password/(:segment)', 'AuthController::showResetPasswordForm/$1');
 $routes->post('/reset-password/(:segment)', 'AuthController::resetPassword/$1');
 
-// Todos los roles con sesion salvo 'recepcion', que solo usa Recepcion de Carga.
-$sinRecepcion = ['auth', 'role:cliente,aduanero,operaciones,bodega,gerente,admin'];
-
-// Requieren sesion activa (DashboardController manda al rol recepcion a /recepciones)
+// Requieren sesion activa (DashboardController manda al rol bodega a /cargas/ingreso)
 $routes->get('/dashboard', 'DashboardController::index', ['filter' => 'auth']);
 
 // Portal de cliente — requiere sesion + rol cliente
 $routes->get('/portal', 'PortalController::index', ['filter' => ['auth', 'role:cliente']]);
 
-// Tracking — requiere sesion (cualquier rol, salvo recepcion y bodega)
+// Tracking — requiere sesion (cualquier rol, salvo bodega)
 $rastreoFilter = ['auth', 'role:cliente,aduanero,operaciones,gerente,admin'];
 $routes->get('/tracking', 'TrackingController::showLookupForm', ['filter' => $rastreoFilter]);
 $routes->post('/tracking/buscar', 'TrackingController::lookup', ['filter' => $rastreoFilter]);
@@ -50,6 +47,8 @@ $routes->group('aduaneros', ['filter' => ['auth', 'role:operaciones,gerente,admi
     $routes->post('/', 'AduaneroController::store');
     $routes->get('(:segment)/editar', 'AduaneroController::showEditForm/$1');
     $routes->post('(:segment)/editar', 'AduaneroController::update/$1');
+    $routes->post('(:segment)/desactivar', 'AduaneroController::desactivar/$1');
+    $routes->post('(:segment)/activar', 'AduaneroController::activar/$1');
 });
 
 // Proveedores — requiere sesion + rol operaciones/gerente/admin (igual que $gestionRoles en WebRoutes.php)
@@ -61,6 +60,26 @@ $routes->group('proveedores', ['filter' => ['auth', 'role:operaciones,gerente,ad
     $routes->get('(:segment)/editar', 'ProveedorController::showEditForm/$1');
     $routes->post('(:segment)/editar', 'ProveedorController::update/$1');
 });
+
+// Navieras — catalogo para las salidas de contenedores; mismos roles que Proveedores
+$routes->group('navieras', ['filter' => ['auth', 'role:operaciones,gerente,admin']], static function ($routes) {
+    $routes->get('/', 'NavieraController::index');
+    $routes->get('buscar', 'NavieraController::buscar');
+    $routes->get('nuevo', 'NavieraController::showCreateForm');
+    $routes->post('/', 'NavieraController::store');
+    $routes->get('(:segment)/editar', 'NavieraController::showEditForm/$1');
+    $routes->post('(:segment)/editar', 'NavieraController::update/$1');
+    $routes->post('(:segment)/desactivar', 'NavieraController::desactivar/$1');
+    $routes->post('(:segment)/activar', 'NavieraController::activar/$1');
+});
+
+// Eliminar clientes/aduaneros/navieras: solo gerencia y owner, y solo si nunca se usaron
+// (si tienen historial el caso de uso lo rechaza y se ofrece desactivar). Fuera de los grupos
+// para que aplique este filtro de rol y no el de cada grupo.
+$eliminarFilter = ['auth', 'role:gerente,admin'];
+$routes->post('clientes/(:segment)/eliminar', 'ClienteController::delete/$1', ['filter' => $eliminarFilter]);
+$routes->post('aduaneros/(:segment)/eliminar', 'AduaneroController::eliminar/$1', ['filter' => $eliminarFilter]);
+$routes->post('navieras/(:segment)/eliminar', 'NavieraController::eliminar/$1', ['filter' => $eliminarFilter]);
 
 // rapido de Cliente/Proveedor se usan desde el picker de Ingreso de Carga — requieren
 // $bodegaRoles (incluye bodega), no $gestionRoles, igual que WebRoutes.php linea 62-63.
@@ -88,7 +107,8 @@ $routes->group('clientes', ['filter' => ['auth', 'role:operaciones,gerente,admin
     $routes->get('(:segment)', 'ClienteController::show/$1');
     $routes->get('(:segment)/editar', 'ClienteController::showEditForm/$1');
     $routes->post('(:segment)/editar', 'ClienteController::update/$1');
-    $routes->post('(:segment)/eliminar', 'ClienteController::delete/$1');
+    $routes->post('(:segment)/desactivar', 'ClienteController::desactivar/$1');
+    $routes->post('(:segment)/activar', 'ClienteController::activar/$1');
     $routes->post('(:segment)/aprobar', 'ClienteController::aprobar/$1');
     $routes->post('(:segment)/rechazar', 'ClienteController::rechazar/$1');
 });
@@ -106,26 +126,34 @@ $routes->get('cargas/masiva', 'CargaMasivaController::index', ['filter' => $masi
 $routes->get('cargas/masiva/plantilla', 'CargaMasivaController::plantilla', ['filter' => $masivaFilter]);
 $routes->post('cargas/masiva/previsualizar', 'CargaMasivaController::previsualizar', ['filter' => $masivaFilter]);
 $routes->post('cargas/masiva/confirmar', 'CargaMasivaController::confirmar', ['filter' => $masivaFilter]);
-$routes->get('cargas/(:segment)', 'CargaController::showDetalle/$1', ['filter' => $sinRecepcion]);
+$routes->get('cargas/(:segment)', 'CargaController::showDetalle/$1', ['filter' => 'auth']);
 $routes->get('cargas/(:segment)/editar', 'CargaController::showEditForm/$1', ['filter' => $bodegaFilter]);
 $routes->post('cargas/(:segment)/editar', 'CargaController::update/$1', ['filter' => $bodegaFilter]);
 $routes->post('cargas/(:segment)/reenviar-correo', 'CargaController::reenviarCorreo/$1', ['filter' => ['auth', 'role:operaciones,gerente,admin']]);
 $routes->post('cargas/(:segment)/lpns/generar', 'CargaController::generarLpns/$1', ['filter' => $bodegaFilter]);
 $routes->post('cargas/(:segment)/lpns/eliminar', 'CargaController::eliminarLpns/$1', ['filter' => ['auth', 'role:gerente,admin']]);
 $routes->post('lpn/plantilla-etiqueta', 'LpnController::guardarPlantillaEtiqueta', ['filter' => ['auth', 'role:admin']]);
-// Actas de recepcion: las ve el personal interno; las llenan bodega/admin (con o sin carga
-// registrada) y las corrigen bodega/gerente/admin (la regla fina esta en ActaRecepcion).
-$recepcionFilter = ['auth', 'role:recepcion,operaciones,bodega,gerente,admin'];
-$routes->get('recepciones', 'ActaRecepcionController::index', ['filter' => $recepcionFilter]);
-$routes->get('recepciones/nueva', 'ActaRecepcionController::nueva', ['filter' => ['auth', 'role:recepcion,bodega,admin']]);
-$routes->post('recepciones', 'ActaRecepcionController::crear', ['filter' => ['auth', 'role:recepcion,bodega,admin']]);
-$routes->get('recepciones/(:segment)', 'ActaRecepcionController::show/$1', ['filter' => $recepcionFilter]);
-$routes->post('recepciones/(:segment)', 'ActaRecepcionController::corregir/$1', ['filter' => ['auth', 'role:recepcion,bodega,gerente,admin']]);
-$routes->get('recepciones/(:segment)/imprimir', 'ActaRecepcionController::imprimir/$1', ['filter' => $recepcionFilter]);
-$routes->post('recepciones/(:segment)/vincular', 'ActaRecepcionController::vincular/$1', ['filter' => $bodegaFilter]);
-$routes->get('cargas/(:segment)/acta-recepcion', 'ActaRecepcionController::porCarga/$1', ['filter' => $recepcionFilter]);
+// Comprobante de recepcion imprimible (datos de entrega + espacios para firmas).
+$routes->get('cargas/(:segment)/comprobante', 'CargaController::comprobante/$1', ['filter' => $bodegaFilter]);
 $routes->get('cargas/(:segment)/recepcion','LpnController::showRecepcion/$1', ['filter' => $bodegaFilter]);
 $routes->post('cargas/(:segment)/recepcion/confirmar', 'LpnController::confirmarRecepcion/$1', ['filter' => $bodegaFilter]);
+// App movil de bodega (PDA/tablet): pagina unica + API JSON con la misma sesion.
+// Los POST llevan el token CSRF en la cabecera X-CSRF-Token (filtro csrfheader).
+$routes->get('bodega/sw.js', 'BodegaAppController::serviceWorker');
+$routes->get('bodega', 'BodegaAppController::index', ['filter' => $bodegaFilter]);
+$routes->group('bodega/api', ['filter' => array_merge($bodegaFilter, ['csrfheader'])], static function ($routes) {
+    $routes->get('ubicaciones', 'Api\BodegaApiController::ubicaciones');
+    $routes->get('recepcion', 'Api\BodegaApiController::recepcionPendientes');
+    $routes->post('recepcion/escanear', 'Api\BodegaApiController::recepcionEscanear');
+    $routes->get('lpns/(:segment)', 'Api\BodegaApiController::lpn/$1');
+    $routes->get('salidas', 'Api\BodegaApiController::salidas');
+    $routes->get('salidas/(:segment)', 'Api\BodegaApiController::salida/$1');
+    $routes->post('salidas/(:segment)/escanear', 'Api\BodegaApiController::salidaEscanear/$1');
+    $routes->post('salidas/(:segment)/finalizar', 'Api\BodegaApiController::salidaFinalizar/$1');
+});
+// Recepcion general de bodega: escanear las etiquetas de cualquier carga (LPN "En recepcion" -> "Disponible").
+$routes->get('recepcion', 'LpnController::recepcionGeneral', ['filter' => $bodegaFilter]);
+$routes->post('recepcion/escanear', 'LpnController::escanearRecepcion', ['filter' => $bodegaFilter]);
 
 // Inventario — requiere sesion + rol operaciones/bodega/gerente/admin
 $routes->get('inventario', 'InventarioController::index', ['filter' => $bodegaFilter]);
@@ -138,6 +166,8 @@ $routes->get('salidas/(:segment)', 'SalidaController::show/$1', ['filter' => $bo
 $routes->post('salidas/(:segment)/escanear', 'SalidaController::confirmarEscaneo/$1', ['filter' => $bodegaFilter]);
 $routes->post('salidas/(:segment)/finalizar', 'SalidaController::finalizar/$1', ['filter' => $bodegaFilter]);
 $routes->post('salidas/(:segment)/cancelar', 'SalidaController::cancelar/$1', ['filter' => $bodegaFilter]);
+$routes->post('salidas/(:segment)/embarque', 'SalidaController::guardarEmbarque/$1', ['filter' => $bodegaFilter]);
+$routes->get('salidas/(:segment)/manifiesto', 'SalidaController::manifiesto/$1', ['filter' => $bodegaFilter]);
 
 // Reempaques — requiere sesion + rol operaciones/bodega/gerente/admin (igual que $bodegaRoles en WebRoutes.php)
 $routes->get('reempaques/historial', 'ReempaqueController::historial', ['filter' => $bodegaFilter]);

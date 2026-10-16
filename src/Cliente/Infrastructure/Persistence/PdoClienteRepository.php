@@ -33,9 +33,9 @@ final class PdoClienteRepository implements ClienteRepositoryInterface
     {
         $stmt = $this->connection->prepare(
             'INSERT INTO clientes
-                (id, usuario_id, nombre, apellido, email, telefono, direccion, empresa, pais, estado, activo, created_at)
+                (id, usuario_id, nombre, apellido, email, telefono, direccion, empresa, pais, aduanero_identificador, estado, activo, created_at)
              VALUES
-                (:id, :usuario_id, :nombre, :apellido, :email, :telefono, :direccion, :empresa, :pais, :estado, :activo, :created_at)'
+                (:id, :usuario_id, :nombre, :apellido, :email, :telefono, :direccion, :empresa, :pais, :aduanero, :estado, :activo, :created_at)'
         );
 
         $stmt->execute([
@@ -48,6 +48,7 @@ final class PdoClienteRepository implements ClienteRepositoryInterface
             ':direccion' => $cliente->direccion(),
             ':empresa' => $cliente->empresa(),
             ':pais' => $cliente->pais(),
+            ':aduanero' => $cliente->aduaneroIdentificador(),
             ':estado' => $cliente->estado()->value,
             ':activo' => $cliente->activo() ? 1 : 0,
             ':created_at' => $cliente->createdAt()->format('Y-m-d H:i:s'),
@@ -66,7 +67,7 @@ final class PdoClienteRepository implements ClienteRepositoryInterface
             'UPDATE clientes SET
                 usuario_id = :usuario_id, nombre = :nombre, apellido = :apellido, email = :email,
                 telefono = :telefono, direccion = :direccion, empresa = :empresa, pais = :pais,
-                estado = :estado, activo = :activo
+                aduanero_identificador = :aduanero, estado = :estado, activo = :activo
              WHERE id = :id'
         );
 
@@ -80,6 +81,7 @@ final class PdoClienteRepository implements ClienteRepositoryInterface
             ':direccion' => $cliente->direccion(),
             ':empresa' => $cliente->empresa(),
             ':pais' => $cliente->pais(),
+            ':aduanero' => $cliente->aduaneroIdentificador(),
             ':estado' => $cliente->estado()->value,
             ':activo' => $cliente->activo() ? 1 : 0,
         ]);
@@ -159,7 +161,7 @@ final class PdoClienteRepository implements ClienteRepositoryInterface
         $offset = ($page - 1) * $perPage;
         $term = trim($term);
 
-        $where = "estado = 'aprobado' AND activo = 1";
+        $where = "estado = 'aprobado'";
         $params = [];
 
         if ($term !== '') {
@@ -178,7 +180,7 @@ final class PdoClienteRepository implements ClienteRepositoryInterface
         $countStmt->execute($params);
         $total = (int) $countStmt->fetchColumn();
 
-        $stmt = $this->connection->prepare("SELECT * FROM clientes WHERE {$where} ORDER BY secuencia ASC LIMIT :limit OFFSET :offset");
+        $stmt = $this->connection->prepare("SELECT * FROM clientes WHERE {$where} ORDER BY activo DESC, secuencia ASC LIMIT :limit OFFSET :offset");
 
         foreach ($params as $key => $value) {
             $stmt->bindValue($key, $value);
@@ -209,6 +211,25 @@ final class PdoClienteRepository implements ClienteRepositoryInterface
         return ((int) $stmt->fetchColumn()) > 0;
     }
 
+    public function referencias(string $id): array
+    {
+        $referencias = [];
+
+        foreach (['cargas' => 'cargas', 'salidas' => 'salida_ordenes', 'facturas' => 'facturas', 'reempaques' => 'reempaque_ordenes'] as $etiqueta => $tabla) {
+            $stmt = $this->connection->prepare("SELECT COUNT(*) FROM {$tabla} WHERE cliente_id = :id");
+            $stmt->execute([':id' => $id]);
+            $referencias[$etiqueta] = (int) $stmt->fetchColumn();
+        }
+
+        return array_filter($referencias);
+    }
+
+    public function delete(string $id): void
+    {
+        $this->connection->prepare('DELETE FROM cliente_documentos WHERE cliente_id = :id')->execute([':id' => $id]);
+        $this->connection->prepare('DELETE FROM clientes WHERE id = :id')->execute([':id' => $id]);
+    }
+
     /** @param array<string, mixed> $row */
     private function hydrate(array $row): Cliente
     {
@@ -227,6 +248,7 @@ final class PdoClienteRepository implements ClienteRepositoryInterface
             new DateTimeImmutable((string) $row['created_at']),
             $row['codigo'] !== null ? (string) $row['codigo'] : null,
             $row['secuencia'] !== null ? (int) $row['secuencia'] : null,
+            isset($row['aduanero_identificador']) ? (string) $row['aduanero_identificador'] : null,
         );
     }
 }

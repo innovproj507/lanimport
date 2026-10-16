@@ -14,6 +14,13 @@ use Courier\Cliente\Application\ListarClientes\ListarClientesHandler;
 use Courier\Cliente\Application\ListarClientes\ListarClientesQuery;
 use Courier\Lpn\Application\BuscarInventario\BuscarInventarioHandler;
 use Courier\Lpn\Application\BuscarInventario\BuscarInventarioQuery;
+use Courier\Cliente\Domain\ClienteRepositoryInterface;
+use Courier\Configuracion\Domain\ConfiguracionRepositoryInterface;
+use Courier\Naviera\Application\ListarNavieras\ListarNavierasHandler;
+use Courier\Naviera\Application\ListarNavieras\ListarNavierasQuery;
+use Courier\Salida\Application\ActualizarEmbarqueSalida\ActualizarEmbarqueSalidaCommand;
+use Courier\Salida\Application\ActualizarEmbarqueSalida\ActualizarEmbarqueSalidaHandler;
+use Courier\Salida\Domain\SalidaOrdenRepositoryInterface;
 use Courier\Salida\Application\CancelarOrdenSalida\CancelarOrdenSalidaCommand;
 use Courier\Salida\Application\CancelarOrdenSalida\CancelarOrdenSalidaHandler;
 use Courier\Salida\Application\ConfirmarSalida\ConfirmarSalidaCommand;
@@ -114,16 +121,70 @@ final class SalidaController extends BaseController
             }
         }
 
+        // Navieras activas, mas la de la orden aunque se haya desactivado despues.
+        $navieras = $this->container()->get(ListarNavierasHandler::class)->handle(new ListarNavierasQuery(false));
+        $navieraActual = $orden->embarque()->navieraId;
+        $navieras = array_values(array_filter($navieras, static fn ($n) => $n->activo() || $n->id() === $navieraActual));
+
+        $mensaje = $_SESSION['salida_mensaje'] ?? null;
+        $error = $_SESSION['salida_error'] ?? null;
+        unset($_SESSION['salida_mensaje'], $_SESSION['salida_error']);
+
         return view('salida/escaneo', [
             'orden' => $orden,
             'clienteNombre' => $clienteNombre,
+            'navieras' => $navieras,
+            'mensaje' => $mensaje,
+            'error' => $error,
+        ]);
+    }
+
+    public function guardarEmbarque(string $id): RedirectResponse
+    {
+        if (Csrf::verify($this->request->getPost('_csrf'))) {
+            try {
+                $this->container()->get(ActualizarEmbarqueSalidaHandler::class)->handle(new ActualizarEmbarqueSalidaCommand(
+                    $id,
+                    (string) $this->request->getPost('numero_contenedor'),
+                    (string) $this->request->getPost('numero_sello'),
+                    (string) $this->request->getPost('naviera_id'),
+                    (string) $this->request->getPost('nombre_barco'),
+                    (string) $this->request->getPost('fecha_cargue'),
+                    (string) $this->request->getPost('fecha_salida_etd'),
+                    (string) $this->request->getPost('destino_final'),
+                ));
+                $_SESSION['salida_mensaje'] = 'Datos del embarque guardados.';
+            } catch (ValidationException|NotFoundException $e) {
+                $_SESSION['salida_error'] = $e->getMessage();
+            }
+        }
+
+        return redirect()->to('/salidas/' . $id);
+    }
+
+    /** Manifiesto imprimible: encabezado del embarque y una fila por carga con totales. */
+    public function manifiesto(string $id): string
+    {
+        $orden = $this->container()->get(VerOrdenSalidaHandler::class)->handle(new VerOrdenSalidaQuery($id));
+
+        if ($orden === null) {
+            $this->response->setStatusCode(404);
+
+            return 'Orden de salida no encontrada.';
+        }
+
+        return view('salida/manifiesto_imprimir', [
+            'orden' => $orden,
+            'cliente' => $this->container()->get(ClienteRepositoryInterface::class)->findById($orden->clienteId()),
+            'filas' => $this->container()->get(SalidaOrdenRepositoryInterface::class)->manifiesto($orden->id()),
+            'empresa' => $this->container()->get(ConfiguracionRepositoryInterface::class)->datosEmpresa(),
         ]);
     }
 
     public function confirmarEscaneo(string $id): ResponseInterface
     {
         if (!Csrf::verify($this->request->getPost('_csrf'))) {
-            return $this->response->setStatusCode(419)->setJSON([
+            return $this->response->setStatusCode(419, 'Page Expired')->setJSON([
                 'success' => false,
                 'message' => 'Sesion expirada, por favor recargue la pagina.',
             ]);

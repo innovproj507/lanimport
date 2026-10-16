@@ -18,15 +18,14 @@ use Courier\Carga\Application\BuscarCargas\BuscarCargasHandler;
 use Courier\Carga\Application\ConsultarTrackingPorNumero\ConsultarTrackingPorNumeroHandler;
 use Courier\Carga\Application\RegistrarCarga\RegistrarCargaCommand;
 use Courier\Carga\Application\RegistrarCarga\RegistrarCargaHandler;
-use Courier\Carga\Application\VincularActaRecepcion\VincularActaRecepcionCommand;
-use Courier\Carga\Application\VincularActaRecepcion\VincularActaRecepcionHandler;
-use Courier\Carga\Domain\ActaRecepcionRepositoryInterface;
+use Courier\Auth\Domain\UsuarioRepositoryInterface;
 use Courier\Carga\Domain\Carga;
 use Courier\Carga\Domain\CargaRepositoryInterface;
 use Courier\Carga\Infrastructure\Persistence\PdoHistorialEstadoRepository;
 use Courier\Carga\Infrastructure\Storage\CargaDocumentoStorage;
 use Courier\Cliente\Application\ListarClientes\ListarClientesHandler;
 use Courier\Cliente\Domain\ClienteRepositoryInterface;
+use Courier\Configuracion\Domain\ConfiguracionRepositoryInterface;
 use Courier\Notificacion\Application\NotificarIngresoCarga\NotificarIngresoCargaHandler;
 use Courier\Notificacion\Domain\NotificacionRepositoryInterface;
 use Courier\Cliente\Application\ListarClientes\ListarClientesQuery;
@@ -53,10 +52,7 @@ final class CargaController extends BaseController
 
     public function showIngresoForm(): string
     {
-        // ?acta=ID: viene de "Registrar carga con esta acta" (mercancia ya recibida por bodega).
-        $acta = (string) ($this->request->getGet('acta') ?? '');
-
-        return $this->renderIngreso(null, $acta !== '' ? $acta : null);
+        return $this->renderIngreso(null);
     }
 
     public function store(): RedirectResponse|string
@@ -67,7 +63,6 @@ final class CargaController extends BaseController
 
         /** @var SessionManager $sessionManager */
         $sessionManager = $this->container()->get(SessionManager::class);
-        $actaId = (string) ($this->request->getPost('acta_recepcion_id') ?? '');
 
         try {
             /** @var ProveedorRepositoryInterface $proveedorRepository */
@@ -92,14 +87,6 @@ final class CargaController extends BaseController
                 }
             }
 
-            /** @var VincularActaRecepcionHandler $vincularActa */
-            $vincularActa = $this->container()->get(VincularActaRecepcionHandler::class);
-
-            if ($actaId !== '') {
-                // Se valida antes de crear la carga, para no dejarla registrada si el acta no corresponde.
-                $vincularActa->validar($actaId, null, (string) $this->request->getPost('cliente_id'));
-            }
-
             $facturaProveedor = $this->procesarFacturaProveedor();
 
             $command = new RegistrarCargaCommand(
@@ -117,23 +104,59 @@ final class CargaController extends BaseController
                 $this->request->getPost('notas') !== '' ? (string) $this->request->getPost('notas') : null,
                 $facturaProveedor['nombre_archivo'] ?? null,
                 $facturaProveedor['ruta_archivo'] ?? null,
+                true,
+                $this->datosEntregaDesdeFormulario(),
             );
 
             $result = $this->container()->get(RegistrarCargaHandler::class)->handle($command);
-
-            if ($actaId !== '') {
-                $vincularActa->handle(new VincularActaRecepcionCommand($actaId, $result->cargaId));
-            }
 
             $this->avisoCorreo('Carga ' . $result->trackingNumero . ' registrada.', $result->correoEstado, $result->correoDestinatario, $result->correoError);
 
             return redirect()->to('/cargas/' . $result->cargaId);
         } catch (ValidationException $e) {
-            return $this->renderIngreso($e->getMessage(), $actaId !== '' ? $actaId : null);
+            return $this->renderIngreso($e->getMessage());
         }
     }
 
-    private function renderIngreso(?string $error, ?string $actaPreseleccionada = null): string
+    /**
+     * Seccion "Datos de entrega" del formulario (lo que antes era el acta de recepcion en papel).
+     *
+     * @return array{empresaTransporte: string, chofer: string, placa: string, entregadoPor: string, cedula: string, tiposMercancia: array<int, string>}
+     */
+    private function datosEntregaDesdeFormulario(): array
+    {
+        $tipos = $this->request->getPost('entrega_tipos_mercancia') ?? [];
+
+        return [
+            'empresaTransporte' => (string) $this->request->getPost('entrega_empresa_transporte'),
+            'chofer' => (string) $this->request->getPost('entrega_chofer'),
+            'placa' => (string) $this->request->getPost('entrega_placa'),
+            'entregadoPor' => (string) $this->request->getPost('entrega_por'),
+            'cedula' => (string) $this->request->getPost('entrega_cedula'),
+            'tiposMercancia' => is_array($tipos) ? array_map('strval', $tipos) : [],
+        ];
+    }
+
+    /** Comprobante de recepcion imprimible (con espacios para firmas) de una carga. */
+    public function comprobante(string $id): string
+    {
+        $carga = $this->container()->get(CargaRepositoryInterface::class)->findById($id);
+
+        if ($carga === null) {
+            $this->response->setStatusCode(404);
+
+            return 'Carga no encontrada.';
+        }
+
+        return view('carga/comprobante_imprimir', [
+            'carga' => $carga,
+            'cliente' => $this->container()->get(ClienteRepositoryInterface::class)->findById($carga->clienteId()),
+            'verificadoPor' => $this->container()->get(UsuarioRepositoryInterface::class)->findById($carga->registradoPorUsuarioId())?->nombre(),
+            'empresa' => $this->container()->get(ConfiguracionRepositoryInterface::class)->datosEmpresa(),
+        ]);
+    }
+
+    private function renderIngreso(?string $error): string
     {
         $clientes = $this->container()->get(ListarClientesHandler::class)->handle(new ListarClientesQuery());
         $aduaneros = $this->container()->get(ListarAduanerosHandler::class)->handle(new ListarAduanerosQuery());
@@ -154,9 +177,7 @@ final class CargaController extends BaseController
             'perPage' => $resultado->perPage,
             'totalPages' => $resultado->totalPages(),
             'nombresClientes' => $this->nombresClientes($clientes),
-            'actasSinCarga' => $this->container()->get(ActaRecepcionRepositoryInterface::class)->actasSinCarga(),
-            'actaPreseleccionada' => $actaPreseleccionada,
-            'mostrarFormulario' => $error !== null || $actaPreseleccionada !== null,
+            'mostrarFormulario' => $error !== null,
         ]);
     }
 
@@ -235,7 +256,8 @@ final class CargaController extends BaseController
             'view' => $view,
             'lpnsGenerados' => $lpnsGenerados,
             'etiquetaConfig' => $etiquetaConfig,
-            'tieneActaRecepcion' => $this->container()->get(ActaRecepcionRepositoryInterface::class)->findByCargaId($carga->id()) !== null,
+            'entrega' => $carga->datosEntrega(),
+            'registradoPor' => $this->container()->get(UsuarioRepositoryInterface::class)->findById($carga->registradoPorUsuarioId())?->nombre(),
             'correos' => $this->container()->get(NotificacionRepositoryInterface::class)->listarPorCarga($carga->id()),
             'aviso' => $this->tomarAviso(),
             'error' => $error,
@@ -389,6 +411,7 @@ final class CargaController extends BaseController
                 $this->request->getPost('notas') !== '' ? (string) $this->request->getPost('notas') : null,
                 $facturaProveedor['nombre_archivo'] ?? $carga->facturaProveedorNombre(),
                 $facturaProveedor['ruta_archivo'] ?? $carga->facturaProveedorRuta(),
+                $this->datosEntregaDesdeFormulario(),
             );
 
             $this->container()->get(ActualizarDatosCargaHandler::class)->handle($command);

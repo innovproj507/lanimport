@@ -17,7 +17,7 @@ final class ResumenDashboardView
      * @param array<string, array{label: string, total: int}> $bultosPorEstado
      * @param array{confirmadasEsteMes: int, pendientes: int} $salidas
      * @param array<int, array{nombre: string, total: int}> $bultosPorUbicacion
-     * @param array{total: int, items: array<int, array{id: string, trackingNumero: string, clienteNombre: string, fecha: string}>} $cargasSinActa
+     * @param array{total: int, items: array<int, array{id: string, trackingNumero: string, clienteNombre: string, fecha: string}>} $cargasEnBodegaAntiguas
      */
     public function __construct(
         public readonly int $cargasHoy,
@@ -37,7 +37,7 @@ final class ResumenDashboardView
         public readonly array $salidas = ['confirmadasEsteMes' => 0, 'pendientes' => 0],
         public readonly int $clientesPorAprobar = 0,
         public readonly array $bultosPorUbicacion = [],
-        public readonly array $cargasSinActa = ['total' => 0, 'items' => []],
+        public readonly array $cargasEnBodegaAntiguas = ['total' => 0, 'items' => []],
     ) {
     }
 

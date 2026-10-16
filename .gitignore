@@ -124,3 +124,12 @@ _modules/*
 
 /results/
 /phpunit.xml
+
+#-------------------------
+# Datos generados por el sistema (no van en git)
+#-------------------------
+/writable/backups/
+/public/uploads/*
+/storage/logs/*
+/*.xlsx
+/*.csv

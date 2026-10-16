@@ -45,6 +45,7 @@ final class ActualizarClienteHandler implements CommandHandlerInterface
             $command->empresa,
             $command->pais,
         );
+        $cliente->asignarAduanero($command->aduaneroIdentificador);
 
         $this->clientes->save($cliente);
 

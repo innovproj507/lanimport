@@ -10,6 +10,7 @@ use Courier\Carga\Domain\CargaStatus;
 use Courier\Carga\Domain\TipoServicio;
 use Courier\Carga\Domain\ValueObject\Aduanero;
 use Courier\Carga\Domain\ValueObject\Contenedor;
+use Courier\Carga\Domain\ValueObject\DatosEntrega;
 use Courier\Carga\Domain\ValueObject\DetalleAereo;
 use Courier\Carga\Domain\ValueObject\DetalleFreight;
 use Courier\Carga\Domain\ValueObject\DetalleMaritimo;
@@ -34,20 +35,27 @@ final class PdoCargaRepository implements CargaRepositoryInterface
                 id, tracking_numero, cliente_id, proveedor, proveedor_identificador,
                 aduanero_identificador, aduanero_nombre, numero_contenedor, notas,
                 factura_proveedor_nombre, factura_proveedor_ruta, tipo_servicio,
-                estado, registrado_por_usuario_id, fecha_ingreso, created_at, updated_at
+                estado, registrado_por_usuario_id, fecha_ingreso, created_at, updated_at,
+                entrega_empresa_transporte, entrega_chofer, entrega_placa, entrega_por, entrega_cedula, entrega_tipos_mercancia
             ) VALUES (
                 :id, :tracking_numero, :cliente_id, :proveedor, :proveedor_identificador,
                 :aduanero_identificador, :aduanero_nombre, :numero_contenedor, :notas,
                 :factura_proveedor_nombre, :factura_proveedor_ruta, :tipo_servicio,
-                :estado, :registrado_por_usuario_id, :fecha_ingreso, :created_at, :updated_at
+                :estado, :registrado_por_usuario_id, :fecha_ingreso, :created_at, :updated_at,
+                :entrega_empresa_transporte, :entrega_chofer, :entrega_placa, :entrega_por, :entrega_cedula, :entrega_tipos_mercancia
             )
             ON DUPLICATE KEY UPDATE
                 cliente_id = VALUES(cliente_id), proveedor = VALUES(proveedor), proveedor_identificador = VALUES(proveedor_identificador),
                 aduanero_identificador = VALUES(aduanero_identificador), aduanero_nombre = VALUES(aduanero_nombre),
                 numero_contenedor = VALUES(numero_contenedor), notas = VALUES(notas),
                 factura_proveedor_nombre = VALUES(factura_proveedor_nombre), factura_proveedor_ruta = VALUES(factura_proveedor_ruta),
-                fecha_ingreso = VALUES(fecha_ingreso), estado = VALUES(estado), updated_at = VALUES(updated_at)'
+                fecha_ingreso = VALUES(fecha_ingreso), estado = VALUES(estado), updated_at = VALUES(updated_at),
+                entrega_empresa_transporte = VALUES(entrega_empresa_transporte), entrega_chofer = VALUES(entrega_chofer),
+                entrega_placa = VALUES(entrega_placa), entrega_por = VALUES(entrega_por), entrega_cedula = VALUES(entrega_cedula),
+                entrega_tipos_mercancia = VALUES(entrega_tipos_mercancia)'
         );
+
+        $entrega = $carga->datosEntrega();
 
         $stmt->execute([
             ':id' => $carga->id(),
@@ -67,6 +75,12 @@ final class PdoCargaRepository implements CargaRepositoryInterface
             ':fecha_ingreso' => $carga->fechaIngreso()->format('Y-m-d H:i:s'),
             ':created_at' => $carga->createdAt()->format('Y-m-d H:i:s'),
             ':updated_at' => $carga->updatedAt()->format('Y-m-d H:i:s'),
+            ':entrega_empresa_transporte' => $entrega?->empresaTransporte,
+            ':entrega_chofer' => $entrega?->chofer,
+            ':entrega_placa' => $entrega?->placa,
+            ':entrega_por' => $entrega?->entregadoPor,
+            ':entrega_cedula' => $entrega?->cedula,
+            ':entrega_tipos_mercancia' => $entrega !== null && $entrega->tiposMercancia !== [] ? implode(',', $entrega->tiposMercancia) : null,
         ]);
 
         $this->saveDetalle($carga);
@@ -305,7 +319,7 @@ final class PdoCargaRepository implements CargaRepositoryInterface
             ? new Aduanero((string) $row['aduanero_identificador'], (string) $row['aduanero_nombre'])
             : null;
 
-        return Carga::reconstituir(
+        $carga = Carga::reconstituir(
             new Uuid((string) $row['id']),
             new TrackingNumero((string) $row['tracking_numero']),
             (string) $row['cliente_id'],
@@ -326,6 +340,17 @@ final class PdoCargaRepository implements CargaRepositoryInterface
             $row['factura_proveedor_nombre'] !== null ? (string) $row['factura_proveedor_nombre'] : null,
             $row['factura_proveedor_ruta'] !== null ? (string) $row['factura_proveedor_ruta'] : null,
         );
+
+        $carga->asignarDatosEntrega(DatosEntrega::desdeArreglo([
+            'empresaTransporte' => $row['entrega_empresa_transporte'] ?? null,
+            'chofer' => $row['entrega_chofer'] ?? null,
+            'placa' => $row['entrega_placa'] ?? null,
+            'entregadoPor' => $row['entrega_por'] ?? null,
+            'cedula' => $row['entrega_cedula'] ?? null,
+            'tiposMercancia' => !empty($row['entrega_tipos_mercancia']) ? explode(',', (string) $row['entrega_tipos_mercancia']) : [],
+        ]));
+
+        return $carga;
     }
 
     /** @return array<int, LineaCarga> */

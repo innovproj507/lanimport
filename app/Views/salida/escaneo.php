@@ -2,14 +2,79 @@
 use App\Libraries\Csrf;
 /** @var \Courier\Salida\Domain\SalidaOrden $orden */
 /** @var string $clienteNombre */
-$pageTitle = 'Orden de salida ' . ($orden->codigo() ?? '');
+/** @var array<int, \Courier\Naviera\Domain\Naviera> $navieras activas (+ la de la orden si esta inactiva) */
+/** @var string|null $mensaje */
+/** @var string|null $error */
+require_once __DIR__ . '/../partials/view_helpers.php';
+$pageTitle = 'Salida ' . $orden->etiquetaDo();
 $pageSubtitle = 'Cliente: ' . $clienteNombre;
+$backHref = '/salidas/historial';
+$headerActions = header_button('/salidas/' . $orden->id() . '/manifiesto', 'printer', 'Imprimir manifiesto', 'blue');
 require __DIR__ . '/../partials/header.php';
 
 $progreso = $orden->progreso();
 $confirmada = $orden->estado()->value === 'confirmada';
 $cancelada = $orden->estado()->value === 'cancelada';
+$embarque = $orden->embarque();
+$claseInput = 'w-full rounded-lg border border-zinc-300 bg-white text-black px-3 py-2 focus:ring-2 focus:ring-amber-400 focus:outline-none disabled:bg-slate-100 disabled:text-zinc-500';
 ?>
+
+<?php if (!empty($mensaje)): ?>
+    <div class="bg-emerald-500/10 text-emerald-700 text-sm rounded-lg px-4 py-3 mb-4 border border-emerald-500/30"><?= htmlspecialchars($mensaje) ?></div>
+<?php endif; ?>
+<?php if (!empty($error)): ?>
+    <div class="bg-red-500/10 text-red-600 text-sm rounded-lg px-4 py-3 mb-4 border border-red-500/30"><?= htmlspecialchars($error) ?></div>
+<?php endif; ?>
+
+<form method="post" action="/salidas/<?= htmlspecialchars($orden->id()) ?>/embarque" class="bg-white rounded-xl shadow-sm p-6 mb-6">
+    <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
+    <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+        <?= card_header('truck', 'Datos del embarque', 'sky') ?>
+        <span class="text-sm text-zinc-500">Consecutivo: <strong class="text-black"><?= htmlspecialchars($orden->etiquetaDo()) ?></strong></span>
+    </div>
+    <fieldset <?= $cancelada ? 'disabled' : '' ?> class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div>
+            <label class="block text-sm font-medium text-zinc-700 mb-1">Numero de contenedor</label>
+            <input type="text" name="numero_contenedor" maxlength="15" placeholder="Ej: TGBU10548-6" value="<?= htmlspecialchars($embarque->contenedorFormateado() ?? '') ?>" class="<?= $claseInput ?> uppercase">
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-zinc-700 mb-1">Numero de sello</label>
+            <input type="text" name="numero_sello" maxlength="40" placeholder="Ej: SML G4187571" value="<?= htmlspecialchars($embarque->numeroSello ?? '') ?>" class="<?= $claseInput ?> uppercase">
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-zinc-700 mb-1">Naviera</label>
+            <select name="naviera_id" class="<?= $claseInput ?>">
+                <option value="">— Seleccione —</option>
+                <?php foreach ($navieras as $naviera): ?>
+                    <option value="<?= htmlspecialchars($naviera->id()) ?>" <?= $naviera->id() === $embarque->navieraId ? 'selected' : '' ?>>
+                        <?= htmlspecialchars($naviera->nombre()) ?><?= $naviera->activo() ? '' : ' (inactiva)' ?>
+                    </option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-zinc-700 mb-1">Nombre del barco</label>
+            <input type="text" name="nombre_barco" maxlength="120" value="<?= htmlspecialchars($embarque->nombreBarco ?? '') ?>" class="<?= $claseInput ?> uppercase">
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-zinc-700 mb-1">Fecha de cargue</label>
+            <input type="date" name="fecha_cargue" value="<?= htmlspecialchars($embarque->fechaCargue?->format('Y-m-d') ?? '') ?>" class="<?= $claseInput ?>">
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-zinc-700 mb-1">Fecha de salida (ETD)</label>
+            <input type="date" name="fecha_salida_etd" value="<?= htmlspecialchars($embarque->fechaSalidaEtd?->format('Y-m-d') ?? '') ?>" class="<?= $claseInput ?>">
+        </div>
+        <div class="md:col-span-2">
+            <label class="block text-sm font-medium text-zinc-700 mb-1">Destino final</label>
+            <input type="text" name="destino_final" maxlength="190" placeholder="Ej: Caracas, Venezuela" value="<?= htmlspecialchars($embarque->destinoFinal ?? '') ?>" class="<?= $claseInput ?>">
+        </div>
+        <div class="flex items-end">
+            <button type="submit" class="w-full inline-flex justify-center items-center gap-2 bg-amber-500 text-black rounded-lg px-4 py-2 font-medium hover:bg-amber-400 transition disabled:opacity-40">
+                <?= icon_small('check') ?><span>Guardar datos del embarque</span>
+            </button>
+        </div>
+    </fieldset>
+</form>
 
 <div class="bg-white rounded-xl shadow-sm p-6 mb-6">
     <div class="flex items-end gap-4 flex-wrap justify-between">

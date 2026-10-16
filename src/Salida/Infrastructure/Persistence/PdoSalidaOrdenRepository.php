@@ -8,6 +8,7 @@ use Courier\Salida\Domain\EstadoSalidaOrden;
 use Courier\Salida\Domain\SalidaLinea;
 use Courier\Salida\Domain\SalidaOrden;
 use Courier\Salida\Domain\SalidaOrdenRepositoryInterface;
+use Courier\Salida\Domain\ValueObject\DatosEmbarque;
 use Courier\Shared\Domain\ValueObject\Uuid;
 use DateTimeImmutable;
 use PDO;
@@ -31,23 +32,36 @@ final class PdoSalidaOrdenRepository implements SalidaOrdenRepositoryInterface
 
     private function insert(SalidaOrden $orden): void
     {
+        // Consecutivo DO del ano: se bloquean las filas del ano para que dos salidas
+        // creadas al mismo tiempo no tomen el mismo numero (corre dentro del UnitOfWork).
+        $anio = (int) $orden->createdAt()->format('Y');
+        $siguiente = $this->connection->prepare(
+            'SELECT COALESCE(MAX(do_numero), 0) + 1 FROM salida_ordenes WHERE do_anio = :anio FOR UPDATE'
+        );
+        $siguiente->execute([':anio' => $anio]);
+        $doNumero = (int) $siguiente->fetchColumn();
+
         $stmt = $this->connection->prepare(
             'INSERT INTO salida_ordenes (
-                id, cliente_id, aduanero_identificador, estado, creado_por_usuario_id, created_at, confirmed_at
+                id, do_anio, do_numero, cliente_id, aduanero_identificador, estado, creado_por_usuario_id, created_at, confirmed_at,
+                numero_contenedor, numero_sello, naviera_id, nombre_barco, fecha_cargue, fecha_salida_etd, destino_final
             ) VALUES (
-                :id, :cliente_id, :aduanero_identificador, :estado, :creado_por_usuario_id, :created_at, :confirmed_at
+                :id, :do_anio, :do_numero, :cliente_id, :aduanero_identificador, :estado, :creado_por_usuario_id, :created_at, :confirmed_at,
+                :numero_contenedor, :numero_sello, :naviera_id, :nombre_barco, :fecha_cargue, :fecha_salida_etd, :destino_final
             )'
         );
 
         $stmt->execute([
             ':id' => $orden->id(),
+            ':do_anio' => $anio,
+            ':do_numero' => $doNumero,
             ':cliente_id' => $orden->clienteId(),
             ':aduanero_identificador' => $orden->aduaneroIdentificador(),
             ':estado' => $orden->estado()->value,
             ':creado_por_usuario_id' => $orden->creadoPorUsuarioId(),
             ':created_at' => $orden->createdAt()->format('Y-m-d H:i:s'),
             ':confirmed_at' => $orden->confirmedAt()?->format('Y-m-d H:i:s'),
-        ]);
+        ] + $this->parametrosEmbarque($orden));
 
         $secuencia = (int) $this->connection->lastInsertId();
         $codigo = 'SAL-' . str_pad((string) $secuencia, 6, '0', STR_PAD_LEFT);
@@ -74,14 +88,18 @@ final class PdoSalidaOrdenRepository implements SalidaOrdenRepositoryInterface
     private function update(SalidaOrden $orden): void
     {
         $stmt = $this->connection->prepare(
-            'UPDATE salida_ordenes SET estado = :estado, confirmed_at = :confirmed_at WHERE id = :id'
+            'UPDATE salida_ordenes SET estado = :estado, confirmed_at = :confirmed_at,
+                numero_contenedor = :numero_contenedor, numero_sello = :numero_sello, naviera_id = :naviera_id,
+                nombre_barco = :nombre_barco, fecha_cargue = :fecha_cargue, fecha_salida_etd = :fecha_salida_etd,
+                destino_final = :destino_final
+             WHERE id = :id'
         );
 
         $stmt->execute([
             ':id' => $orden->id(),
             ':estado' => $orden->estado()->value,
             ':confirmed_at' => $orden->confirmedAt()?->format('Y-m-d H:i:s'),
-        ]);
+        ] + $this->parametrosEmbarque($orden));
 
         $upsertLinea = $this->connection->prepare(
             'UPDATE salida_lineas SET escaneado = :escaneado, escaneado_at = :escaneado_at
@@ -115,22 +133,22 @@ final class PdoSalidaOrdenRepository implements SalidaOrdenRepositoryInterface
         $params = [];
 
         if (!empty($filtros['estado'])) {
-            $where[] = 'estado = :estado';
+            $where[] = 's.estado = :estado';
             $params[':estado'] = $filtros['estado'];
         }
 
         if (!empty($filtros['clienteId'])) {
-            $where[] = 'cliente_id = :cliente_id';
+            $where[] = 's.cliente_id = :cliente_id';
             $params[':cliente_id'] = $filtros['clienteId'];
         }
 
-        $sql = 'SELECT * FROM salida_ordenes';
+        $sql = 'SELECT s.*, n.nombre AS naviera_nombre FROM salida_ordenes s LEFT JOIN navieras n ON n.id = s.naviera_id';
 
         if ($where !== []) {
             $sql .= ' WHERE ' . implode(' AND ', $where);
         }
 
-        $sql .= ' ORDER BY secuencia DESC';
+        $sql .= ' ORDER BY s.secuencia DESC';
 
         $stmt = $this->connection->prepare($sql);
         $stmt->execute($params);
@@ -141,10 +159,71 @@ final class PdoSalidaOrdenRepository implements SalidaOrdenRepositoryInterface
         );
     }
 
+    /** @return array<string, ?string> */
+    private function parametrosEmbarque(SalidaOrden $orden): array
+    {
+        $e = $orden->embarque();
+
+        return [
+            ':numero_contenedor' => $e->numeroContenedor,
+            ':numero_sello' => $e->numeroSello,
+            ':naviera_id' => $e->navieraId,
+            ':nombre_barco' => $e->nombreBarco,
+            ':fecha_cargue' => $e->fechaCargue?->format('Y-m-d'),
+            ':fecha_salida_etd' => $e->fechaSalidaEtd?->format('Y-m-d'),
+            ':destino_final' => $e->destinoFinal,
+        ];
+    }
+
+    public function manifiesto(string $ordenId): array
+    {
+        // Una fila por carga: los bultos son los LPN de esa carga que van en la salida; kilos,
+        // m3 y valor salen de las lineas de la carga, prorrateados si solo sale parte de sus bultos.
+        // En las lineas el peso y el valor son totales de la linea y el cubicaje (p3) es por pieza.
+        $stmt = $this->connection->prepare(
+            "SELECT ca.tracking_numero, ca.proveedor, c.nombre AS cliente_nombre,
+                    COUNT(*) AS bultos_salida,
+                    (SELECT COUNT(*) FROM lpns l2 WHERE l2.carga_id = ca.id) AS bultos_carga,
+                    GROUP_CONCAT(DISTINCT NULLIF(l.marca, '') ORDER BY l.marca SEPARATOR ', ') AS marcas,
+                    t.kilos, t.valor, t.pies3
+             FROM salida_lineas sl
+             JOIN lpns l ON l.id = sl.lpn_id
+             LEFT JOIN cargas ca ON ca.id = l.carga_id
+             JOIN clientes c ON c.id = l.cliente_id
+             LEFT JOIN (
+                 SELECT carga_id, SUM(peso) AS kilos, SUM(valor) AS valor,
+                        SUM(COALESCE(cubicaje_p3, ancho * alto * largo / 28316.846592) * cantidad) AS pies3
+                 FROM carga_lineas GROUP BY carga_id
+             ) t ON t.carga_id = ca.id
+             WHERE sl.salida_orden_id = :orden
+             GROUP BY ca.id, ca.tracking_numero, ca.proveedor, c.nombre, t.kilos, t.valor, t.pies3
+             ORDER BY ca.proveedor, ca.tracking_numero"
+        );
+        $stmt->execute([':orden' => $ordenId]);
+
+        return array_map(static function (array $r): array {
+            $factor = (int) $r['bultos_carga'] > 0 ? (int) $r['bultos_salida'] / (int) $r['bultos_carga'] : 1.0;
+
+            return [
+                'cliente' => (string) $r['cliente_nombre'],
+                'marca' => (string) ($r['marcas'] ?? ''),
+                'compania' => $r['proveedor'] !== null ? (string) $r['proveedor'] : 'Reempaque',
+                'tracking' => $r['tracking_numero'] !== null ? (string) $r['tracking_numero'] : null,
+                'bultos' => (int) $r['bultos_salida'],
+                'kilos' => round((float) $r['kilos'] * $factor, 2),
+                'm3' => round((float) $r['pies3'] * 0.028316846592 * $factor, 3),
+                'valor' => round((float) $r['valor'] * $factor, 2),
+            ];
+        }, $stmt->fetchAll());
+    }
+
     /** @return array<string, mixed>|null */
     private function findHeader(string $id): ?array
     {
-        $stmt = $this->connection->prepare('SELECT * FROM salida_ordenes WHERE id = :id LIMIT 1');
+        $stmt = $this->connection->prepare(
+            'SELECT s.*, n.nombre AS naviera_nombre FROM salida_ordenes s
+             LEFT JOIN navieras n ON n.id = s.naviera_id WHERE s.id = :id LIMIT 1'
+        );
         $stmt->execute([':id' => $id]);
         $row = $stmt->fetch();
 
@@ -190,6 +269,18 @@ final class PdoSalidaOrdenRepository implements SalidaOrdenRepositoryInterface
             $lineas,
             $row['codigo'] !== null ? (string) $row['codigo'] : null,
             $row['secuencia'] !== null ? (int) $row['secuencia'] : null,
+            isset($row['do_anio']) ? (int) $row['do_anio'] : null,
+            isset($row['do_numero']) ? (int) $row['do_numero'] : null,
+            DatosEmbarque::desdeArreglo([
+                'numeroContenedor' => $row['numero_contenedor'] ?? null,
+                'numeroSello' => $row['numero_sello'] ?? null,
+                'navieraId' => $row['naviera_id'] ?? null,
+                'navieraNombre' => $row['naviera_nombre'] ?? null,
+                'nombreBarco' => $row['nombre_barco'] ?? null,
+                'fechaCargue' => $row['fecha_cargue'] ?? null,
+                'fechaSalidaEtd' => $row['fecha_salida_etd'] ?? null,
+                'destinoFinal' => $row['destino_final'] ?? null,
+            ]),
         );
     }
 }

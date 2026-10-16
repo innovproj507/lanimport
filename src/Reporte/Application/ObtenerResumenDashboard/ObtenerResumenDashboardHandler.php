@@ -36,7 +36,7 @@ final class ObtenerResumenDashboardHandler implements QueryHandlerInterface
             $this->repository->salidas(),
             $this->repository->clientesPorAprobar(),
             $this->repository->bultosPorUbicacion(),
-            $this->repository->cargasSinActaRecepcion(),
+            $this->repository->cargasMasAntiguasEnBodega(),
         );
     }
 }

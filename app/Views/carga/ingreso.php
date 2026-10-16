@@ -11,8 +11,6 @@ use App\Libraries\Csrf;
 /** @var int $perPage */
 /** @var int $totalPages */
 /** @var bool $mostrarFormulario */
-/** @var array<int, array{actaId: string, codigo: string, clienteId: string, clienteNombre: string, marca: ?string, totalRecibido: int, fechaRecepcion: string}> $actasSinCarga */
-/** @var string|null $actaPreseleccionada */
 require_once __DIR__ . '/../partials/view_helpers.php';
 $pageTitle = 'Ingreso de Carga';
 $pageSubtitle = 'Cargas ingresadas al sistema';
@@ -106,52 +104,6 @@ require __DIR__ . '/../partials/header.php';
     <form method="post" action="/cargas" id="form-ingreso-carga" enctype="multipart/form-data" class="max-w-5xl space-y-5">
         <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
 
-        <?php if ($actasSinCarga !== []): ?>
-            <?php
-            $clientesPorId = [];
-            foreach ($clientes as $c) {
-                $clientesPorId[$c->id()] = implode(' — ', array_filter([$c->codigo(), $c->nombre(), $c->empresa(), (string) $c->email()]));
-            }
-            ?>
-            <div class="bg-amber-50 border border-amber-200 rounded-xl p-5">
-                <?= card_header('receipt', 'Mercancia ya recibida por bodega', 'amber') ?>
-                <label class="block text-sm font-medium text-zinc-700 mb-1">Acta de recepcion (opcional)</label>
-                <select name="acta_recepcion_id" id="acta-recepcion-select"
-                        class="w-full md:w-2/3 rounded-lg border border-zinc-300 bg-white text-black px-3 py-2 focus:ring-2 focus:ring-amber-400 focus:outline-none">
-                    <option value="">— Ninguna: la carga no tiene acta todavia —</option>
-                    <?php foreach ($actasSinCarga as $a): ?>
-                        <option value="<?= htmlspecialchars($a['actaId']) ?>"
-                                data-cliente-id="<?= htmlspecialchars($a['clienteId']) ?>"
-                                data-cliente-etiqueta="<?= htmlspecialchars($clientesPorId[$a['clienteId']] ?? $a['clienteNombre']) ?>"
-                                <?= $a['actaId'] === $actaPreseleccionada ? 'selected' : '' ?>>
-                            <?= htmlspecialchars($a['codigo'] . ' — ' . $a['clienteNombre'] . ($a['marca'] ? ' — ' . $a['marca'] : '') . ' — ' . $a['totalRecibido'] . ' bulto(s) — ' . (new DateTimeImmutable($a['fechaRecepcion']))->format('d/m/Y')) ?>
-                        </option>
-                    <?php endforeach; ?>
-                </select>
-                <p class="text-xs text-zinc-500 mt-1">Al elegir un acta se selecciona su cliente, y al guardar la carga el acta queda vinculada a ella.</p>
-            </div>
-            <script>
-            document.addEventListener('DOMContentLoaded', function () {
-                var select = document.getElementById('acta-recepcion-select');
-
-                function aplicarCliente() {
-                    var opcion = select.options[select.selectedIndex];
-
-                    if (!opcion || !opcion.getAttribute('data-cliente-id')) {
-                        return;
-                    }
-
-                    document.getElementById('cliente-id-hidden').value = opcion.getAttribute('data-cliente-id');
-                    document.getElementById('cliente-buscar').value = opcion.getAttribute('data-cliente-etiqueta');
-                    document.getElementById('cliente-error').classList.add('hidden');
-                }
-
-                select.addEventListener('change', aplicarCliente);
-                aplicarCliente();
-            });
-            </script>
-        <?php endif; ?>
-
         <div class="bg-white rounded-xl shadow-sm p-6">
             <?= card_header('users', 'Datos del cliente y proveedor', 'amber') ?>
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -175,6 +127,7 @@ require __DIR__ . '/../partials/header.php';
                             'email' => (string) $cliente->email(),
                             'empresa' => $cliente->empresa(),
                             'codigo' => $cliente->codigo(),
+                            'aduanero' => $cliente->aduaneroIdentificador(),
                         ],
                         $clientes,
                     ), JSON_UNESCAPED_UNICODE | JSON_HEX_TAG) ?></script>
@@ -276,6 +229,8 @@ require __DIR__ . '/../partials/header.php';
                 </table>
             </div>
         </div>
+
+        <?php require __DIR__ . '/_datos_entrega.php'; ?>
 
         <div class="bg-white rounded-xl shadow-sm p-6">
             <?= card_header('shield', 'Aduana y contenedor', 'amber') ?>

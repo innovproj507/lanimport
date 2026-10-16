@@ -16,11 +16,9 @@ final class DashboardController extends BaseController
         /** @var SessionManager $sessionManager */
         $sessionManager = $this->container()->get(SessionManager::class);
 
-        // Roles operativos sin dashboard (el login los manda aqui): recepcion -> actas, bodega -> ingreso.
-        $inicioPorRol = ['recepcion' => '/recepciones', 'bodega' => '/cargas/ingreso'];
-
-        if (isset($inicioPorRol[$sessionManager->currentRol()])) {
-            return redirect()->to($inicioPorRol[$sessionManager->currentRol()]);
+        // Bodega no tiene dashboard (el login la manda aqui): va directo a la app movil (/bodega).
+        if ($sessionManager->currentRol() === 'bodega') {
+            return redirect()->to('/bodega');
         }
 
         $resumen = $this->container()->get(ObtenerResumenDashboardHandler::class)

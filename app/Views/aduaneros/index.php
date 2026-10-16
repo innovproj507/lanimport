@@ -11,6 +11,8 @@ $headerActions = header_button('/aduaneros/nuevo', 'plus', 'Nuevo Aduanero', 'am
 require __DIR__ . '/../partials/header.php';
 ?>
 
+<?php require __DIR__ . '/../partials/_flash.php'; ?>
+
 <div class="bg-white rounded-xl shadow-sm p-6">
     <div class="mb-4 flex items-center justify-between gap-4 flex-wrap">
         <div class="flex items-center gap-2">

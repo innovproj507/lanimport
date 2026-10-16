@@ -98,7 +98,7 @@ final class PdoAduaneroRepository implements AduaneroRepositoryInterface
         $offset = ($page - 1) * $perPage;
         $term = trim($term);
 
-        $where = 'activo = 1';
+        $where = '1=1';
         $params = [];
 
         if ($term !== '') {
@@ -114,7 +114,7 @@ final class PdoAduaneroRepository implements AduaneroRepositoryInterface
         $countStmt->execute($params);
         $total = (int) $countStmt->fetchColumn();
 
-        $stmt = $this->connection->prepare("SELECT * FROM aduaneros WHERE {$where} ORDER BY secuencia ASC LIMIT :limit OFFSET :offset");
+        $stmt = $this->connection->prepare("SELECT * FROM aduaneros WHERE {$where} ORDER BY activo DESC, secuencia ASC LIMIT :limit OFFSET :offset");
 
         foreach ($params as $key => $value) {
             $stmt->bindValue($key, $value);
@@ -135,6 +135,27 @@ final class PdoAduaneroRepository implements AduaneroRepositoryInterface
         $stmt->execute([':identificador' => $identificador]);
 
         return ((int) $stmt->fetchColumn()) > 0;
+    }
+
+    public function referencias(string $id): array
+    {
+        // Cargas y salidas guardan el identificador del aduanero (no el id).
+        $referencias = [];
+
+        foreach (['cargas' => 'cargas', 'salidas' => 'salida_ordenes'] as $etiqueta => $tabla) {
+            $stmt = $this->connection->prepare(
+                "SELECT COUNT(*) FROM {$tabla} t JOIN aduaneros a ON a.identificador = t.aduanero_identificador WHERE a.id = :id"
+            );
+            $stmt->execute([':id' => $id]);
+            $referencias[$etiqueta] = (int) $stmt->fetchColumn();
+        }
+
+        return array_filter($referencias);
+    }
+
+    public function delete(string $id): void
+    {
+        $this->connection->prepare('DELETE FROM aduaneros WHERE id = :id')->execute([':id' => $id]);
     }
 
     /** @param array<string, mixed> $row */

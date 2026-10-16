@@ -182,7 +182,7 @@ $formatoFecha = static fn (string $fecha): string => (new DateTimeImmutable($fec
     </div>
 </div>
 
-<!-- Fila 3: top clientes, inventario, cargas sin acta -->
+<!-- Fila 3: top clientes, inventario, cargas con mas tiempo en bodega -->
 <div class="grid grid-cols-1 xl:grid-cols-3 gap-6 mb-6">
     <div class="bg-white rounded-2xl shadow-sm p-5 flex flex-col">
         <h2 class="font-semibold text-[#0b1b4d] mb-3">Top 5 clientes</h2>
@@ -232,13 +232,13 @@ $formatoFecha = static fn (string $fecha): string => (new DateTimeImmutable($fec
         <a href="/inventario" class="mt-auto pt-3 text-center text-sm text-blue-600 hover:underline">Ver inventario &rarr;</a>
     </div>
 
-    <div id="sin-acta" class="rounded-2xl shadow-sm p-5 flex flex-col bg-gradient-to-b from-red-50 to-white border border-red-100">
-        <h2 class="font-semibold text-red-600 mb-3 flex items-center gap-2">
-            <?= icon_small('receipt', 'w-5 h-5') ?> Cargas sin acta de recepcion
-            <span class="text-xs font-normal text-red-500">(<?= $resumen->cargasSinActa['total'] ?>)</span>
+    <div class="rounded-2xl shadow-sm p-5 flex flex-col bg-gradient-to-b from-amber-50 to-white border border-amber-100">
+        <h2 class="font-semibold text-amber-700 mb-3 flex items-center gap-2">
+            <?= icon_small('clock', 'w-5 h-5') ?> Mas tiempo en bodega
+            <span class="text-xs font-normal text-amber-600">(<?= $resumen->cargasEnBodegaAntiguas['total'] ?> en bodega)</span>
         </h2>
-        <?php if ($resumen->cargasSinActa['items'] === []): ?>
-            <p class="text-sm text-zinc-500">Todas las cargas tienen su acta de recepcion.</p>
+        <?php if ($resumen->cargasEnBodegaAntiguas['items'] === []): ?>
+            <p class="text-sm text-zinc-500">No hay cargas esperando en bodega.</p>
         <?php else: ?>
             <table class="w-full text-sm">
                 <thead>
@@ -249,21 +249,22 @@ $formatoFecha = static fn (string $fecha): string => (new DateTimeImmutable($fec
                     </tr>
                 </thead>
                 <tbody>
-                    <?php foreach ($resumen->cargasSinActa['items'] as $carga): ?>
-                        <tr class="border-t border-red-100">
+                    <?php foreach ($resumen->cargasEnBodegaAntiguas['items'] as $carga): ?>
+                        <?php $dias = (int) (new DateTimeImmutable($carga['fecha']))->diff(new DateTimeImmutable('today'))->days; ?>
+                        <tr class="border-t border-amber-100">
                             <td class="py-2 pr-2">
-                                <a href="/cargas/<?= htmlspecialchars($carga['id']) ?>/acta-recepcion" class="font-medium text-blue-600 hover:underline"><?= htmlspecialchars($carga['trackingNumero']) ?></a>
+                                <a href="/cargas/<?= htmlspecialchars($carga['id']) ?>" class="font-medium text-blue-600 hover:underline"><?= htmlspecialchars($carga['trackingNumero']) ?></a>
                             </td>
                             <td class="py-2 pr-2 text-zinc-700 truncate max-w-[9rem]"><?= htmlspecialchars($carga['clienteNombre']) ?></td>
-                            <td class="py-2 text-right">
-                                <span class="px-2 py-0.5 rounded-full bg-red-500 text-white text-xs"><?= htmlspecialchars($formatoFecha($carga['fecha'])) ?></span>
+                            <td class="py-2 text-right whitespace-nowrap" title="Ingreso: <?= htmlspecialchars($formatoFecha($carga['fecha'])) ?>">
+                                <span class="px-2 py-0.5 rounded-full <?= $dias >= 15 ? 'bg-red-500' : 'bg-amber-500' ?> text-white text-xs"><?= $dias ?> dia<?= $dias === 1 ? '' : 's' ?></span>
                             </td>
                         </tr>
                     <?php endforeach; ?>
                 </tbody>
             </table>
         <?php endif; ?>
-        <a href="/recepciones" class="mt-auto pt-3 text-center text-sm text-red-600 hover:underline">Ir a Recepcion de Carga &rarr;</a>
+        <a href="/inventario" class="mt-auto pt-3 text-center text-sm text-amber-700 hover:underline">Ver inventario &rarr;</a>
     </div>
 </div>
 

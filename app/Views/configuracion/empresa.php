@@ -6,7 +6,7 @@ use App\Libraries\Csrf;
 /** @var string|null $mensaje */
 require_once __DIR__ . '/../partials/view_helpers.php';
 $pageTitle = 'Datos de la empresa';
-$pageSubtitle = 'Aparecen en los documentos impresos (acta de recepcion)';
+$pageSubtitle = 'Aparecen en los documentos impresos (comprobante de recepcion)';
 $backHref = '/configuracion';
 require __DIR__ . '/../partials/header.php';
 

@@ -31,7 +31,8 @@ $estadoColores = [
     <div class="flex items-end gap-4 flex-wrap">
         <div>
             <label class="block text-sm font-medium text-zinc-700 mb-1">Escanear codigo de LPN</label>
-            <input type="text" id="lpn-scan-input" autocomplete="off" autofocus
+            <input type="text" id="lpn-scan-input" autocomplete="off" autofocus autocapitalize="characters"
+                   data-url="/cargas/<?= htmlspecialchars($carga->id()) ?>/recepcion/confirmar"
                    placeholder="Escanea o escribe el codigo y presiona Enter"
                    class="w-80 rounded-lg border border-zinc-300 bg-white text-black px-3 py-2 focus:ring-2 focus:ring-amber-400 focus:outline-none">
         </div>
@@ -44,10 +45,13 @@ $estadoColores = [
                 <?php endforeach; ?>
             </select>
         </div>
-        <p id="lpn-scan-mensaje" class="text-sm"></p>
+        <p class="text-sm text-zinc-700 pb-2">
+            Recibidos: <span id="lpn-recibidos-carga" class="font-semibold"><?= count(array_filter($lpns, static fn ($l) => $l->estado()->value !== 'receiving')) ?></span> de <?= count($lpns) ?>
+        </p>
     </div>
+    <p id="lpn-scan-mensaje" class="hidden mt-4 rounded-lg px-4 py-3 text-base font-medium"></p>
+    <ul id="lpn-scan-historial" class="mt-3 space-y-1 text-sm text-zinc-600"></ul>
     <input type="hidden" id="lpn-csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
-    <input type="hidden" id="lpn-carga-id" value="<?= htmlspecialchars($carga->id()) ?>">
 </div>
 
 <div class="bg-white rounded-xl shadow-sm p-6">
