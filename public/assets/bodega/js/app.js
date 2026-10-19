@@ -41,6 +41,8 @@
     function aviso(contenedor, texto, tipo) {
         contenedor.textContent = texto;
         contenedor.className = 'aviso aviso-' + tipo;
+        // Si la camara esta abierta tapa la pantalla: el resultado se repite sobre la imagen.
+        window.Escaner.mostrarResultado(texto, tipo);
     }
 
     function barraProgreso(hechos, total) {
@@ -297,6 +299,8 @@
         campoEscaneo(document.getElementById('zona-escaneo'), function (codigo) {
             return window.Api.get('/lpns/' + encodeURIComponent(codigo)).then(function (l) {
                 avisoCon.className = 'aviso oculto';
+                // En consulta se cierra la camara para mostrar la ficha del bulto.
+                window.Escaner.cerrar();
                 window.Escaner.pitido(true);
                 document.getElementById('con-ficha').innerHTML =
                     '<div class="tarjeta ficha">'

@@ -45,7 +45,8 @@
                 // El mismo codigo queda frente a la camara varios cuadros seguidos: se lee una sola vez.
                 if (codigo !== ultimo.codigo || ahora - ultimo.hora > 2500) {
                     ultimo = { codigo: codigo, hora: ahora };
-                    texto.textContent = 'Leido: ' + codigo;
+                    texto.textContent = 'Leido: ' + codigo + ' — enviando...';
+                    texto.className = 'camara-texto';
                     alLeer(codigo);
                 }
             }
@@ -62,6 +63,7 @@
         alLeer = callback;
         detector = detector || new window.BarcodeDetector({ formats: ['code_128', 'code_39', 'qr_code'] });
         texto.textContent = 'Apunte al codigo de barras de la etiqueta';
+        texto.className = 'camara-texto';
         capa.classList.remove('oculto');
 
         return navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false })
@@ -80,6 +82,19 @@
     }
 
     document.getElementById('camara-cerrar').addEventListener('click', cerrar);
+
+    /**
+     * Resultado de la ultima lectura sobre la imagen de la camara: con la camara abierta,
+     * los avisos de la pantalla quedan tapados.
+     */
+    function mostrarResultado(mensaje, tipo) {
+        if (!activo) {
+            return;
+        }
+
+        texto.textContent = mensaje;
+        texto.className = 'camara-texto camara-texto-' + (tipo === 'ok' ? 'ok' : 'error');
+    }
 
     var audio = null;
 
@@ -109,5 +124,5 @@
         }
     }
 
-    window.Escaner = { disponible: disponible, abrir: abrir, cerrar: cerrar, pitido: pitido };
+    window.Escaner = { disponible: disponible, abrir: abrir, cerrar: cerrar, pitido: pitido, mostrarResultado: mostrarResultado };
 })();

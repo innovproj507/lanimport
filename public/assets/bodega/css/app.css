@@ -271,3 +271,6 @@ h2 { font-size: 17px; margin: 0 0 10px; display: flex; justify-content: space-be
 }
 .camara-texto { position: absolute; top: calc(20px + env(safe-area-inset-top)); left: 16px; right: 16px; text-align: center; color: #fff; font-weight: 600; }
 .camara-cerrar { position: absolute; bottom: calc(24px + env(safe-area-inset-bottom)); left: 16px; right: 16px; }
+.camara-texto { padding: 10px 12px; border-radius: 10px; background: rgba(0, 0, 0, .45); }
+.camara-texto-ok { background: rgba(4, 120, 87, .92); }
+.camara-texto-error { background: rgba(185, 28, 28, .92); }
