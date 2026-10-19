@@ -441,21 +441,12 @@ document.addEventListener('DOMContentLoaded', function () {
             });
     }
 
-    scanInput.addEventListener('keydown', function (event) {
-        if (event.key !== 'Enter') {
-            return;
-        }
-
-        event.preventDefault();
-        var codigo = scanInput.value.trim();
-        scanInput.value = '';
-        scanInput.focus();
-
-        if (codigo !== '') {
-            cola.push(codigo);
-            siguiente();
-        }
+    // Acepta Enter, Tab o lectores sin sufijo (ver lector-codigos.js).
+    LectorCodigos.conectar(scanInput, function (codigo) {
+        cola.push(codigo);
+        siguiente();
     });
+    LectorCodigos.mantenerFoco(scanInput);
 
     // Si el operador toca otra parte de la pantalla, el siguiente escaneo debe seguir llegando al campo.
     ubicacionSelect.addEventListener('change', function () {
@@ -475,18 +466,10 @@ document.addEventListener('DOMContentLoaded', function () {
         return;
     }
 
-    scanInput.addEventListener('keydown', function (event) {
-        if (event.key !== 'Enter') {
-            return;
-        }
+    LectorCodigos.mantenerFoco(scanInput);
 
-        event.preventDefault();
-        var codigo = scanInput.value.trim();
-
-        if (codigo === '') {
-            return;
-        }
-
+    // Acepta Enter, Tab o lectores sin sufijo (ver lector-codigos.js).
+    LectorCodigos.conectar(scanInput, function (codigo) {
         var body = new URLSearchParams();
         body.set('_csrf', csrfInput.value);
         body.set('codigo', codigo);
@@ -528,7 +511,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 mensaje.className = 'text-sm text-red-600';
             });
 
-        scanInput.value = '';
         scanInput.focus();
     });
 });

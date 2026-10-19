@@ -1,7 +1,7 @@
 <?php
 /** @var \Courier\Reporte\Application\ObtenerReporteOperativo\ReporteOperativoView $reporte */
 $pageTitle = 'Reportes';
-$pageSubtitle = 'Resumen operativo y financiero por periodo';
+$pageSubtitle = 'Operacion de bodega, despachos y facturacion por periodo';
 require __DIR__ . '/../partials/header.php';
 
 $serviceLabels = ['aereo' => 'Aereo', 'maritimo' => 'Maritimo', 'freight' => 'Freight', 'sin_especificar' => 'Sin especificar'];
@@ -44,6 +44,8 @@ $inventarioColores = [
         </button>
     </form>
 </div>
+
+<?php require __DIR__ . '/_operacion_bodega.php'; ?>
 
 <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
     <div class="bg-white rounded-xl shadow-sm border-l-4 border-emerald-500 p-4">

@@ -51,7 +51,7 @@
     }
 
     /**
-     * Campo de escaneo: recibe lo que manda el lector (texto + Enter), o la camara.
+     * Campo de escaneo: recibe lo que manda el lector de la PDA, o la camara.
      * Procesa las lecturas en cola, una por una, para no perder ninguna si se escanea rapido.
      */
     function campoEscaneo(contenedor, procesar, etiqueta) {
@@ -90,12 +90,10 @@
             }
         }
 
-        input.addEventListener('keydown', function (evento) {
-            if (evento.key === 'Enter') {
-                evento.preventDefault();
-                recibir(input.value);
-                input.value = '';
-            }
+        // Enter, Tab, salto de linea o lector sin sufijo (lector-codigos.js). Con el teclado
+        // en pantalla activado (escritura a mano) solo envia con Enter.
+        window.LectorCodigos.conectar(input, recibir, {
+            autoEnviar: function () { return input.getAttribute('inputmode') === 'none'; },
         });
 
         contenedor.querySelector('[data-accion="teclado"]').addEventListener('click', function () {

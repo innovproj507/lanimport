@@ -7,7 +7,6 @@ namespace Courier\Carga\Application\RegistrarCarga;
 use Courier\Carga\Domain\BarcodeGeneratorInterface;
 use Courier\Carga\Domain\Carga;
 use Courier\Carga\Domain\CargaRepositoryInterface;
-use Courier\Carga\Domain\CargaStatus;
 use Courier\Carga\Domain\TipoServicio;
 use Courier\Carga\Domain\TrackingNumeroGeneratorInterface;
 use Courier\Carga\Domain\ValueObject\Aduanero;
@@ -84,7 +83,7 @@ final class RegistrarCargaHandler implements CommandHandlerInterface
             $command->facturaProveedorRuta,
         );
 
-        $carga->cambiarEstado(CargaStatus::EN_BODEGA, $command->registradoPorUsuarioId, 'Ingreso fisico a bodega');
+        // Queda "Ingresado" hasta que bodega escanee todos sus bultos (SincronizarEstadoCarga).
         $carga->asignarDatosEntrega(DatosEntrega::desdeArreglo($command->datosEntrega ?? []));
 
         $etiquetaUrl = $this->unitOfWork->run(function () use ($carga) {

@@ -25,6 +25,7 @@ final class ObtenerReporteOperativoHandler implements QueryHandlerInterface
             $this->repository->facturacionPorEstado($query->desde, $query->hasta),
             $this->repository->topClientesFacturacion($query->desde, $query->hasta),
             $this->repository->inventarioPorEstado(),
+            $this->repository->operacionBodega($query->desde, $query->hasta),
         );
     }
 }

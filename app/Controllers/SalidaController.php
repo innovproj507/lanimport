@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Controllers;
 
 use App\Libraries\Csrf;
+use Courier\Lpn\Application\ConfirmarRecepcionLpn\ConfirmarRecepcionLpnHandler;
 use CodeIgniter\HTTP\RedirectResponse;
 use CodeIgniter\HTTP\ResponseInterface;
 use Courier\Aduanero\Application\ListarAduaneros\ListarAduanerosHandler;
@@ -191,7 +192,8 @@ final class SalidaController extends BaseController
         }
 
         try {
-            $codigo = (string) ($this->request->getPost('codigo') ?? '');
+            // Mismo ajuste que la recepcion: el lector puede escribir el guion como apostrofo.
+            $codigo = ConfirmarRecepcionLpnHandler::normalizarCodigo((string) ($this->request->getPost('codigo') ?? ''));
             $command = new RegistrarEscaneoSalidaCommand($id, $codigo);
             $progreso = $this->container()->get(RegistrarEscaneoSalidaHandler::class)->handle($command);
 

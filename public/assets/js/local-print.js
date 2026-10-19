@@ -1,5 +1,5 @@
 /**
- * Cliente para el Agente de Impresion LAN (herramientas/agente-impresion),
+ * Cliente para el Agente de Impresion LAN (herramientas/agente-impresion de este proyecto),
  * un servicio propio que corre en http://localhost:9898 y hace de puente
  * entre el navegador y las impresoras instaladas en este equipo.
  * Reemplaza la dependencia de QZ Tray por una solucion propia del sistema.

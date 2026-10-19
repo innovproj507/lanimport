@@ -123,6 +123,7 @@ final class ConfiguracionController extends BaseController
             $this->container()->get(GuardarPreferenciasNotificacionHandler::class)->handle(new GuardarPreferenciasNotificacionCommand(
                 $this->request->getPost('notificar_ingreso_carga') !== null,
                 $this->usuarioId(),
+                $this->request->getPost('notificar_despacho_carga') !== null,
             ));
 
             return $this->redirectConMensaje('/configuracion/notificaciones', 'Preferencias de notificacion guardadas.');

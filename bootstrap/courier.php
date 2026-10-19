@@ -73,6 +73,10 @@ use Courier\Carga\Infrastructure\Storage\CargaDocumentoStorage;
 use Courier\Lpn\Application\ActualizarEtiquetaLpnConfig\ActualizarEtiquetaLpnConfigHandler;
 use Courier\Lpn\Application\BuscarInventario\BuscarInventarioHandler;
 use Courier\Lpn\Application\ConfirmarRecepcionLpn\ConfirmarRecepcionLpnHandler;
+use Courier\Carga\Application\SincronizarEstadoCarga\SincronizarEstadoCargaHandler;
+use Courier\Carga\Domain\ConteoBultosCargaInterface;
+use Courier\Carga\Infrastructure\Persistence\PdoConteoBultosCarga;
+use Courier\Notificacion\Application\NotificarDespachoCarga\NotificarDespachoCargaHandler;
 use Courier\Lpn\Application\EliminarLpnsDeCarga\EliminarLpnsDeCargaHandler;
 use Courier\Lpn\Application\GenerarLpnsParaCarga\GenerarLpnsParaCargaHandler;
 use Courier\Lpn\Application\ListarLpnsPorCarga\ListarLpnsPorCargaHandler;
@@ -208,6 +212,7 @@ $container->set(BuscarUsuariosHandler::class, fn (Container $c) => new BuscarUsu
 // Carga
 $container->set(CargaRepositoryInterface::class, fn (Container $c) => new PdoCargaRepository($c->get(PDO::class)));
 $container->set(PdoHistorialEstadoRepository::class, fn (Container $c) => new PdoHistorialEstadoRepository($c->get(PDO::class)));
+$container->set(ConteoBultosCargaInterface::class, fn (Container $c) => new PdoConteoBultosCarga($c->get(PDO::class)));
 $container->set(PdoEtiquetaRepository::class, fn (Container $c) => new PdoEtiquetaRepository($c->get(PDO::class)));
 $container->set(TrackingNumeroGeneratorInterface::class, fn (Container $c) => new UuidTrackingNumeroGenerator($c->get(CargaRepositoryInterface::class)));
 $container->set(BarcodeGeneratorInterface::class, fn () => new PicqerBarcodeGeneratorService(dirname(__DIR__) . '/public'));
@@ -241,6 +246,7 @@ $container->set(EliminarLpnsDeCargaHandler::class, fn (Container $c) => new Elim
 $container->set(ConfirmarRecepcionLpnHandler::class, fn (Container $c) => new ConfirmarRecepcionLpnHandler(
     $c->get(LpnRepositoryInterface::class),
     $c->get(UbicacionRepositoryInterface::class),
+    $c->get(SincronizarEstadoCargaHandler::class),
 ));
 $container->set(ListarLpnsPorCargaHandler::class, fn (Container $c) => new ListarLpnsPorCargaHandler($c->get(LpnRepositoryInterface::class)));
 $container->set(BuscarInventarioHandler::class, fn (Container $c) => new BuscarInventarioHandler($c->get(LpnRepositoryInterface::class)));
@@ -268,6 +274,7 @@ $container->set(ConfirmarSalidaHandler::class, fn (Container $c) => new Confirma
     $c->get(SalidaOrdenRepositoryInterface::class),
     $c->get(LpnRepositoryInterface::class),
     $c->get(UnitOfWork::class),
+    $c->get(SincronizarEstadoCargaHandler::class),
 ));
 $container->set(CancelarOrdenSalidaHandler::class, fn (Container $c) => new CancelarOrdenSalidaHandler(
     $c->get(SalidaOrdenRepositoryInterface::class),
@@ -393,6 +400,22 @@ $container->set(NotificarIngresoCargaHandler::class, fn (Container $c) => new No
     $c->get(EmailServiceInterface::class),
     $c->get(NotificacionRepositoryInterface::class),
     $c->get(ConfiguracionRepositoryInterface::class),
+));
+
+$container->set(NotificarDespachoCargaHandler::class, fn (Container $c) => new NotificarDespachoCargaHandler(
+    $c->get(EmailServiceInterface::class),
+    $c->get(NotificacionRepositoryInterface::class),
+    $c->get(ConfiguracionRepositoryInterface::class),
+));
+
+// El estado de la carga sigue a sus bultos: recepcion de LPNs y salidas confirmadas.
+$container->set(SincronizarEstadoCargaHandler::class, fn (Container $c) => new SincronizarEstadoCargaHandler(
+    $c->get(CargaRepositoryInterface::class),
+    $c->get(ConteoBultosCargaInterface::class),
+    $c->get(PdoHistorialEstadoRepository::class),
+    $c->get(ClienteRepositoryInterface::class),
+    $c->get(NotificarDespachoCargaHandler::class),
+    $c->get(UnitOfWork::class),
 ));
 
 $container->set(RegistrarCargaHandler::class, fn (Container $c) => new RegistrarCargaHandler(

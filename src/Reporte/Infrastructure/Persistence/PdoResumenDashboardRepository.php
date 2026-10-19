@@ -40,6 +40,7 @@ final class PdoResumenDashboardRepository
     public function pendientes(): int
     {
         $pendientesEstados = [
+            CargaStatus::INGRESADO->value,
             CargaStatus::EN_BODEGA->value,
             CargaStatus::EN_TRANSITO->value,
             CargaStatus::EN_ADUANA->value,
@@ -230,12 +231,12 @@ final class PdoResumenDashboardRepository
     }
 
     /** @return array{total: int, items: array<int, array{id: string, trackingNumero: string, clienteNombre: string, fecha: string}>} */
-    /** Cargas que siguen en bodega, las de ingreso mas antiguo primero (las que mas esperan). */
+    /** Cargas que siguen fisicamente en bodega (ingresadas o ya escaneadas), las mas antiguas primero. */
     public function cargasMasAntiguasEnBodega(int $limite = 5): array
     {
         $desde = "FROM cargas ca
                   JOIN clientes c ON c.id = ca.cliente_id
-                  WHERE ca.estado = 'en_bodega'";
+                  WHERE ca.estado IN ('ingresado', 'en_bodega')";
 
         $total = (int) $this->connection->query("SELECT COUNT(*) {$desde}")->fetchColumn();
         $stmt = $this->connection->query(

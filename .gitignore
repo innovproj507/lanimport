@@ -133,3 +133,6 @@ _modules/*
 /storage/logs/*
 /*.xlsx
 /*.csv
+
+# Migraciones de la base: se mantienen solo en local y en el servidor
+/database/migrations/

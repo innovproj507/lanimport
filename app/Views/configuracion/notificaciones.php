@@ -25,6 +25,17 @@ require __DIR__ . '/../partials/header.php';
         </span>
     </label>
 
+    <label class="flex items-start gap-3">
+        <input type="checkbox" name="notificar_despacho_carga" value="1" <?= $preferencias->notificarDespachoCarga ? 'checked' : '' ?>
+               class="mt-1 rounded border-zinc-300 text-amber-500 focus:ring-amber-400">
+        <span>
+            <span class="block text-sm font-medium text-black">Avisar al cliente cuando su carga se despacha</span>
+            <span class="block text-xs text-zinc-500">Se envia al finalizar la salida que lleva todos sus bultos, con el DO, contenedor, naviera y fecha estimada de salida.</span>
+        </span>
+    </label>
+
+    <p class="text-xs text-zinc-500">No se envia nada a los clientes con correo provisional (<code>sincorreo…@importado.local</code>).</p>
+
     <div class="text-xs text-zinc-500 border-t border-slate-200 pt-3">
         Siempre se envian (no se pueden desactivar): las credenciales al aprobar un cliente y el enlace para recuperar contrasena.
     </div>

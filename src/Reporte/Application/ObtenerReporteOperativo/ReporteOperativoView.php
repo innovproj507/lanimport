@@ -11,6 +11,7 @@ final class ReporteOperativoView
      * @param array<string, array{cantidad: int, total: float}> $facturacion
      * @param array<int, array{nombre: string, totalFacturado: float}> $topClientesFacturacion
      * @param array<string, int> $inventarioPorEstado
+     * @param array<string, mixed> $operacionBodega ver PdoReporteOperativoRepository::operacionBodega()
      */
     public function __construct(
         public readonly string $desde,
@@ -19,6 +20,7 @@ final class ReporteOperativoView
         public readonly array $facturacion,
         public readonly array $topClientesFacturacion,
         public readonly array $inventarioPorEstado,
+        public readonly array $operacionBodega = [],
     ) {
     }
 

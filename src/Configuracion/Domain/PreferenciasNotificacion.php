@@ -12,11 +12,12 @@ final class PreferenciasNotificacion
 {
     public function __construct(
         public readonly bool $notificarIngresoCarga,
+        public readonly bool $notificarDespachoCarga = true,
     ) {
     }
 
     public static function porDefecto(): self
     {
-        return new self(true);
+        return new self(true, true);
     }
 }

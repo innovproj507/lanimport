@@ -20,7 +20,7 @@ final class GuardarPreferenciasNotificacionHandler implements CommandHandlerInte
         assert($command instanceof GuardarPreferenciasNotificacionCommand);
 
         $this->configuracion->guardarPreferenciasNotificacion(
-            new PreferenciasNotificacion($command->notificarIngresoCarga),
+            new PreferenciasNotificacion($command->notificarIngresoCarga, $command->notificarDespachoCarga),
             $command->usuarioId,
         );
 

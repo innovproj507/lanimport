@@ -51,6 +51,7 @@ $v = static fn (string $archivo): string => '/assets/bodega/' . $archivo . '?v='
             'nombre' => $nombre,
         ], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP) ?>;
     </script>
+    <script src="/assets/js/lector-codigos.js?v=<?= @filemtime(FCPATH . 'assets/js/lector-codigos.js') ?>"></script>
     <script src="<?= $v('js/api.js') ?>"></script>
     <script src="<?= $v('js/escaner.js') ?>"></script>
     <script src="<?= $v('js/app.js') ?>"></script>

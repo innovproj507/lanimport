@@ -117,13 +117,17 @@ final class PdoConfiguracionRepository implements ConfiguracionRepositoryInterfa
             return PreferenciasNotificacion::porDefecto();
         }
 
-        return new PreferenciasNotificacion((bool) ($datos['notificar_ingreso_carga'] ?? true));
+        return new PreferenciasNotificacion(
+            (bool) ($datos['notificar_ingreso_carga'] ?? true),
+            (bool) ($datos['notificar_despacho_carga'] ?? true),
+        );
     }
 
     public function guardarPreferenciasNotificacion(PreferenciasNotificacion $preferencias, string $usuarioId): void
     {
         $this->escribir(self::NOTIFICACIONES, [
             'notificar_ingreso_carga' => $preferencias->notificarIngresoCarga,
+            'notificar_despacho_carga' => $preferencias->notificarDespachoCarga,
         ], $usuarioId);
     }
 

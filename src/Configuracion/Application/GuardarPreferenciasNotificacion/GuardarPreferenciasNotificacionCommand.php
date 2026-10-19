@@ -11,6 +11,7 @@ final class GuardarPreferenciasNotificacionCommand implements CommandInterface
     public function __construct(
         public readonly bool $notificarIngresoCarga,
         public readonly string $usuarioId,
+        public readonly bool $notificarDespachoCarga = true,
     ) {
     }
 }

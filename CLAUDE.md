@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-LAN Import WMS: a courier/freight-forwarding warehouse system. This repo is a **CodeIgniter 4 port** of the original plain-PHP "Courier" app in the sibling folder `../lan`. The domain layer (`src/`, namespace `Courier\`) was copied over unchanged; only the interfaces layer (routing, controllers, filters, views) was rewritten on CI4. Many comments say "igual que WebRoutes.php" or "equivalente a ... del sistema original". Those point to the `../lan/interfaces/` code this port must match. All identifiers, views and messages are in Spanish; keep new code in Spanish too.
+LAN Import WMS: a courier/freight-forwarding warehouse system. It is a **CodeIgniter 4 port** of an older plain-PHP "Courier" app: the domain layer (`src/`, namespace `Courier\`) came from it, and the interfaces layer (routing, controllers, filters, views) was rewritten on CI4. Comments like "igual que WebRoutes.php" or "del sistema original" refer to that old app, which is no longer used: **everything lives in this repo** (do not depend on the sibling `../lan` folder). All identifiers, views and messages are in Spanish; keep new code in Spanish too.
 
 ## Commands
 
@@ -19,7 +19,7 @@ php spark routes                   # list registered routes with their filters
 
 The app is served by Laragon with DocumentRoot at `public/`. There is no JS/CSS build step. Views use Tailwind classes directly, and front-end behavior lives in `public/assets/js/app.js`.
 
-**Database schema is not managed here.** `app/Database/Migrations` is empty. The schema and seeders come from `../lan/database/migrations` (`php ../lan/bin/migrate.php`, `php ../lan/bin/seed.php`).
+**Database schema:** plain SQL/PHP files in `database/migrations/NNN_descripcion.(sql|php)`, not CI migrations (`app/Database/Migrations` is empty). `php bin/migrate.php` (or `composer migrate`) applies the pending ones and records each in the `schema_migraciones` table; `--estado` lists pending, `--baseline` marks all as applied without running them (only for a database whose schema is already current). MySQL DDL is not transactional, so a failing migration stops the run. `php bin/seed.php` creates demo users (development only). Production is MariaDB 10.6.
 
 ## Configuration: two `.env` systems in one file
 
@@ -39,7 +39,7 @@ These are hexagonal/DDD bounded contexts (`Auth`, `Carga`, `Cliente`, `Lpn`, `Sa
 
 ### Wiring: `bootstrap/courier.php`
 
-This is the single composition root, a copy of `../lan/bootstrap/app.php`. It builds a lazy-singleton `Courier\Shared\Infrastructure\Container` with every repository and handler binding. CI exposes it as `Services::courierContainer()` (`app/Config/Services.php`), and controllers reach it through `$this->container()->get(XHandler::class)` from `BaseController`. **A new use case must be registered in `bootstrap/courier.php`**, under its context's comment heading.
+This is the single composition root. It builds a lazy-singleton `Courier\Shared\Infrastructure\Container` with every repository and handler binding. CI exposes it as `Services::courierContainer()` (`app/Config/Services.php`), and controllers reach it through `$this->container()->get(XHandler::class)` from `BaseController`. **A new use case must be registered in `bootstrap/courier.php`**, under its context's comment heading.
 
 ### Web layer (session-based)
 
@@ -75,6 +75,21 @@ This is the single composition root, a copy of `../lan/bootstrap/app.php`. It bu
 
 The paper delivery form (empresa de transporte, chofer, placa, entregado por, cedula, tipo de mercancia) is part of the carga itself: the `Carga\Domain\ValueObject\DatosEntrega` value object is stored in the `entrega_*` columns of `cargas` and filled in the "Datos de entrega" section of the Ingreso/Editar forms (`carga/_datos_entrega.php`). "Verificado por" is the user who registered the carga. `GET /cargas/{id}/comprobante` prints the signable comprobante. The former actas module, its table and the `recepcion` role were removed (migration 053).
 
+### Estado de la carga sigue a los bultos
+
+- A new carga stays `ingresado` (no longer jumps to `en_bodega` on registration).
+- `Carga::sincronizarConBultos()` holds the rule:
+  - `ingresado` → `en_bodega` when every LPN has been scanned in reception;
+  - `en_bodega` → `en_transito` when every LPN left in confirmed salidas;
+  - a partial shipment changes nothing.
+- `Carga/Application/SincronizarEstadoCarga` counts bultos through `ConteoBultosCargaInterface` (`PdoConteoBultosCarga`), saves the state plus history, and sends the client the despacho email (`NotificarDespachoCargaHandler`, toggle in Configuracion > Notificaciones).
+- It is called by `ConfirmarRecepcionLpnHandler` and `ConfirmarSalidaHandler`.
+- Client emails share `Notificacion/Application/PlantillaCorreo`. Placeholder addresses (`sincorreo.N@importado.local`) are never sent to; the notification is recorded as failed with an explanation.
+- Reportes (gerente/admin) opens with "Operacion de bodega" (`PdoReporteOperativoRepository::operacionBodega()`):
+  - period movement: ingresos, recepciones completas, salidas, bultos despachados;
+  - current stock, bultos por escanear and cargas without LPNs;
+  - inventory age, top clients, and receptions pending for more than 24 h.
+
 ### Aduanero asignado al cliente
 
 `clientes.aduanero_identificador` (migration 056, FK to `aduaneros.identificador`) is the client's usual aduanero. It is edited in the client form, shown in the client list, and pre-selected in Ingreso de Carga when the client is picked (`alSeleccionar` in `app.js`), unless the user already chose another one.
@@ -99,7 +114,7 @@ The paper delivery form (empresa de transporte, chofer, placa, entregado por, ce
 
 ### Label printing
 
-Barcode and label images are generated server-side into `public/` (`PicqerBarcodeGeneratorService`, `LpnBarcodeGeneratorService`). Uploaded documents are also stored under `public/uploads`. Physical printing goes through a separate local "Agente de Impresion LAN" at `http://localhost:9898`, which `public/assets/js/local-print.js` calls (source in `../lan/herramientas/`).
+Barcode and label images are generated server-side into `public/` (`PicqerBarcodeGeneratorService`, `LpnBarcodeGeneratorService`). Uploaded documents are also stored under `public/uploads`. Physical printing goes through a separate local "Agente de Impresion LAN" at `http://localhost:9898`, which `public/assets/js/local-print.js` calls. Its source (PowerShell, no dependencies) is in `herramientas/agente-impresion/`; users download it from the Impresoras page as `public/descargas/AgenteImpresionLAN.zip` and install it with `Instalar.bat`. After changing the agent, rebuild the ZIP with `powershell -ExecutionPolicy Bypass -File herramientas/empaquetar-agente.ps1`.
 
 ### Cross-context rules (from the original project)
 

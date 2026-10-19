@@ -47,6 +47,7 @@
         "sort-packages": true
     },
     "scripts": {
-        "test": "phpunit"
+        "test": "phpunit",
+        "migrate": "@php bin/migrate.php"
     }
 }

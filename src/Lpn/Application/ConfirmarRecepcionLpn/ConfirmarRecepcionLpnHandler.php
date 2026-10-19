@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Courier\Lpn\Application\ConfirmarRecepcionLpn;
 
+use Courier\Carga\Application\SincronizarEstadoCarga\SincronizarEstadoCargaCommand;
+use Courier\Carga\Application\SincronizarEstadoCarga\SincronizarEstadoCargaHandler;
 use Courier\Lpn\Domain\EstadoLpn;
 use Courier\Lpn\Domain\Lpn;
 use Courier\Lpn\Domain\LpnRepositoryInterface;
@@ -19,6 +21,7 @@ final class ConfirmarRecepcionLpnHandler implements CommandHandlerInterface
     public function __construct(
         private readonly LpnRepositoryInterface $lpns,
         private readonly UbicacionRepositoryInterface $ubicaciones,
+        private readonly SincronizarEstadoCargaHandler $sincronizarCarga,
     ) {
     }
 
@@ -52,6 +55,11 @@ final class ConfirmarRecepcionLpnHandler implements CommandHandlerInterface
 
         $lpn->confirmarRecepcion($command->ubicacionId);
         $this->lpns->save($lpn);
+
+        // Con el ultimo bulto escaneado la carga pasa de "Ingresado" a "En bodega".
+        if ($lpn->cargaId() !== null) {
+            $this->sincronizarCarga->handle(new SincronizarEstadoCargaCommand($lpn->cargaId(), $command->usuarioId));
+        }
 
         return $lpn;
     }
