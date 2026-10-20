@@ -10,7 +10,8 @@ require_once __DIR__ . '/../partials/view_helpers.php';
 $pageTitle = 'Salida ' . $orden->etiquetaDo();
 $pageSubtitle = (str_contains($clienteNombre, ', ') ? 'Clientes: ' : 'Cliente: ') . $clienteNombre;
 $backHref = '/salidas/historial';
-$headerActions = header_button('/salidas/' . $orden->id() . '/manifiesto', 'printer', 'Imprimir manifiesto', 'blue');
+$headerActions = header_button('/salidas/' . $orden->id() . '/reporte', 'chart', 'Reporte de salida', 'amber')
+    . header_button('/salidas/' . $orden->id() . '/manifiesto', 'printer', 'Imprimir manifiesto', 'blue');
 require __DIR__ . '/../partials/header.php';
 
 $progreso = $orden->progreso();
@@ -169,5 +170,13 @@ $claseInput = 'w-full rounded-lg border border-zinc-300 bg-white text-black px-3
         </table>
     </div>
 </div>
+
+<?php
+$fotosTitulo = 'Fotos de la salida';
+$fotosAyuda = 'Evidencia del despacho: contenedor, sello y carga estibada. Bodega las toma desde la app movil; tambien se pueden agregar aqui.';
+$fotosUrlSubir = '/bodega/api/salidas/' . $orden->id() . '/fotos';
+$fotosVolver = '/salidas/' . $orden->id();
+require __DIR__ . '/../evidencia/_fotos.php';
+?>
 
 <?php require __DIR__ . '/../partials/footer.php'; ?>

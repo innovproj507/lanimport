@@ -110,7 +110,7 @@ foreach ($clientes as $c) {
                         <td class="py-2 pr-4"><?= badge($orden->estado()->label(), $estadoColores[$orden->estado()->value] ?? 'slate') ?></td>
                         <td class="py-2 pr-4 text-zinc-700"><?= htmlspecialchars($orden->createdAt()->format('Y-m-d H:i')) ?></td>
                         <td class="py-2 pr-4 text-zinc-700"><?= htmlspecialchars($orden->confirmedAt()?->format('Y-m-d H:i') ?? '—') ?></td>
-                        <td class="py-2 text-right"><?= icon_button('/salidas/' . $orden->id() . '/manifiesto', 'printer', 'Imprimir manifiesto', 'slate') ?></td>
+                        <td class="py-2 text-right whitespace-nowrap"><?= icon_button('/salidas/' . $orden->id() . '/reporte', 'chart', 'Reporte de salida', 'slate') ?> <?= icon_button('/salidas/' . $orden->id() . '/manifiesto', 'printer', 'Imprimir manifiesto', 'slate') ?></td>
                     </tr>
                 <?php endforeach; ?>
             </tbody>

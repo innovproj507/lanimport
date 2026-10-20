@@ -275,21 +275,22 @@ final class PdoSalidaOrdenRepository implements SalidaOrdenRepositoryInterface
                  UNION
                  SELECT g.lpn_origen_id FROM contenido x JOIN lpn_genealogia g ON g.lpn_destino_id = x.lpn_id
              )
-             SELECT ca.tracking_numero, ca.proveedor, c.nombre AS cliente_nombre,
+             SELECT ca.tracking_numero, ca.proveedor, ca.fecha_ingreso, ca.aduanero_nombre, c.nombre AS cliente_nombre,
                     COUNT(*) AS bultos_salida,
                     (SELECT COUNT(*) FROM lpns l2 WHERE l2.carga_id = ca.id) AS bultos_carga,
                     GROUP_CONCAT(DISTINCT NULLIF(l.marca, '') ORDER BY l.marca SEPARATOR ', ') AS marcas,
-                    t.kilos, t.valor, t.pies3
+                    t.kilos, t.valor, t.pies3, t.descripciones
              FROM contenido x
              JOIN lpns l ON l.id = x.lpn_id AND l.carga_id IS NOT NULL
              JOIN cargas ca ON ca.id = l.carga_id
              JOIN clientes c ON c.id = l.cliente_id
              LEFT JOIN (
                  SELECT carga_id, SUM(peso) AS kilos, SUM(valor) AS valor,
-                        SUM(COALESCE(cubicaje_p3, ancho * alto * largo / 28316.846592) * cantidad) AS pies3
+                        SUM(COALESCE(cubicaje_p3, ancho * alto * largo / 28316.846592) * cantidad) AS pies3,
+                        GROUP_CONCAT(DISTINCT NULLIF(descripcion, '') ORDER BY orden SEPARATOR ', ') AS descripciones
                  FROM carga_lineas GROUP BY carga_id
              ) t ON t.carga_id = ca.id
-             GROUP BY ca.id, ca.tracking_numero, ca.proveedor, c.nombre, t.kilos, t.valor, t.pies3
+             GROUP BY ca.id, ca.tracking_numero, ca.proveedor, ca.fecha_ingreso, ca.aduanero_nombre, c.nombre, t.kilos, t.valor, t.pies3, t.descripciones
              ORDER BY ca.proveedor, ca.tracking_numero"
         );
         $stmt->execute([':orden' => $ordenId]);
@@ -305,7 +306,11 @@ final class PdoSalidaOrdenRepository implements SalidaOrdenRepositoryInterface
                 'bultos' => (int) $r['bultos_salida'],
                 'kilos' => round((float) $r['kilos'] * $factor, 2),
                 'm3' => round((float) $r['pies3'] * 0.028316846592 * $factor, 3),
+                'pies3' => round((float) $r['pies3'] * $factor, 2),
                 'valor' => round((float) $r['valor'] * $factor, 2),
+                'fechaIngreso' => $r['fecha_ingreso'] !== null ? (string) $r['fecha_ingreso'] : null,
+                'aduanero' => (string) ($r['aduanero_nombre'] ?? ''),
+                'descripcion' => (string) ($r['descripciones'] ?? ''),
             ];
         }, $stmt->fetchAll());
     }

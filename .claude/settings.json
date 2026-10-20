@@ -1,7 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Bash(/c/laragon/bin/php/php-8.2.33-Win32-vs16-x64/php.exe -r ' *)"
+      "Bash(/c/laragon/bin/php/php-8.2.33-Win32-vs16-x64/php.exe -r ' *)",
+      "Bash(/c/laragon/bin/php/php-8.2.33-Win32-vs16-x64/php.exe -l app/Controllers/SalidaController.php)",
+      "Bash(node C:/Users/darango/AppData/Local/Temp/claude/c--laragon-www-lanimport/3aa16985-8bfc-40af-95cd-f572d74528a1/scratchpad/e2e_reporte.mjs C:/Users/darango/AppData/Local/Temp/claude/c--laragon-www-lanimport/3aa16985-8bfc-40af-95cd-f572d74528a1/scratchpad 72cf40b0-9b7e-4b52-91ac-7aacfbe1dc16)"
     ]
   }
 }

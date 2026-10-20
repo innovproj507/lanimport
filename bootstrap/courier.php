@@ -2,6 +2,12 @@
 
 declare(strict_types=1);
 
+use Courier\Evidencia\Application\EliminarFotoEvidencia\EliminarFotoEvidenciaHandler;
+use Courier\Evidencia\Application\SubirFotoEvidencia\SubirFotoEvidenciaHandler;
+use Courier\Evidencia\Domain\AlmacenFotosInterface;
+use Courier\Evidencia\Domain\FotoEvidenciaRepositoryInterface;
+use Courier\Evidencia\Infrastructure\Persistence\PdoFotoEvidenciaRepository;
+use Courier\Evidencia\Infrastructure\Storage\FotoEvidenciaStorage;
 use Courier\Auth\Application\Login\LoginHandler;
 use Courier\Auth\Application\Logout\LogoutHandler;
 use Courier\Auth\Application\RestablecerPassword\RestablecerPasswordHandler;
@@ -395,6 +401,20 @@ $container->set(ActualizarNavieraHandler::class, fn (Container $c) => new Actual
 $container->set(BuscarNavierasHandler::class, fn (Container $c) => new BuscarNavierasHandler($c->get(NavieraRepositoryInterface::class)));
 $container->set(ListarNavierasHandler::class, fn (Container $c) => new ListarNavierasHandler($c->get(NavieraRepositoryInterface::class)));
 $container->set(EliminarNavieraHandler::class, fn (Container $c) => new EliminarNavieraHandler($c->get(NavieraRepositoryInterface::class)));
+
+// Evidencia (fotos de recepcion y de salida)
+$container->set(FotoEvidenciaRepositoryInterface::class, fn (Container $c) => new PdoFotoEvidenciaRepository($c->get(PDO::class)));
+$container->set(AlmacenFotosInterface::class, fn () => new FotoEvidenciaStorage(dirname(__DIR__) . '/public'));
+$container->set(SubirFotoEvidenciaHandler::class, fn (Container $c) => new SubirFotoEvidenciaHandler(
+    $c->get(FotoEvidenciaRepositoryInterface::class),
+    $c->get(AlmacenFotosInterface::class),
+    $c->get(CargaRepositoryInterface::class),
+    $c->get(SalidaOrdenRepositoryInterface::class),
+));
+$container->set(EliminarFotoEvidenciaHandler::class, fn (Container $c) => new EliminarFotoEvidenciaHandler(
+    $c->get(FotoEvidenciaRepositoryInterface::class),
+    $c->get(AlmacenFotosInterface::class),
+));
 
 // Pais
 $container->set(PaisRepositoryInterface::class, fn (Container $c) => new PdoPaisRepository($c->get(PDO::class)));

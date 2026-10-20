@@ -280,3 +280,24 @@ h2 { font-size: 17px; margin: 0 0 10px; display: flex; justify-content: space-be
 @media (min-width: 640px) { .menu { grid-template-columns: repeat(2, 1fr); } }
 .btn-texto-oscuro { background: none; border: 1px solid var(--borde); border-radius: 8px; padding: 4px 10px; font-size: 14px; color: var(--error); }
 .lineas li { align-items: center; }
+
+/* Fotos de evidencia */
+a.btn, label.btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; text-decoration: none; cursor: pointer; }
+.btn-claro { border: 1px solid var(--borde); }
+.fotos-acciones { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.fotos-acciones .btn { margin-top: 0; }
+.btn-foto {
+    display: inline-block;
+    padding: 6px 12px;
+    border: 1px solid var(--borde);
+    border-radius: 8px;
+    background: #fff;
+    color: var(--texto);
+    font-size: 15px;
+    font-weight: 700;
+    text-decoration: none;
+}
+.fotos-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
+.fotos-grid .vacio { grid-column: 1 / -1; }
+.foto { display: flex; flex-direction: column; gap: 4px; color: var(--suave); text-decoration: none; font-size: 12px; }
+.foto img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 10px; border: 1px solid var(--borde); background: #f1f5f9; }

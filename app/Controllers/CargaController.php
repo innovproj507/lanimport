@@ -44,6 +44,8 @@ use Courier\Pais\Application\ListarPaises\ListarPaisesQuery;
 use Courier\Proveedor\Application\ListarProveedores\ListarProveedoresHandler;
 use Courier\Proveedor\Application\ListarProveedores\ListarProveedoresQuery;
 use Courier\Proveedor\Domain\ProveedorRepositoryInterface;
+use Courier\Evidencia\Domain\FotoEvidenciaRepositoryInterface;
+use Courier\Evidencia\Domain\TipoEvidencia;
 use Courier\Shared\Domain\Exception\NotFoundException;
 use Courier\Shared\Domain\Exception\ValidationException;
 
@@ -265,6 +267,7 @@ final class CargaController extends BaseController
             'registradoPor' => $this->container()->get(UsuarioRepositoryInterface::class)->findById($carga->registradoPorUsuarioId())?->nombre(),
             'correos' => $this->container()->get(NotificacionRepositoryInterface::class)->listarPorCarga($carga->id()),
             'whatsapp' => $this->datosWhatsapp($carga),
+            'fotos' => $this->container()->get(FotoEvidenciaRepositoryInterface::class)->listar(TipoEvidencia::Recepcion, $carga->id()),
             'aviso' => $this->tomarAviso(),
             'error' => $error,
         ]);

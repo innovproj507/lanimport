@@ -317,4 +317,12 @@ document.addEventListener('DOMContentLoaded', function () {
     <?php endif; ?>
 </div>
 
+<?php
+$fotosTitulo = 'Fotos de recepcion';
+$fotosAyuda = 'Estado en que llego la mercancia. Bodega las toma desde la app movil al recibir; tambien se pueden agregar aqui.';
+$fotosUrlSubir = '/bodega/api/cargas/' . $view->cargaId . '/fotos';
+$fotosVolver = '/cargas/' . $view->cargaId;
+require __DIR__ . '/../evidencia/_fotos.php';
+?>
+
 <?php require __DIR__ . '/../partials/footer.php'; ?>

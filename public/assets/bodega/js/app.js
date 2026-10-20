@@ -229,7 +229,8 @@
                     return '<div class="fila' + (completa ? ' fila-completa' : '') + '">'
                         + '<div class="fila-principal"><strong>' + esc(c.tracking) + '</strong><span>' + esc(c.cliente) + (c.marca ? ' · ' + esc(c.marca) : '') + '</span>'
                         + '<small>Ingreso ' + esc(fecha(c.fechaIngreso)) + (completa ? ' · Completa' : '') + '</small></div>'
-                        + '<div class="fila-progreso">' + barraProgreso(c.recibidos, c.total) + '</div>'
+                        + '<div class="fila-progreso">' + barraProgreso(c.recibidos, c.total)
+                        + '<a class="btn-foto" href="#' + rutaFotos('cargas', c.cargaId, c.tracking) + '">📷 ' + (c.fotos || 0) + '</a></div>'
                         + '</div>';
                 }).join('');
         }
@@ -257,6 +258,7 @@
                         var i = cargas.findIndex(function (c) { return c.cargaId === r.progreso.cargaId; });
 
                         if (i >= 0) {
+                            r.progreso.fotos = cargas[i].fotos;
                             cargas[i] = r.progreso;
                         } else {
                             cargas.push(r.progreso);
@@ -366,6 +368,10 @@
                 + (orden.estado === 'pendiente' ? '  <button type="button" id="sal-finalizar" class="btn btn-primario btn-bloque" disabled>Finalizar salida</button>' : '')
                 + '</section>'
                 + '<section class="tarjeta"><h2>Cargas de la salida</h2><div id="sal-cargas" class="lista"></div></section>'
+                + '<section class="tarjeta"><h2>Fotos de evidencia <span class="contador">' + (orden.fotos || 0) + '</span></h2>'
+                + '  <p class="sub">Contenedor, sello y carga estibada.</p>'
+                + '  <a class="btn btn-claro btn-bloque" href="#' + rutaFotos('salidas', orden.id, orden.do) + '">📷 Tomar fotos de la salida</a>'
+                + '</section>'
             );
 
             var avisoSal = document.getElementById('sal-aviso');
@@ -589,6 +595,82 @@
         });
     }
 
+    // ---------- fotos de evidencia ----------
+
+    /** #/fotos/{cargas|salidas}/{id}/{titulo}: el titulo (tracking o DO) solo es para mostrarlo. */
+    function rutaFotos(recurso, id, titulo) {
+        return '/fotos/' + recurso + '/' + encodeURIComponent(id) + '/' + encodeURIComponent(titulo || '');
+    }
+
+    /**
+     * Fotos de la recepcion de una carga o de una salida: tomar con la camara (o elegir de la
+     * galeria), se reducen en el equipo y se suben una por una (js/fotos-evidencia.js).
+     */
+    function vistaFotos(recurso, id, titulo) {
+        var esSalida = recurso === 'salidas';
+        var volver = esSalida ? '/salidas/' + encodeURIComponent(id) : '/recepcion';
+        var url = window.BLAN_CONFIG.apiBase + '/' + recurso + '/' + encodeURIComponent(id) + '/fotos';
+
+        html(
+            cabecera(esSalida ? 'Fotos de la salida' : 'Fotos de recepcion', volver)
+            + '<section class="tarjeta">'
+            + '  <p class="sub">' + esc(titulo) + (esSalida ? ' · contenedor, sello y carga estibada' : ' · estado en que llego la mercancia') + '</p>'
+            + '  <div class="fotos-acciones">'
+            + '    <label class="btn btn-primario">📷 Tomar foto<input id="foto-camara" type="file" accept="image/*" capture="environment" class="oculto"></label>'
+            + '    <label class="btn btn-claro">🖼 Galeria<input id="foto-galeria" type="file" accept="image/*" multiple class="oculto"></label>'
+            + '  </div>'
+            + '  <p id="fotos-aviso" class="aviso oculto"></p>'
+            + '</section>'
+            + '<section class="tarjeta"><h2>Fotos <span id="fotos-cuenta" class="contador"></span></h2><div id="fotos-lista" class="fotos-grid"><p class="vacio">Cargando...</p></div></section>'
+        );
+
+        var avisoFotos = document.getElementById('fotos-aviso');
+
+        function pintar(fotos) {
+            document.getElementById('fotos-cuenta').textContent = fotos.length;
+            document.getElementById('fotos-lista').innerHTML = fotos.length === 0
+                ? '<p class="vacio">Todavia no hay fotos.</p>'
+                : fotos.map(function (f) {
+                    return '<a class="foto" href="' + esc(f.url) + '" target="_blank" rel="noopener">'
+                        + '<img src="' + esc(f.url) + '" alt="Foto de evidencia" loading="lazy">'
+                        + '<small>' + esc(f.fecha) + (f.usuario ? ' · ' + esc(f.usuario) : '') + '</small></a>';
+                }).join('');
+        }
+
+        function subir(input) {
+            if (input.files.length === 0) {
+                return;
+            }
+
+            var entradas = vista.querySelectorAll('.fotos-acciones input');
+            entradas.forEach(function (e) { e.disabled = true; });
+
+            window.FotosEvidencia.subirVarias(url, input.files, window.BLAN_CONFIG.csrf, function (i, total) {
+                avisoFotos.textContent = 'Subiendo ' + (i + 1) + ' de ' + total + '...';
+                avisoFotos.className = 'aviso aviso-ok';
+            }).then(function (fotos) {
+                pintar(fotos);
+                avisoFotos.textContent = 'Foto guardada.';
+                avisoFotos.className = 'aviso aviso-ok';
+                window.Escaner.pitido(true);
+            }, function (error) {
+                avisoFotos.textContent = error.message;
+                avisoFotos.className = 'aviso aviso-error';
+                window.Escaner.pitido(false);
+            }).then(function () {
+                entradas.forEach(function (e) { e.disabled = false; });
+                input.value = '';
+            });
+        }
+
+        document.getElementById('foto-camara').addEventListener('change', function () { subir(this); });
+        document.getElementById('foto-galeria').addEventListener('change', function () { subir(this); });
+
+        window.Api.get('/' + recurso + '/' + encodeURIComponent(id) + '/fotos').then(pintar, function (error) {
+            document.getElementById('fotos-lista').innerHTML = '<p class="vacio">' + esc(error.message) + '</p>';
+        });
+    }
+
     // ---------- navegacion ----------
 
     function enrutar() {
@@ -600,8 +682,11 @@
 
         var salida = ruta.match(/^\/salidas\/(.+)$/);
         var reempaque = ruta.match(/^\/reempaques\/(.+)$/);
+        var fotos = ruta.match(/^\/fotos\/(cargas|salidas)\/([^/]+)\/?(.*)$/);
 
-        if (ruta === '/recepcion') {
+        if (fotos) {
+            vistaFotos(fotos[1], decodeURIComponent(fotos[2]), decodeURIComponent(fotos[3]));
+        } else if (ruta === '/recepcion') {
             vistaRecepcion();
         } else if (ruta === '/consulta') {
             vistaConsulta();

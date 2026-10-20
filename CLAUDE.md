@@ -31,7 +31,7 @@ The app is served by Laragon with DocumentRoot at `public/`. There is no JS/CSS 
 
 ### Domain: `src/<Contexto>/{Domain,Application,Infrastructure}`
 
-These are hexagonal/DDD bounded contexts (`Auth`, `Carga`, `Cliente`, `Lpn`, `Salida`, `Reempaque`, `Factura`, `Notificacion`, `Reporte`, `Aduanero`, `Proveedor`, `Pais`, `Naviera`, `Configuracion`, plus `Shared`).
+These are hexagonal/DDD bounded contexts (`Auth`, `Carga`, `Cliente`, `Lpn`, `Salida`, `Reempaque`, `Factura`, `Notificacion`, `Reporte`, `Aduanero`, `Proveedor`, `Pais`, `Naviera`, `Configuracion`, `Evidencia`, plus `Shared`).
 - **Application** has one folder per use case, named `VerboSustantivo/`. Each holds a `*Command`/`*Query` DTO and a `*Handler` (`handle()` implementing `Shared/Application` interfaces), and sometimes a `*Result`.
 - **Infrastructure/Persistence** holds `Pdo*Repository` classes: raw PDO with prepared statements, no ORM. CI's Model/Query Builder is not used.
 - Writes that touch several repositories go through `UnitOfWork::run(callable)` (a PDO transaction). `RegistrarCargaHandler` is the canonical example.
@@ -115,6 +115,7 @@ The paper delivery form (empresa de transporte, chofer, placa, entregado por, ce
 - `GET /salidas/{id}/manifiesto` prints the manifest with one row per carga.
   - Kilos, m3 and valor come from `carga_lineas` and are prorated when only part of a carga's LPNs ship.
   - Line peso and valor are line totals; `cubicaje_p3` is per piece.
+- `GET /salidas/{id}/reporte` is the traffic team's "reporte de salida" sheet (`salida/reporte_imprimir.php`): FECHA (carga ingreso, m/d/Y), COMPAÑÍA, CLIENTE, MARCA, BULTOS, CUBICAJE P3, PESO, VALOR, ADUANERO, DESCRIPCION, with totals. It is built from the same `manifiesto()` rows (prorated), sorted by aduanero and fecha, and can be filtered with `?aduanero=`. `/reporte/excel` downloads the same rows as .xlsx (`EscritorXlsx`).
 
 ### Reempaque: trafico ordena, bodega ejecuta
 
@@ -131,6 +132,14 @@ The paper delivery form (empresa de transporte, chofer, placa, entregado por, ce
   - the manifest expands boxes to their original bultos per carga;
   - `PdoConteoBultosCarga` counts a bulto as despachado when its final box shipped;
   - `ConfirmarSalidaHandler` syncs the cargas inside the boxes.
+
+### Fotos de evidencia (recepcion y salida)
+
+- Table `fotos_evidencia` (migration 059): `tipo` = `recepcion` (linked to `carga_id`) or `salida` (linked to `salida_orden_id`). Files live in `public/uploads/evidencias/AAAA/MM/<uuid>.<ext>` (`Evidencia\Infrastructure\Storage\FotoEvidenciaStorage`).
+- One API for PDA and web: `GET|POST bodega/api/{cargas|salidas}/{id}/fotos` (`Api\FotoEvidenciaApiController`, multipart field `foto`, CSRF in `X-CSRF-Token`). `SubirFotoEvidenciaHandler` accepts only real images (getimagesize: JPG/PNG/WEBP, max 10 MB).
+- `public/assets/js/fotos-evidencia.js` shrinks each photo on the device (longest side 1600 px, JPEG 0.8) before uploading; both the PDA and the web gallery use it.
+- PDA: each carga in Recepcion has a "📷 n" button, and each salida has a "Fotos de evidencia" section, both open `#/fotos/{cargas|salidas}/{id}/{titulo}` (Tomar foto / Galeria).
+- Web: gallery partial `evidencia/_fotos.php` in the carga detail (recepcion) and the salida page. Upload: operaciones/bodega/gerente/admin. Delete (`POST fotos-evidencia/{id}/eliminar`): gerente/admin only.
 
 ### Carga masiva (Excel/CSV)
 

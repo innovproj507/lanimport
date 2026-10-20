@@ -8,6 +8,8 @@ use CodeIgniter\HTTP\ResponseInterface;
 use Courier\Auth\Infrastructure\Security\SessionManager;
 use Courier\Carga\Domain\CargaRepositoryInterface;
 use Courier\Cliente\Domain\ClienteRepositoryInterface;
+use Courier\Evidencia\Domain\FotoEvidenciaRepositoryInterface;
+use Courier\Evidencia\Domain\TipoEvidencia;
 use Courier\Lpn\Application\ConfirmarRecepcionLpn\ConfirmarRecepcionLpnCommand;
 use Courier\Lpn\Application\ConfirmarRecepcionLpn\ConfirmarRecepcionLpnHandler;
 use Courier\Lpn\Application\ListarUbicaciones\ListarUbicacionesHandler;
@@ -61,11 +63,14 @@ final class BodegaApiController extends BaseApiController
         }
     }
 
-    /** Cargas con etiquetas todavia "En recepcion", con su avance. */
+    /** Cargas con etiquetas todavia "En recepcion", con su avance y cuantas fotos de recepcion tienen. */
     public function recepcionPendientes(): ResponseInterface
     {
         try {
-            return $this->success($this->container()->get(LpnRepositoryInterface::class)->resumenRecepcion());
+            $cargas = $this->container()->get(LpnRepositoryInterface::class)->resumenRecepcion();
+            $fotos = $this->container()->get(FotoEvidenciaRepositoryInterface::class)->contarRecepcionPorCargas(array_column($cargas, 'cargaId'));
+
+            return $this->success(array_map(static fn (array $c) => $c + ['fotos' => $fotos[$c['cargaId']] ?? 0], $cargas));
         } catch (Throwable $e) {
             return $this->fromException($e);
         }
@@ -168,6 +173,7 @@ final class BodegaApiController extends BaseApiController
             ], $orden->lineas());
             // Para escanear carga por carga en la PDA.
             $datos['cargas'] = $this->container()->get(SalidaOrdenRepositoryInterface::class)->avancePorCarga($orden->id());
+            $datos['fotos'] = count($this->container()->get(FotoEvidenciaRepositoryInterface::class)->listar(TipoEvidencia::Salida, $orden->id()));
 
             return $this->success($datos);
         } catch (Throwable $e) {

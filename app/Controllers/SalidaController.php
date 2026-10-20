@@ -17,6 +17,9 @@ use Courier\Lpn\Application\BuscarInventario\BuscarInventarioHandler;
 use Courier\Lpn\Application\BuscarInventario\BuscarInventarioQuery;
 use Courier\Cliente\Domain\ClienteRepositoryInterface;
 use Courier\Configuracion\Domain\ConfiguracionRepositoryInterface;
+use Courier\Carga\Infrastructure\Importacion\EscritorXlsx;
+use Courier\Evidencia\Domain\FotoEvidenciaRepositoryInterface;
+use Courier\Evidencia\Domain\TipoEvidencia;
 use Courier\Naviera\Application\ListarNavieras\ListarNavierasHandler;
 use Courier\Naviera\Application\ListarNavieras\ListarNavierasQuery;
 use Courier\Salida\Application\ActualizarEmbarqueSalida\ActualizarEmbarqueSalidaCommand;
@@ -145,6 +148,7 @@ final class SalidaController extends BaseController
             'clienteNombre' => $clienteNombre,
             'avance' => $repositorio->avancePorCarga($orden->id()),
             'navieras' => $navieras,
+            'fotos' => $this->container()->get(FotoEvidenciaRepositoryInterface::class)->listar(TipoEvidencia::Salida, $orden->id()),
             'mensaje' => $mensaje,
             'error' => $error,
         ]);
@@ -174,6 +178,88 @@ final class SalidaController extends BaseController
     }
 
     /** Manifiesto imprimible: encabezado del embarque y una fila por carga con totales. */
+    /**
+     * Reporte de salida (formato de la hoja de trafico): una fila por carga con fecha de ingreso,
+     * compania, cliente, marca, bultos, p3, peso, valor, aduanero y descripcion. Se puede
+     * filtrar por aduanero (?aduanero=) e imprimir, o bajar en Excel (reporteExcel).
+     */
+    public function reporte(string $id): string
+    {
+        $datos = $this->datosReporte($id);
+
+        if ($datos === null) {
+            $this->response->setStatusCode(404);
+
+            return 'Orden de salida no encontrada.';
+        }
+
+        return view('salida/reporte_imprimir', $datos);
+    }
+
+    public function reporteExcel(string $id): ResponseInterface|string
+    {
+        $datos = $this->datosReporte($id);
+
+        if ($datos === null) {
+            $this->response->setStatusCode(404);
+
+            return 'Orden de salida no encontrada.';
+        }
+
+        $filas = [['FECHA', 'COMPAÑÍA', 'CLIENTE', 'MARCA', 'BULTOS', 'CUBICAJE P3', 'PESO', 'VALOR', 'ADUANERO', 'DESCRIPCION']];
+        $totales = ['bultos' => 0, 'pies3' => 0.0, 'kilos' => 0.0, 'valor' => 0.0];
+
+        foreach ($datos['filas'] as $f) {
+            $filas[] = [
+                $f['fechaIngreso'] !== null ? (new \DateTimeImmutable($f['fechaIngreso']))->format('m/d/Y') : '',
+                mb_strtoupper($f['compania']), mb_strtoupper($f['cliente']), mb_strtoupper($f['marca']),
+                $f['bultos'], $f['pies3'], $f['kilos'], $f['valor'],
+                mb_strtoupper($f['aduanero']), mb_strtoupper($f['descripcion']),
+            ];
+
+            foreach ($totales as $k => $_) {
+                $totales[$k] += $f[$k];
+            }
+        }
+
+        $filas[] = ['TOTALES', '', '', '', $totales['bultos'], round($totales['pies3'], 2), round($totales['kilos'], 2), round($totales['valor'], 2), '', ''];
+
+        $orden = $datos['orden'];
+        // "DO.2 / 2026" (+ aduanero) -> reporte-salida-do-2-2026-marara.xlsx
+        $slug = trim((string) preg_replace('/[^a-z0-9]+/', '-', strtolower($orden->etiquetaDo() . ' ' . $datos['aduanero'])), '-');
+        $contenido = $this->container()->get(EscritorXlsx::class)->generar([
+            $orden->numeroDo() => ['filas' => $filas, 'anchos' => [12, 24, 28, 18, 9, 13, 12, 13, 18, 28]],
+        ]);
+
+        return $this->response
+            ->setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+            ->setHeader('Content-Disposition', 'attachment; filename="reporte-salida-' . $slug . '.xlsx"')
+            ->setBody($contenido);
+    }
+
+    /** @return array{orden: \Courier\Salida\Domain\SalidaOrden, filas: array<int, array<string, mixed>>, aduaneros: array<int, string>, aduanero: string}|null */
+    private function datosReporte(string $id): ?array
+    {
+        $orden = $this->container()->get(VerOrdenSalidaHandler::class)->handle(new VerOrdenSalidaQuery($id));
+
+        if ($orden === null) {
+            return null;
+        }
+
+        $filas = $this->container()->get(SalidaOrdenRepositoryInterface::class)->manifiesto($orden->id());
+        // Ordenado como la hoja de trafico: por aduanero y fecha de ingreso.
+        usort($filas, static fn (array $a, array $b) => [$a['aduanero'], $a['fechaIngreso'], $a['compania']] <=> [$b['aduanero'], $b['fechaIngreso'], $b['compania']]);
+
+        $aduaneros = array_values(array_unique(array_filter(array_column($filas, 'aduanero'))));
+        $aduanero = trim((string) $this->request->getGet('aduanero'));
+
+        if ($aduanero !== '') {
+            $filas = array_values(array_filter($filas, static fn (array $f) => $f['aduanero'] === $aduanero));
+        }
+
+        return ['orden' => $orden, 'filas' => $filas, 'aduaneros' => $aduaneros, 'aduanero' => $aduanero];
+    }
+
     public function manifiesto(string $id): string
     {
         $orden = $this->container()->get(VerOrdenSalidaHandler::class)->handle(new VerOrdenSalidaQuery($id));

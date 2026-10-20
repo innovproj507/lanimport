@@ -134,6 +134,8 @@ $routes->post('cargas/(:segment)/reenviar-correo', 'CargaController::reenviarCor
 $routes->post('cargas/(:segment)/whatsapp/(ingreso|despacho)', 'CargaController::avisarWhatsapp/$1/$2', ['filter' => ['auth', 'role:operaciones,gerente,admin']]);
 $routes->post('cargas/(:segment)/lpns/generar', 'CargaController::generarLpns/$1', ['filter' => $bodegaFilter]);
 $routes->post('cargas/(:segment)/lpns/eliminar', 'CargaController::eliminarLpns/$1', ['filter' => ['auth', 'role:gerente,admin']]);
+// Fotos de evidencia (se suben por bodega/api/.../fotos): borrarlas, solo gerencia y owner.
+$routes->post('fotos-evidencia/(:segment)/eliminar', 'FotoEvidenciaController::eliminar/$1', ['filter' => ['auth', 'role:gerente,admin']]);
 $routes->post('lpn/plantilla-etiqueta', 'LpnController::guardarPlantillaEtiqueta', ['filter' => ['auth', 'role:admin']]);
 // Comprobante de recepcion imprimible (datos de entrega + espacios para firmas).
 $routes->get('cargas/(:segment)/comprobante', 'CargaController::comprobante/$1', ['filter' => $bodegaFilter]);
@@ -152,6 +154,9 @@ $routes->group('bodega/api', ['filter' => array_merge($bodegaFilter, ['csrfheade
     $routes->get('salidas/(:segment)', 'Api\BodegaApiController::salida/$1');
     $routes->post('salidas/(:segment)/escanear', 'Api\BodegaApiController::salidaEscanear/$1');
     $routes->post('salidas/(:segment)/finalizar', 'Api\BodegaApiController::salidaFinalizar/$1');
+    // Fotos de evidencia: de recepcion (por carga) y de salida (por orden). Tambien las usa la web.
+    $routes->get('(cargas|salidas)/(:segment)/fotos', 'Api\FotoEvidenciaApiController::listar/$1/$2');
+    $routes->post('(cargas|salidas)/(:segment)/fotos', 'Api\FotoEvidenciaApiController::subir/$1/$2');
     // Reempaque: bodega ejecuta la orden de trafico caja por caja.
     $routes->get('reempaques', 'Api\BodegaApiController::reempaques');
     $routes->get('reempaques/(:segment)', 'Api\BodegaApiController::reempaque/$1');
@@ -174,6 +179,8 @@ $routes->post('salidas/(:segment)/finalizar', 'SalidaController::finalizar/$1', 
 $routes->post('salidas/(:segment)/cancelar', 'SalidaController::cancelar/$1', ['filter' => $bodegaFilter]);
 $routes->post('salidas/(:segment)/embarque', 'SalidaController::guardarEmbarque/$1', ['filter' => $bodegaFilter]);
 $routes->get('salidas/(:segment)/manifiesto', 'SalidaController::manifiesto/$1', ['filter' => $bodegaFilter]);
+$routes->get('salidas/(:segment)/reporte', 'SalidaController::reporte/$1', ['filter' => $bodegaFilter]);
+$routes->get('salidas/(:segment)/reporte/excel', 'SalidaController::reporteExcel/$1', ['filter' => $bodegaFilter]);
 
 // Reempaques: trafico (y gerencia/owner) ordena y cancela; bodega ve las ordenes y las ejecuta
 // caja por caja en la app de bodega (/bodega/api/reempaques/*).
