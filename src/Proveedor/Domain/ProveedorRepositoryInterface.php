@@ -19,4 +19,7 @@ interface ProveedorRepositoryInterface
     public function searchPaginado(string $term, int $page, int $perPage): array;
 
     public function existsIdentificador(string $identificador): bool;
+
+    /** Siguiente consecutivo libre: PROV-0001, PROV-0002... (el mayor PROV-#### + 1). */
+    public function siguienteIdentificador(): string;
 }

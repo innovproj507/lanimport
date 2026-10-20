@@ -63,13 +63,21 @@ final class ProveedorController extends BaseController
 
     public function showCreateForm(): string
     {
-        return view('proveedores/nuevo', ['error' => null]);
+        return $this->renderNuevo(null);
+    }
+
+    private function renderNuevo(?string $error): string
+    {
+        return view('proveedores/nuevo', [
+            'error' => $error,
+            'siguienteIdentificador' => $this->container()->get(ProveedorRepositoryInterface::class)->siguienteIdentificador(),
+        ]);
     }
 
     public function store(): RedirectResponse|string
     {
         if (!Csrf::verify($this->request->getPost('_csrf'))) {
-            return view('proveedores/nuevo', ['error' => 'Sesion expirada, por favor intente de nuevo.']);
+            return $this->renderNuevo('Sesion expirada, por favor intente de nuevo.');
         }
 
         try {
@@ -82,7 +90,7 @@ final class ProveedorController extends BaseController
 
             return redirect()->to('/proveedores');
         } catch (ValidationException $e) {
-            return view('proveedores/nuevo', ['error' => $e->getMessage()]);
+            return $this->renderNuevo($e->getMessage());
         }
     }
 
@@ -101,14 +109,17 @@ final class ProveedorController extends BaseController
                 (string) $this->request->getPost('nombre'),
             );
 
-            $this->container()->get(RegistrarProveedorHandler::class)->handle($command);
+            $id = $this->container()->get(RegistrarProveedorHandler::class)->handle($command);
+            $repositorio = $this->container()->get(ProveedorRepositoryInterface::class);
+            $proveedor = $repositorio->findById((string) $id);
 
             return $this->response->setJSON([
                 'success' => true,
                 'proveedor' => [
-                    'identificador' => $command->identificador,
-                    'nombre' => $command->nombre,
+                    'identificador' => $proveedor->identificador(),
+                    'nombre' => $proveedor->nombre(),
                 ],
+                'siguienteIdentificador' => $repositorio->siguienteIdentificador(),
             ]);
         } catch (ValidationException $e) {
             return $this->response->setStatusCode(422)->setJSON([

@@ -116,22 +116,9 @@ final class ImportarCargasHandler implements CommandHandlerInterface
         return null;
     }
 
-    /** Siguiente identificador libre con el formato de los existentes: PROV-0001, PROV-0002... */
     private function crearProveedor(string $nombre): Proveedor
     {
-        $mayor = 0;
-
-        foreach ($this->proveedores->findAll() as $proveedor) {
-            if (preg_match('/^PROV-(\d+)$/i', $proveedor->identificador(), $m)) {
-                $mayor = max($mayor, (int) $m[1]);
-            }
-        }
-
-        do {
-            $identificador = sprintf('PROV-%04d', ++$mayor);
-        } while ($this->proveedores->existsIdentificador($identificador));
-
-        $proveedor = Proveedor::registrar(Uuid::generate(), $identificador, mb_substr($nombre, 0, 190));
+        $proveedor = Proveedor::registrar(Uuid::generate(), $this->proveedores->siguienteIdentificador(), mb_substr($nombre, 0, 190));
         $this->proveedores->save($proveedor);
 
         return $proveedor;

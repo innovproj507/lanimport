@@ -333,8 +333,9 @@ require __DIR__ . '/../partials/header.php';
             <div class="space-y-3">
                 <div>
                     <label class="block text-sm font-medium text-zinc-700 mb-1">Identificador</label>
-                    <input type="text" id="proveedor-rapido-identificador" required placeholder="Ej: PROV-0001"
+                    <input type="text" id="proveedor-rapido-identificador" value="<?= htmlspecialchars((string) ($siguienteProveedor ?? '')) ?>" placeholder="Automatico (PROV-####)"
                            class="w-full rounded-lg border border-zinc-300 bg-white text-black px-3 py-2 focus:ring-2 focus:ring-amber-400 focus:outline-none">
+                    <p class="text-xs text-zinc-500 mt-1">Consecutivo sugerido; puede cambiarlo. Si lo deja vacio se asigna el siguiente.</p>
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-zinc-700 mb-1">Nombre</label>
@@ -483,8 +484,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
             proveedorError.classList.add('hidden');
 
-            if (identificador === '' || nombre === '') {
-                proveedorError.textContent = 'Identificador y nombre son obligatorios.';
+            if (nombre === '') {
+                proveedorError.textContent = 'El nombre es obligatorio.';
                 proveedorError.classList.remove('hidden');
                 return;
             }
@@ -511,7 +512,7 @@ document.addEventListener('DOMContentLoaded', function () {
                         window.ProveedorPicker.agregarYSeleccionar(data.proveedor);
                     }
 
-                    document.getElementById('proveedor-rapido-identificador').value = '';
+                    document.getElementById('proveedor-rapido-identificador').value = data.siguienteIdentificador || '';
                     document.getElementById('proveedor-rapido-nombre').value = '';
 
                     cerrarModal('modal-proveedor-nuevo');

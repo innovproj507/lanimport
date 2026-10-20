@@ -103,6 +103,20 @@ final class PdoProveedorRepository implements ProveedorRepositoryInterface
         return ((int) $stmt->fetchColumn()) > 0;
     }
 
+    public function siguienteIdentificador(): string
+    {
+        $mayor = (int) $this->connection->query(
+            "SELECT COALESCE(MAX(CAST(SUBSTRING(identificador, 6) AS UNSIGNED)), 0)
+             FROM proveedores WHERE identificador REGEXP '^PROV-[0-9]+$'"
+        )->fetchColumn();
+
+        do {
+            $identificador = sprintf('PROV-%04d', ++$mayor);
+        } while ($this->existsIdentificador($identificador));
+
+        return $identificador;
+    }
+
     /** @param array<string, mixed> $row */
     private function hydrate(array $row): Proveedor
     {

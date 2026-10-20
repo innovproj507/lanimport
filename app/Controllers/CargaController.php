@@ -174,6 +174,7 @@ final class CargaController extends BaseController
             'clientes' => $clientes,
             'aduaneros' => $aduaneros,
             'proveedores' => $proveedores,
+            'siguienteProveedor' => $this->container()->get(ProveedorRepositoryInterface::class)->siguienteIdentificador(),
             'paises' => $paises,
             'cargas' => $resultado->items,
             'total' => $resultado->total,

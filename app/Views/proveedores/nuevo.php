@@ -17,8 +17,9 @@ require __DIR__ . '/../partials/header.php';
     <?= card_header('truck', 'Datos del proveedor', 'sky') ?>
     <div>
         <label class="block text-sm font-medium text-zinc-700 mb-1">Identificador</label>
-        <input type="text" name="identificador" required placeholder="Ej: PROV-0001"
+        <input type="text" name="identificador" value="<?= htmlspecialchars((string) ($siguienteIdentificador ?? '')) ?>" placeholder="Automatico (PROV-####)"
                class="w-full rounded-lg border border-zinc-300 bg-white text-black px-3 py-2 focus:ring-2 focus:ring-amber-400 focus:outline-none">
+        <p class="text-xs text-zinc-500 mt-1">Consecutivo sugerido; puede cambiarlo. Si lo deja vacio se asigna el siguiente.</p>
     </div>
     <div>
         <label class="block text-sm font-medium text-zinc-700 mb-1">Nombre</label>

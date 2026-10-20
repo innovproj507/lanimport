@@ -21,11 +21,16 @@ final class RegistrarProveedorHandler implements CommandHandlerInterface
     {
         assert($command instanceof RegistrarProveedorCommand);
 
-        if ($this->proveedores->existsIdentificador($command->identificador)) {
-            throw new ProveedorDuplicadoException("Ya existe un proveedor con el identificador {$command->identificador}.");
+        // Sin identificador se asigna el siguiente consecutivo (PROV-####).
+        $identificador = trim($command->identificador);
+
+        if ($identificador === '') {
+            $identificador = $this->proveedores->siguienteIdentificador();
+        } elseif ($this->proveedores->existsIdentificador($identificador)) {
+            throw new ProveedorDuplicadoException("Ya existe un proveedor con el identificador {$identificador}.");
         }
 
-        $proveedor = Proveedor::registrar(Uuid::generate(), $command->identificador, $command->nombre);
+        $proveedor = Proveedor::registrar(Uuid::generate(), $identificador, $command->nombre);
         $this->proveedores->save($proveedor);
 
         return $proveedor->id();
