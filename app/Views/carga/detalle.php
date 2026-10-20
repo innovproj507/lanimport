@@ -6,7 +6,8 @@ use App\Libraries\Csrf;
 /** @var string|null $error */
 /** @var \Courier\Carga\Domain\ValueObject\DatosEntrega|null $entrega */
 /** @var string|null $registradoPor */
-/** @var array<int, array{destinatario: string, asunto: string, estado: string, error: ?string, fecha: string}> $correos */
+/** @var array<int, array{destinatario: string, canal: string, asunto: string, estado: string, error: ?string, fecha: string}> $correos */
+/** @var array{clienteId: string, telefono: ?string, telefonoValido: ?string, despachada: bool} $whatsapp */
 /** @var array{tipo: string, texto: string}|null $aviso */
 require_once __DIR__ . '/../partials/view_helpers.php';
 $pageTitle = 'Carga registrada';
@@ -255,30 +256,61 @@ document.addEventListener('DOMContentLoaded', function () {
 
 <div class="bg-white rounded-xl shadow p-6 mt-6">
     <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
-        <?= card_header('mail', 'Correos al cliente', 'amber') ?>
+        <?= card_header('mail', 'Avisos al cliente', 'amber') ?>
         <?php if (in_array($rolActual, ['operaciones', 'gerente', 'admin'], true)): ?>
-            <form method="post" action="/cargas/<?= htmlspecialchars($view->cargaId) ?>/reenviar-correo">
-                <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
-                <button type="submit" class="inline-flex items-center gap-2 bg-white border border-zinc-300 text-zinc-700 rounded-lg px-4 py-2 text-sm font-medium hover:bg-slate-100 transition">
-                    <?= icon_small('mail') ?><span><?= $correos === [] ? 'Enviar correo al cliente' : 'Reenviar correo' ?></span>
-                </button>
-            </form>
+            <div class="flex flex-wrap items-center gap-2">
+                <form method="post" action="/cargas/<?= htmlspecialchars($view->cargaId) ?>/reenviar-correo">
+                    <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
+                    <button type="submit" class="inline-flex items-center gap-2 bg-white border border-zinc-300 text-zinc-700 rounded-lg px-4 py-2 text-sm font-medium hover:bg-slate-100 transition">
+                        <?= icon_small('mail') ?><span><?= $correos === [] ? 'Enviar correo' : 'Reenviar correo' ?></span>
+                    </button>
+                </form>
+                <?php if ($whatsapp['telefonoValido'] !== null): ?>
+                    <?php foreach (['ingreso' => 'WhatsApp: ingreso', 'despacho' => 'WhatsApp: despacho'] as $tipoAviso => $textoBoton): ?>
+                        <?php if ($tipoAviso === 'despacho' && !$whatsapp['despachada']) { continue; } ?>
+                        <form method="post" action="/cargas/<?= htmlspecialchars($view->cargaId) ?>/whatsapp/<?= $tipoAviso ?>" target="_blank"
+                              onsubmit="setTimeout(function () { location.reload(); }, 1500);">
+                            <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
+                            <button type="submit" title="Abre WhatsApp con el mensaje listo para <?= htmlspecialchars($whatsapp['telefonoValido']) ?>"
+                                    class="inline-flex items-center gap-2 bg-emerald-600 text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-emerald-500 transition">
+                                <?= icon_small('chat') ?><span><?= $textoBoton ?></span>
+                            </button>
+                        </form>
+                    <?php endforeach; ?>
+                <?php endif; ?>
+            </div>
         <?php endif; ?>
     </div>
+
+    <?php if (in_array($rolActual, ['operaciones', 'gerente', 'admin'], true) && $whatsapp['telefonoValido'] === null): ?>
+        <p class="text-xs text-zinc-500 mb-3">
+            <?php if ($whatsapp['telefono']): ?>
+                El telefono del cliente (<?= htmlspecialchars($whatsapp['telefono']) ?>) no tiene un formato valido para WhatsApp.
+            <?php else: ?>
+                El cliente no tiene telefono registrado, por eso no se le puede avisar por WhatsApp.
+            <?php endif; ?>
+            <a href="/clientes/<?= htmlspecialchars($whatsapp['clienteId']) ?>/editar" class="text-blue-700 underline">Agregar telefono</a>
+        </p>
+    <?php endif; ?>
+
     <?php if ($correos === []): ?>
-        <p class="text-sm text-zinc-500">No se ha enviado ningun correo al cliente por esta carga.</p>
+        <p class="text-sm text-zinc-500">No se ha enviado ningun aviso al cliente por esta carga.</p>
     <?php else: ?>
         <ul class="divide-y divide-slate-100">
-            <?php foreach ($correos as $correo): ?>
+            <?php foreach ($correos as $correo): $esWhatsapp = ($correo['canal'] ?? 'email') === 'whatsapp'; ?>
                 <li class="py-3 flex flex-wrap items-start justify-between gap-2 text-sm">
                     <div class="min-w-0">
                         <p class="text-black font-medium"><?= htmlspecialchars($correo['asunto']) ?></p>
-                        <p class="text-xs text-zinc-500">Para <?= htmlspecialchars($correo['destinatario']) ?> · <?= htmlspecialchars((new DateTimeImmutable($correo['fecha']))->format('d/m/Y H:i')) ?></p>
+                        <p class="text-xs text-zinc-500"><?= $esWhatsapp ? 'WhatsApp' : 'Correo' ?> para <?= htmlspecialchars($correo['destinatario']) ?> · <?= htmlspecialchars((new DateTimeImmutable($correo['fecha']))->format('d/m/Y H:i')) ?></p>
                         <?php if ($correo['estado'] === 'fallido' && $correo['error']): ?>
                             <p class="text-xs text-red-600 mt-1"><?= htmlspecialchars($correo['error']) ?></p>
                         <?php endif; ?>
                     </div>
-                    <?= badge(['enviado' => 'Enviado', 'fallido' => 'Fallido', 'pendiente' => 'Pendiente'][$correo['estado']] ?? $correo['estado'], ['enviado' => 'emerald', 'fallido' => 'red'][$correo['estado']] ?? 'slate') ?>
+                    <?php if ($esWhatsapp): ?>
+                        <?= badge('Abierto en WhatsApp', 'emerald') ?>
+                    <?php else: ?>
+                        <?= badge(['enviado' => 'Enviado', 'fallido' => 'Fallido', 'pendiente' => 'Pendiente'][$correo['estado']] ?? $correo['estado'], ['enviado' => 'emerald', 'fallido' => 'red'][$correo['estado']] ?? 'slate') ?>
+                    <?php endif; ?>
                 </li>
             <?php endforeach; ?>
         </ul>

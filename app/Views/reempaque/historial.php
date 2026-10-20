@@ -16,9 +16,13 @@ $estados = [
 $estadoColores = ['pendiente' => 'amber', 'completado' => 'emerald', 'cancelado' => 'red'];
 ?>
 
+<?php if (in_array($_SESSION['usuario_rol'] ?? '', ['operaciones', 'gerente', 'admin'], true)): ?>
 <div class="flex justify-end mb-4">
-    <?= header_button('/reempaques', 'plus', 'Nueva orden de reempaque', 'amber') ?>
+    <?= header_button('/reempaques', 'plus', 'Ordenar reempaque', 'amber') ?>
 </div>
+<?php else: ?>
+<p class="text-sm text-zinc-500 mb-4">Trafico ordena los reempaques; bodega los ejecuta en la app de bodega (PDA).</p>
+<?php endif; ?>
 
 <div class="bg-white rounded-xl shadow-sm p-6 mb-6">
 <?= card_header('filter', 'Filtros', 'amber') ?>

@@ -74,7 +74,7 @@ require_once __DIR__ . '/view_helpers.php';
                         <?= nav_item('/bodega', 'scan', 'App movil de bodega', $currentPath, false, 'text-lime-300') ?>
                         <?= nav_item('/inventario', 'box', 'Inventario', $currentPath, false, 'text-emerald-400') ?>
                         <?= nav_item('/salidas/historial', 'truck', 'Salidas', $currentPath, false, 'text-orange-400') ?>
-                        <?= nav_item('/reempaques', 'box', 'Reempaque', $currentPath, false, 'text-violet-400') ?>
+                        <?= nav_item($esBodega ? '/reempaques/historial' : '/reempaques', 'box', 'Reempaque', $currentPath, false, 'text-violet-400') ?>
                     <?php endif; ?>
                     <?php if (!$esBodega): ?>
                         <?= nav_item('/tracking', 'search', 'Rastreo', $currentPath, false, 'text-cyan-400') ?>

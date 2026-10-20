@@ -46,8 +46,9 @@ final class ConfirmarSalidaHandler implements CommandHandlerInterface
                     $lpn->confirmarSalida();
                     $this->lpns->save($lpn);
 
-                    if ($lpn->cargaId() !== null) {
-                        $cargaIds[$lpn->cargaId()] = true;
+                    // Una caja reempacada no tiene carga propia: cuentan las de los bultos que lleva.
+                    foreach ($lpn->cargaId() !== null ? [$lpn->cargaId()] : $this->lpns->cargasContenidas($lpn->id()) as $cargaId) {
+                        $cargaIds[$cargaId] = true;
                     }
                 }
             }
@@ -68,17 +69,8 @@ final class ConfirmarSalidaHandler implements CommandHandlerInterface
     /** @return array{0: string, 1: array<string, string|null>} texto del historial y datos para el correo al cliente */
     private function datosDespacho(SalidaOrden $orden): array
     {
-        $embarque = $orden->embarque();
-        $contenedor = $embarque->contenedorFormateado();
-        $detalle = $orden->etiquetaDo() . ($contenedor !== null ? ", contenedor {$contenedor}" : '');
+        $contenedor = $orden->embarque()->contenedorFormateado();
 
-        return [$detalle, [
-            'Documento de salida' => $orden->etiquetaDo(),
-            'Contenedor' => $contenedor,
-            'Naviera' => $embarque->navieraNombre,
-            'Barco' => $embarque->nombreBarco,
-            'Fecha estimada de salida (ETD)' => $embarque->fechaSalidaEtd?->format('d/m/Y'),
-            'Destino' => $embarque->destinoFinal,
-        ]];
+        return [$orden->etiquetaDo() . ($contenedor !== null ? ", contenedor {$contenedor}" : ''), $orden->datosParaCliente()];
     }
 }

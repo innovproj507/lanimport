@@ -274,3 +274,9 @@ h2 { font-size: 17px; margin: 0 0 10px; display: flex; justify-content: space-be
 .camara-texto { padding: 10px 12px; border-radius: 10px; background: rgba(0, 0, 0, .45); }
 .camara-texto-ok { background: rgba(4, 120, 87, .92); }
 .camara-texto-error { background: rgba(185, 28, 28, .92); }
+
+/* Reempaque */
+.menu-reempaque { border-left-color: #7c3aed; }
+@media (min-width: 640px) { .menu { grid-template-columns: repeat(2, 1fr); } }
+.btn-texto-oscuro { background: none; border: 1px solid var(--borde); border-radius: 8px; padding: 4px 10px; font-size: 14px; color: var(--error); }
+.lineas li { align-items: center; }

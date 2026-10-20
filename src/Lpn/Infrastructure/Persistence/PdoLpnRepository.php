@@ -132,6 +132,43 @@ final class PdoLpnRepository implements LpnRepositoryInterface
         $stmt->execute([':carga_id' => $cargaId]);
     }
 
+    public function deleteById(string $id): void
+    {
+        $this->connection->prepare('DELETE FROM etiquetas WHERE lpn_id = :id')->execute([':id' => $id]);
+        $this->connection->prepare('DELETE FROM lpns WHERE id = :id')->execute([':id' => $id]);
+    }
+
+    public function cargasContenidas(string $lpnId): array
+    {
+        return array_values(array_unique(array_column($this->bultosContenidos($lpnId), 'cargaId')));
+    }
+
+    public function bultosContenidos(string $lpnId): array
+    {
+        // Baja por la genealogia (destino -> origen) hasta los bultos que tienen carga.
+        $stmt = $this->connection->prepare(
+            "WITH RECURSIVE contenido (lpn_id) AS (
+                 SELECT l0.id FROM lpns l0 WHERE l0.id = :lpn
+                 UNION
+                 SELECT g.lpn_origen_id FROM lpn_genealogia g JOIN contenido c ON g.lpn_destino_id = c.lpn_id
+             )
+             SELECT l.id, l.codigo, l.carga_id, ca.tracking_numero, l.marca
+             FROM contenido c
+             JOIN lpns l ON l.id = c.lpn_id
+             JOIN cargas ca ON ca.id = l.carga_id
+             ORDER BY ca.tracking_numero, l.orden_en_carga"
+        );
+        $stmt->execute([':lpn' => $lpnId]);
+
+        return array_map(static fn (array $f) => [
+            'lpnId' => (string) $f['id'],
+            'codigo' => (string) $f['codigo'],
+            'cargaId' => (string) $f['carga_id'],
+            'tracking' => (string) $f['tracking_numero'],
+            'marca' => $f['marca'] !== null ? (string) $f['marca'] : null,
+        ], $stmt->fetchAll(PDO::FETCH_ASSOC));
+    }
+
     public function search(array $filtros): array
     {
         $where = [];

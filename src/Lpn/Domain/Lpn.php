@@ -60,6 +60,17 @@ final class Lpn extends AggregateRoot
         return new self($id, null, $clienteId, EstadoLpn::AVAILABLE, $ubicacionId, $now, $now, $codigo);
     }
 
+    /**
+     * Caja o paleta nueva que bodega abre en un reempaque: queda "En reempaque" hasta que se
+     * termina la orden. No tiene carga propia: lo que lleva se sabe por la genealogia.
+     */
+    public static function abrirCajaReempaque(Uuid $id, string $clienteId, string $codigo, ?string $marca): self
+    {
+        $now = new DateTimeImmutable();
+
+        return new self($id, null, $clienteId, EstadoLpn::IN_REPACK, null, $now, $now, $codigo, null, $marca, 'REEMPAQUE');
+    }
+
     public function confirmarRecepcion(?string $ubicacionId = null): void
     {
         $this->estado->assertTransitionTo(EstadoLpn::AVAILABLE);

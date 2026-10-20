@@ -14,6 +14,19 @@ use Courier\Lpn\Application\ListarUbicaciones\ListarUbicacionesHandler;
 use Courier\Lpn\Application\ListarUbicaciones\ListarUbicacionesQuery;
 use Courier\Lpn\Domain\LpnRepositoryInterface;
 use Courier\Lpn\Domain\UbicacionRepositoryInterface;
+use Courier\Reempaque\Application\AbrirCajaReempaque\AbrirCajaReempaqueCommand;
+use Courier\Reempaque\Application\AbrirCajaReempaque\AbrirCajaReempaqueHandler;
+use Courier\Reempaque\Application\CerrarCajaReempaque\CerrarCajaReempaqueCommand;
+use Courier\Reempaque\Application\CerrarCajaReempaque\CerrarCajaReempaqueHandler;
+use Courier\Reempaque\Application\EmpacarBultoReempaque\EmpacarBultoReempaqueCommand;
+use Courier\Reempaque\Application\EmpacarBultoReempaque\EmpacarBultoReempaqueHandler;
+use Courier\Reempaque\Application\ListarReempaqueOrdenes\ListarReempaqueOrdenesHandler;
+use Courier\Reempaque\Application\ListarReempaqueOrdenes\ListarReempaqueOrdenesQuery;
+use Courier\Reempaque\Application\TerminarReempaque\TerminarReempaqueCommand;
+use Courier\Reempaque\Application\TerminarReempaque\TerminarReempaqueHandler;
+use Courier\Reempaque\Application\VerReempaqueOrden\VerReempaqueOrdenHandler;
+use Courier\Reempaque\Application\VerReempaqueOrden\VerReempaqueOrdenQuery;
+use Courier\Reempaque\Domain\ReempaqueOrden;
 use Courier\Salida\Application\ConfirmarSalida\ConfirmarSalidaCommand;
 use Courier\Salida\Application\ConfirmarSalida\ConfirmarSalidaHandler;
 use Courier\Salida\Application\ListarOrdenesSalida\ListarOrdenesSalidaHandler;
@@ -23,6 +36,7 @@ use Courier\Salida\Application\RegistrarEscaneoSalida\RegistrarEscaneoSalidaHand
 use Courier\Salida\Application\VerOrdenSalida\VerOrdenSalidaHandler;
 use Courier\Salida\Application\VerOrdenSalida\VerOrdenSalidaQuery;
 use Courier\Salida\Domain\SalidaOrden;
+use Courier\Salida\Domain\SalidaOrdenRepositoryInterface;
 use Courier\Shared\Domain\Exception\NotFoundException;
 use Throwable;
 
@@ -118,6 +132,8 @@ final class BodegaApiController extends BaseApiController
                     'fechaIngreso' => $carga->fechaIngreso()->format('Y-m-d'),
                 ],
                 'actualizado' => $lpn->updatedAt()->format('Y-m-d H:i'),
+                // Caja reempacada: los bultos originales que lleva.
+                'contenido' => $lpn->cargaId() === null ? $this->container()->get(LpnRepositoryInterface::class)->bultosContenidos($lpn->id()) : [],
             ]);
         } catch (Throwable $e) {
             return $this->fromException($e);
@@ -150,6 +166,8 @@ final class BodegaApiController extends BaseApiController
                 'codigo' => $l->codigoLpn(),
                 'escaneado' => $l->escaneado(),
             ], $orden->lineas());
+            // Para escanear carga por carga en la PDA.
+            $datos['cargas'] = $this->container()->get(SalidaOrdenRepositoryInterface::class)->avancePorCarga($orden->id());
 
             return $this->success($datos);
         } catch (Throwable $e) {
@@ -184,12 +202,13 @@ final class BodegaApiController extends BaseApiController
     /** @return array<string, mixed> */
     private function resumenSalida(SalidaOrden $orden): array
     {
-        $cliente = $this->container()->get(ClienteRepositoryInterface::class)->findById($orden->clienteId());
+        // Puede ser consolidada: todos los clientes de sus cargas.
+        $clientes = $this->container()->get(SalidaOrdenRepositoryInterface::class)->clientesPorOrden([$orden->id()])[$orden->id()] ?? [];
 
         return [
             'id' => $orden->id(),
             'do' => $orden->etiquetaDo(),
-            'cliente' => $cliente?->nombreCompleto(),
+            'cliente' => implode(', ', $clientes),
             'contenedor' => $orden->embarque()->contenedorFormateado(),
             'estado' => $orden->estado()->value,
             'progreso' => $orden->progreso(),
@@ -202,10 +221,109 @@ final class BodegaApiController extends BaseApiController
         return (string) $this->container()->get(SessionManager::class)->currentUsuarioId();
     }
 
+    /** Ordenes de reempaque pendientes (las ordena trafico; bodega las ejecuta). */
+    public function reempaques(): ResponseInterface
+    {
+        try {
+            $ordenes = $this->container()->get(ListarReempaqueOrdenesHandler::class)->handle(new ListarReempaqueOrdenesQuery('pendiente'));
+
+            return $this->success(array_map(fn (ReempaqueOrden $o) => $this->resumenReempaque($o), $ordenes));
+        } catch (Throwable $e) {
+            return $this->fromException($e);
+        }
+    }
+
+    public function reempaque(string $id): ResponseInterface
+    {
+        try {
+            return $this->success($this->detalleReempaque($id));
+        } catch (Throwable $e) {
+            return $this->fromException($e);
+        }
+    }
+
+    /** Acciones de bodega sobre la orden; cada una devuelve la orden actualizada. */
+    public function reempaqueAccion(string $id, string $accion): ResponseInterface
+    {
+        try {
+            $codigo = (string) ($this->cuerpo()['codigo'] ?? '');
+            $resultado = match ($accion) {
+                'abrir-caja' => $this->container()->get(AbrirCajaReempaqueHandler::class)->handle(new AbrirCajaReempaqueCommand($id)),
+                'empacar' => $this->container()->get(EmpacarBultoReempaqueHandler::class)->handle(new EmpacarBultoReempaqueCommand($id, $codigo)),
+                'quitar' => $this->container()->get(EmpacarBultoReempaqueHandler::class)->handle(new EmpacarBultoReempaqueCommand($id, $codigo, true)),
+                'cerrar-caja' => $this->container()->get(CerrarCajaReempaqueHandler::class)->handle(new CerrarCajaReempaqueCommand($id)),
+                'descartar-caja' => $this->container()->get(CerrarCajaReempaqueHandler::class)->handle(new CerrarCajaReempaqueCommand($id, true)),
+                'terminar' => $this->container()->get(TerminarReempaqueHandler::class)->handle(new TerminarReempaqueCommand($id)),
+                default => throw new NotFoundException('Accion no valida.'),
+            };
+
+            return $this->success(['resultado' => $resultado, 'orden' => $this->detalleReempaque($id)]);
+        } catch (Throwable $e) {
+            return $this->fromException($e);
+        }
+    }
+
+    /** @return array<string, mixed> */
+    private function resumenReempaque(ReempaqueOrden $orden): array
+    {
+        $cliente = $this->container()->get(ClienteRepositoryInterface::class)->findById($orden->clienteId());
+
+        return [
+            'id' => $orden->id(),
+            'codigo' => $orden->codigo(),
+            'cliente' => $cliente?->nombreCompleto(),
+            'tipo' => $orden->tipo()->label(),
+            'instrucciones' => $orden->instrucciones(),
+            'estado' => $orden->estado()->value,
+            'progreso' => $orden->progreso(),
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    private function detalleReempaque(string $id): array
+    {
+        $orden = $this->container()->get(VerReempaqueOrdenHandler::class)->handle(new VerReempaqueOrdenQuery($id));
+
+        if ($orden === null) {
+            throw new NotFoundException('Orden de reempaque no encontrada.');
+        }
+
+        $lpns = $this->container()->get(LpnRepositoryInterface::class);
+        $info = function (string $lpnId) use ($lpns): array {
+            $lpn = $lpns->findById($lpnId);
+
+            return ['codigo' => (string) $lpn?->codigo(), 'marca' => $lpn?->marca()];
+        };
+
+        $datos = $this->resumenReempaque($orden);
+        // Para bodega "empacado" es estar en cualquier caja, tambien la que esta llenando.
+        $enCajas = array_unique(array_merge(...array_values(array_column($orden->cajas(), 'contenido')) ?: [[]]));
+        $datos['pendientes'] = array_map($info, array_values(array_diff($orden->origenLpnIds(), $enCajas)));
+        $datos['progreso']['empacados'] = count($enCajas);
+        $datos['cajas'] = [];
+
+        foreach ($orden->cajas() as $cajaId => $caja) {
+            $datos['cajas'][] = [
+                'codigo' => $info($cajaId)['codigo'],
+                'cerrada' => $caja['cerrada'],
+                'contenido' => array_map(static fn (string $o) => $info($o)['codigo'], $caja['contenido']),
+            ];
+        }
+
+        $abierta = $orden->cajaAbierta();
+        $datos['cajaAbierta'] = $abierta !== null ? $info($abierta)['codigo'] : null;
+
+        return $datos;
+    }
+
     /** @return array<string, mixed> JSON del cuerpo (la PWA envia application/json). */
     private function cuerpo(): array
     {
-        $json = $this->request->getJSON(true);
+        try {
+            $json = $this->request->getJSON(true);
+        } catch (\CodeIgniter\HTTP\Exceptions\HTTPException) {
+            throw new \Courier\Shared\Domain\Exception\ValidationException('Los datos enviados no son validos. Vuelva a escanear.');
+        }
 
         return is_array($json) ? $json : (array) $this->request->getPost();
     }

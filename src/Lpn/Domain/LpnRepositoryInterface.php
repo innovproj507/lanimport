@@ -19,6 +19,24 @@ interface LpnRepositoryInterface
 
     public function deleteByCargaId(string $cargaId): void;
 
+    /** Borra un LPN que nunca existio fisicamente (caja de reempaque descartada o cancelada). */
+    public function deleteById(string $id): void;
+
+    /**
+     * Cargas cuyos bultos van dentro de este LPN: la suya, o la de los bultos que se
+     * reempacaron en el (recorriendo reempaques de reempaques).
+     *
+     * @return array<int, string> ids de carga
+     */
+    public function cargasContenidas(string $lpnId): array;
+
+    /**
+     * Bultos originales (con carga) que van dentro de una caja reempacada, a cualquier nivel.
+     *
+     * @return array<int, array{lpnId: string, codigo: string, cargaId: string, tracking: string, marca: ?string}>
+     */
+    public function bultosContenidos(string $lpnId): array;
+
     /**
      * @param array{estado?: string, ubicacionId?: string, clienteId?: string, cargaCodigo?: string} $filtros
      * @return array<int, Lpn>

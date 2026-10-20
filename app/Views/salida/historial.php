@@ -1,6 +1,7 @@
 <?php
 /** @var array<int, \Courier\Salida\Domain\SalidaOrden> $ordenes */
 /** @var array<string, string> $mapaClientes */
+/** @var array<string, array<int, string>> $clientesPorOrden ordenId => clientes de sus cargas */
 /** @var array<int, \Courier\Cliente\Domain\Cliente> $clientes */
 /** @var array{estado: string, cliente_id: string} $filtros */
 $pageTitle = 'Historial de salidas';
@@ -36,7 +37,7 @@ foreach ($clientes as $c) {
 ?>
 
 <div class="flex justify-end mb-4">
-    <?= header_button('/salidas', 'plus', 'Nueva orden de salida', 'amber') ?>
+    <?= header_button('/salidas', 'plus', 'Armar salida', 'amber') ?>
 </div>
 
 <div class="bg-white rounded-xl shadow-sm p-6 mb-6">
@@ -103,7 +104,7 @@ foreach ($clientes as $c) {
                                 <?= htmlspecialchars($orden->etiquetaDo()) ?>
                             </a>
                         </td>
-                        <td class="py-2 pr-4 text-zinc-700"><?= htmlspecialchars($mapaClientes[$orden->clienteId()] ?? '—') ?></td>
+                        <td class="py-2 pr-4 text-zinc-700"><?= htmlspecialchars(implode(', ', $clientesPorOrden[$orden->id()] ?? [$mapaClientes[$orden->clienteId() ?? ''] ?? '—'])) ?></td>
                         <td class="py-2 pr-4 font-mono text-zinc-700"><?= htmlspecialchars($orden->embarque()->contenedorFormateado() ?? '—') ?></td>
                         <td class="py-2 pr-4 text-zinc-700"><?= htmlspecialchars($orden->embarque()->navieraNombre ?? '—') ?></td>
                         <td class="py-2 pr-4"><?= badge($orden->estado()->label(), $estadoColores[$orden->estado()->value] ?? 'slate') ?></td>

@@ -30,9 +30,11 @@ final class CancelarReempaqueHandler implements CommandHandlerInterface
             throw new ReempaqueOrdenNotFoundException("No se encontro la orden de reempaque con id {$command->reempaqueOrdenId}.");
         }
 
+        // Las cajas nuevas (abiertas o cerradas) se descartan: los bultos vuelven a quedar libres.
+        $cajas = $orden->destinoLpnIds();
         $orden->cancelar();
 
-        $this->unitOfWork->run(function () use ($orden) {
+        $this->unitOfWork->run(function () use ($orden, $cajas) {
             foreach ($orden->origenLpnIds() as $origenId) {
                 $lpn = $this->lpns->findById($origenId);
 
@@ -43,6 +45,10 @@ final class CancelarReempaqueHandler implements CommandHandlerInterface
             }
 
             $this->ordenes->save($orden);
+
+            foreach ($cajas as $cajaId) {
+                $this->lpns->deleteById($cajaId);
+            }
         });
 
         return null;

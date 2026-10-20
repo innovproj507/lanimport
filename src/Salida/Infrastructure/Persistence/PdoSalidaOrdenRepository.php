@@ -127,6 +127,92 @@ final class PdoSalidaOrdenRepository implements SalidaOrdenRepositoryInterface
         return $this->hydrate($row, $this->hydrarLineas($id));
     }
 
+    public function clientesPorOrden(array $ordenIds): array
+    {
+        if ($ordenIds === []) {
+            return [];
+        }
+
+        $marcas = implode(',', array_fill(0, count($ordenIds), '?'));
+        $stmt = $this->connection->prepare(
+            "SELECT DISTINCT sl.salida_orden_id, TRIM(CONCAT(c.nombre, ' ', COALESCE(c.apellido, ''))) AS nombre
+             FROM salida_lineas sl
+             JOIN lpns l ON l.id = sl.lpn_id
+             JOIN clientes c ON c.id = l.cliente_id
+             WHERE sl.salida_orden_id IN ({$marcas})
+             ORDER BY nombre"
+        );
+        $stmt->execute(array_values($ordenIds));
+
+        $resultado = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $fila) {
+            $resultado[(string) $fila['salida_orden_id']][] = (string) $fila['nombre'];
+        }
+
+        return $resultado;
+    }
+
+    public function avancePorCarga(string $ordenId): array
+    {
+        $stmt = $this->connection->prepare(
+            "SELECT ca.id AS carga_id, ca.tracking_numero, TRIM(CONCAT(c.nombre, ' ', COALESCE(c.apellido, ''))) AS cliente,
+                    l.id AS lpn_id, l.marca, l.codigo, sl.escaneado
+             FROM salida_lineas sl
+             JOIN lpns l ON l.id = sl.lpn_id
+             LEFT JOIN cargas ca ON ca.id = l.carga_id
+             LEFT JOIN clientes c ON c.id = l.cliente_id
+             WHERE sl.salida_orden_id = :orden
+             ORDER BY ca.tracking_numero, l.orden_en_carga, l.codigo"
+        );
+        $stmt->execute([':orden' => $ordenId]);
+
+        $porCarga = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $fila) {
+            // Una caja reempacada no tiene carga propia: va como grupo propio.
+            $clave = $fila['carga_id'] !== null ? (string) $fila['carga_id'] : 'caja-' . $fila['lpn_id'];
+            $porCarga[$clave] ??= [
+                'cargaId' => $clave,
+                'tracking' => $fila['tracking_numero'] !== null ? (string) $fila['tracking_numero'] : 'Caja reempacada',
+                'cliente' => (string) ($fila['cliente'] ?? ''),
+                'marca' => $fila['marca'] !== null ? (string) $fila['marca'] : null,
+                'total' => 0,
+                'escaneadas' => 0,
+                'pendientes' => [],
+                'codigos' => [],
+            ];
+            $porCarga[$clave]['total']++;
+            $porCarga[$clave]['codigos'][] = (string) $fila['codigo'];
+
+            if ((bool) $fila['escaneado']) {
+                $porCarga[$clave]['escaneadas']++;
+            } else {
+                $porCarga[$clave]['pendientes'][] = (string) $fila['codigo'];
+            }
+        }
+
+        // Las que faltan por escanear primero.
+        usort($porCarga, static fn (array $a, array $b) => [$a['escaneadas'] >= $a['total'], $a['tracking']] <=> [$b['escaneadas'] >= $b['total'], $b['tracking']]);
+
+        return $porCarga;
+    }
+
+    public function ultimaConfirmadaConCarga(string $cargaId): ?SalidaOrden
+    {
+        $stmt = $this->connection->prepare(
+            "SELECT so.id
+             FROM salida_ordenes so
+             JOIN salida_lineas sl ON sl.salida_orden_id = so.id
+             JOIN lpns l ON l.id = sl.lpn_id
+             WHERE l.carga_id = :carga_id AND so.estado = 'confirmada'
+             ORDER BY so.confirmed_at DESC
+             LIMIT 1"
+        );
+        $stmt->execute([':carga_id' => $cargaId]);
+        $id = $stmt->fetchColumn();
+
+        return $id !== false ? $this->findById((string) $id) : null;
+    }
+
     public function search(array $filtros): array
     {
         $where = [];
@@ -138,7 +224,9 @@ final class PdoSalidaOrdenRepository implements SalidaOrdenRepositoryInterface
         }
 
         if (!empty($filtros['clienteId'])) {
-            $where[] = 's.cliente_id = :cliente_id';
+            // Tambien las salidas consolidadas que llevan cargas del cliente.
+            $where[] = '(s.cliente_id = :cliente_id OR EXISTS (SELECT 1 FROM salida_lineas fl JOIN lpns fp ON fp.id = fl.lpn_id WHERE fl.salida_orden_id = s.id AND fp.cliente_id = :cliente_id_lpn))';
+            $params[':cliente_id_lpn'] = $filtros['clienteId'];
             $params[':cliente_id'] = $filtros['clienteId'];
         }
 
@@ -180,22 +268,27 @@ final class PdoSalidaOrdenRepository implements SalidaOrdenRepositoryInterface
         // Una fila por carga: los bultos son los LPN de esa carga que van en la salida; kilos,
         // m3 y valor salen de las lineas de la carga, prorrateados si solo sale parte de sus bultos.
         // En las lineas el peso y el valor son totales de la linea y el cubicaje (p3) es por pieza.
+        // Las cajas reempacadas se abren (genealogia) hasta sus bultos originales, que son los que tienen carga.
         $stmt = $this->connection->prepare(
-            "SELECT ca.tracking_numero, ca.proveedor, c.nombre AS cliente_nombre,
+            "WITH RECURSIVE contenido (lpn_id) AS (
+                 SELECT sl.lpn_id FROM salida_lineas sl WHERE sl.salida_orden_id = :orden
+                 UNION
+                 SELECT g.lpn_origen_id FROM contenido x JOIN lpn_genealogia g ON g.lpn_destino_id = x.lpn_id
+             )
+             SELECT ca.tracking_numero, ca.proveedor, c.nombre AS cliente_nombre,
                     COUNT(*) AS bultos_salida,
                     (SELECT COUNT(*) FROM lpns l2 WHERE l2.carga_id = ca.id) AS bultos_carga,
                     GROUP_CONCAT(DISTINCT NULLIF(l.marca, '') ORDER BY l.marca SEPARATOR ', ') AS marcas,
                     t.kilos, t.valor, t.pies3
-             FROM salida_lineas sl
-             JOIN lpns l ON l.id = sl.lpn_id
-             LEFT JOIN cargas ca ON ca.id = l.carga_id
+             FROM contenido x
+             JOIN lpns l ON l.id = x.lpn_id AND l.carga_id IS NOT NULL
+             JOIN cargas ca ON ca.id = l.carga_id
              JOIN clientes c ON c.id = l.cliente_id
              LEFT JOIN (
                  SELECT carga_id, SUM(peso) AS kilos, SUM(valor) AS valor,
                         SUM(COALESCE(cubicaje_p3, ancho * alto * largo / 28316.846592) * cantidad) AS pies3
                  FROM carga_lineas GROUP BY carga_id
              ) t ON t.carga_id = ca.id
-             WHERE sl.salida_orden_id = :orden
              GROUP BY ca.id, ca.tracking_numero, ca.proveedor, c.nombre, t.kilos, t.valor, t.pies3
              ORDER BY ca.proveedor, ca.tracking_numero"
         );
@@ -260,7 +353,7 @@ final class PdoSalidaOrdenRepository implements SalidaOrdenRepositoryInterface
     {
         return new SalidaOrden(
             new Uuid((string) $row['id']),
-            (string) $row['cliente_id'],
+            $row['cliente_id'] !== null ? (string) $row['cliente_id'] : null,
             $row['aduanero_identificador'] !== null ? (string) $row['aduanero_identificador'] : null,
             EstadoSalidaOrden::from((string) $row['estado']),
             (string) $row['creado_por_usuario_id'],

@@ -130,6 +130,8 @@ $routes->get('cargas/(:segment)', 'CargaController::showDetalle/$1', ['filter' =
 $routes->get('cargas/(:segment)/editar', 'CargaController::showEditForm/$1', ['filter' => $bodegaFilter]);
 $routes->post('cargas/(:segment)/editar', 'CargaController::update/$1', ['filter' => $bodegaFilter]);
 $routes->post('cargas/(:segment)/reenviar-correo', 'CargaController::reenviarCorreo/$1', ['filter' => ['auth', 'role:operaciones,gerente,admin']]);
+// Aviso al cliente por WhatsApp (abre wa.me con el mensaje listo): ingreso o despacho.
+$routes->post('cargas/(:segment)/whatsapp/(ingreso|despacho)', 'CargaController::avisarWhatsapp/$1/$2', ['filter' => ['auth', 'role:operaciones,gerente,admin']]);
 $routes->post('cargas/(:segment)/lpns/generar', 'CargaController::generarLpns/$1', ['filter' => $bodegaFilter]);
 $routes->post('cargas/(:segment)/lpns/eliminar', 'CargaController::eliminarLpns/$1', ['filter' => ['auth', 'role:gerente,admin']]);
 $routes->post('lpn/plantilla-etiqueta', 'LpnController::guardarPlantillaEtiqueta', ['filter' => ['auth', 'role:admin']]);
@@ -150,6 +152,10 @@ $routes->group('bodega/api', ['filter' => array_merge($bodegaFilter, ['csrfheade
     $routes->get('salidas/(:segment)', 'Api\BodegaApiController::salida/$1');
     $routes->post('salidas/(:segment)/escanear', 'Api\BodegaApiController::salidaEscanear/$1');
     $routes->post('salidas/(:segment)/finalizar', 'Api\BodegaApiController::salidaFinalizar/$1');
+    // Reempaque: bodega ejecuta la orden de trafico caja por caja.
+    $routes->get('reempaques', 'Api\BodegaApiController::reempaques');
+    $routes->get('reempaques/(:segment)', 'Api\BodegaApiController::reempaque/$1');
+    $routes->post('reempaques/(:segment)/(abrir-caja|empacar|quitar|cerrar-caja|descartar-caja|terminar)', 'Api\BodegaApiController::reempaqueAccion/$1/$2');
 });
 // Recepcion general de bodega: escanear las etiquetas de cualquier carga (LPN "En recepcion" -> "Disponible").
 $routes->get('recepcion', 'LpnController::recepcionGeneral', ['filter' => $bodegaFilter]);
@@ -169,13 +175,14 @@ $routes->post('salidas/(:segment)/cancelar', 'SalidaController::cancelar/$1', ['
 $routes->post('salidas/(:segment)/embarque', 'SalidaController::guardarEmbarque/$1', ['filter' => $bodegaFilter]);
 $routes->get('salidas/(:segment)/manifiesto', 'SalidaController::manifiesto/$1', ['filter' => $bodegaFilter]);
 
-// Reempaques — requiere sesion + rol operaciones/bodega/gerente/admin (igual que $bodegaRoles en WebRoutes.php)
+// Reempaques: trafico (y gerencia/owner) ordena y cancela; bodega ve las ordenes y las ejecuta
+// caja por caja en la app de bodega (/bodega/api/reempaques/*).
+$ordenaReempaque = ['auth', 'role:operaciones,gerente,admin'];
 $routes->get('reempaques/historial', 'ReempaqueController::historial', ['filter' => $bodegaFilter]);
-$routes->get('reempaques', 'ReempaqueController::index', ['filter' => $bodegaFilter]);
-$routes->post('reempaques', 'ReempaqueController::store', ['filter' => $bodegaFilter]);
+$routes->get('reempaques', 'ReempaqueController::index', ['filter' => $ordenaReempaque]);
+$routes->post('reempaques', 'ReempaqueController::store', ['filter' => $ordenaReempaque]);
 $routes->get('reempaques/(:segment)', 'ReempaqueController::show/$1', ['filter' => $bodegaFilter]);
-$routes->post('reempaques/(:segment)/completar', 'ReempaqueController::completar/$1', ['filter' => $bodegaFilter]);
-$routes->post('reempaques/(:segment)/cancelar', 'ReempaqueController::cancelar/$1', ['filter' => $bodegaFilter]);
+$routes->post('reempaques/(:segment)/cancelar', 'ReempaqueController::cancelar/$1', ['filter' => $ordenaReempaque]);
 
 // Impresoras — trafico/gerencia/owner (bodega no configura impresoras)
 $routes->get('impresoras', 'ImpresoraController::index', ['filter' => ['auth', 'role:operaciones,gerente,admin']]);

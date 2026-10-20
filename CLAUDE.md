@@ -85,6 +85,10 @@ The paper delivery form (empresa de transporte, chofer, placa, entregado por, ce
 - `Carga/Application/SincronizarEstadoCarga` counts bultos through `ConteoBultosCargaInterface` (`PdoConteoBultosCarga`), saves the state plus history, and sends the client the despacho email (`NotificarDespachoCargaHandler`, toggle in Configuracion > Notificaciones).
 - It is called by `ConfirmarRecepcionLpnHandler` and `ConfirmarSalidaHandler`.
 - Client emails share `Notificacion/Application/PlantillaCorreo`. Placeholder addresses (`sincorreo.N@importado.local`) are never sent to; the notification is recorded as failed with an explanation.
+- WhatsApp without API: the carga detail ("Avisos al cliente") has "WhatsApp: ingreso" / "WhatsApp: despacho" buttons.
+  - `POST /cargas/{id}/whatsapp/{ingreso|despacho}` → `PrepararAvisoWhatsappHandler` builds the text, records a `notificaciones` row with `canal = 'whatsapp'`, and redirects to `https://wa.me/<number>?text=...`; the user presses Send.
+  - Phone numbers are normalized by `Notificacion\Domain\TelefonoWhatsapp` (809/829/849 → +1, 7-8 digits → +507).
+  - Despacho data comes from `SalidaOrden::datosParaCliente()` of `SalidaOrdenRepositoryInterface::ultimaConfirmadaConCarga()`, the same data the despacho email uses.
 - Reportes (gerente/admin) opens with "Operacion de bodega" (`PdoReporteOperativoRepository::operacionBodega()`):
   - period movement: ingresos, recepciones completas, salidas, bultos despachados;
   - current stock, bultos por escanear and cargas without LPNs;
@@ -96,6 +100,14 @@ The paper delivery form (empresa de transporte, chofer, placa, entregado por, ce
 
 ### Salidas: embarque y manifiesto
 
+- "Armar salida" (`GET /salidas`, view `salida/armar.php`): Trafico fills the container data and checks **cargas** (not LPNs).
+  - The list comes from `Salida\Domain\CargasParaSalidaInterface` (`PdoCargasParaSalida`). It shows every carga en bodega, ready ones first; the rest are disabled with the reason (sin etiquetas / por escanear / en otra salida).
+  - `POST /salidas` takes each checked carga's scanned, free LPNs (`lpnsListos`). A partial carga ships what was scanned, and the rest stays as saldo.
+  - `CrearOrdenSalidaHandler` validates the container before creating anything, and stores it with the order.
+- A DO can mix clients (consolidated): `salida_ordenes.cliente_id` is NULL then (migration 057), and set only when all LPNs belong to one client.
+  - Client names come from `SalidaOrdenRepositoryInterface::clientesPorOrden()`.
+  - The scan screens (web and PDA) group by carga via `avancePorCarga()`.
+
 - Each `SalidaOrden` gets a DO consecutive per year (`do_anio` + `do_numero`, shown as "DO.193 / 2026").
   - `PdoSalidaOrdenRepository::insert()` assigns it with `SELECT ... FOR UPDATE` inside the UnitOfWork.
   - The number restarts every year, and a unique key on (`do_anio`, `do_numero`) prevents duplicates.
@@ -103,6 +115,22 @@ The paper delivery form (empresa de transporte, chofer, placa, entregado por, ce
 - `GET /salidas/{id}/manifiesto` prints the manifest with one row per carga.
   - Kilos, m3 and valor come from `carga_lineas` and are prorated when only part of a carga's LPNs ship.
   - Line peso and valor are line totals; `cubicaje_p3` is per piece.
+
+### Reempaque: trafico ordena, bodega ejecuta
+
+- **Ordering (web):** Trafico (operaciones/gerente/admin) orders it at `GET /reempaques` (`reempaque/ordenar.php`).
+  - Always one client. Trafico checks cargas (their scanned, free LPNs), picks a type (Consolidar / Dividir / Cambiar caja, `TipoReempaque::seleccionables()`), and writes an instruction (migration 058).
+  - Origin LPNs go to `in_repack`.
+- **Execution (PDA):** Bodega runs it in the PDA app (`#/reempaques`, `bodega/api/reempaques/{id}/{abrir-caja|empacar|quitar|cerrar-caja|descartar-caja|terminar}`).
+  - The `ReempaqueOrden` aggregate holds the rules: one open box at a time; a bulto in only one box unless Dividir; finish only when everything is in closed boxes.
+  - Boxes are new LPNs `LPN-R<orden>-N`, `in_repack` until the order finishes. Each box's contents live in `lpn_genealogia`, and `reempaque_lpns.cerrada_at` marks it closed.
+  - Closing a box generates its label (marca, "CONTIENE N BULTOS", "REEMPAQUE"), printed from the web order page. Finishing consumes the origins and makes the boxes `available`.
+- **Boxes in salidas:** a box has no `carga_id`. Contents are resolved recursively through the genealogy:
+  - `LpnRepositoryInterface::bultosContenidos()` / `cargasContenidas()`;
+  - `PdoCargasParaSalida::cajasListas()` (rows in Armar salida);
+  - the manifest expands boxes to their original bultos per carga;
+  - `PdoConteoBultosCarga` counts a bulto as despachado when its final box shipped;
+  - `ConfirmarSalidaHandler` syncs the cargas inside the boxes.
 
 ### Carga masiva (Excel/CSV)
 

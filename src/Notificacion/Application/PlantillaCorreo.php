@@ -9,7 +9,7 @@ use Courier\Configuracion\Domain\DatosEmpresa;
 /** HTML comun de los avisos al cliente: encabezado con la empresa, tabla de datos y pie de contacto. */
 final class PlantillaCorreo
 {
-    public const SIN_CORREO_REAL = 'El cliente no tiene un correo real registrado; actualicelo en Clientes.';
+    public const SIN_CORREO_REAL = 'El cliente no tiene un correo real registrado: avisele por WhatsApp desde la carga o actualice su correo en Clientes.';
 
     /**
      * @param string $mensajeHtml parrafo principal (ya escapado; puede llevar <strong>)

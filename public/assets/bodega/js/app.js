@@ -159,6 +159,7 @@
             + '  <a class="menu-item menu-recepcion" href="#/recepcion"><span class="menu-icono">⬇</span><span class="menu-titulo">Recepcion</span><span class="menu-detalle" id="cuenta-recepcion">Escanear etiquetas nuevas</span></a>'
             + '  <a class="menu-item menu-consulta" href="#/consulta"><span class="menu-icono">🔍</span><span class="menu-titulo">Consultar LPN</span><span class="menu-detalle">Ver estado y ubicacion de un bulto</span></a>'
             + '  <a class="menu-item menu-salidas" href="#/salidas"><span class="menu-icono">⬆</span><span class="menu-titulo">Salidas</span><span class="menu-detalle" id="cuenta-salidas">Despachar ordenes</span></a>'
+            + '  <a class="menu-item menu-reempaque" href="#/reempaques"><span class="menu-icono">📦</span><span class="menu-titulo">Reempaque</span><span class="menu-detalle" id="cuenta-reempaques">Ordenes de trafico</span></a>'
             + '</nav>'
             + '<p class="pie"><a href="/recepcion">Ir a la version completa del sistema</a></p>'
         );
@@ -177,6 +178,14 @@
 
             if (el) {
                 el.textContent = ordenes.length > 0 ? ordenes.length + ' orden(es) por despachar' : 'Nada pendiente';
+            }
+        }).catch(function () {});
+
+        window.Api.get('/reempaques').then(function (ordenes) {
+            var el = document.getElementById('cuenta-reempaques');
+
+            if (el) {
+                el.textContent = ordenes.length > 0 ? ordenes.length + ' orden(es) por armar' : 'Nada pendiente';
             }
         }).catch(function () {});
     }
@@ -315,6 +324,7 @@
                         + '<dt>Proveedor</dt><dd>' + esc(l.carga.proveedor) + '</dd>'
                         + '<dt>Ingreso</dt><dd>' + esc(fecha(l.carga.fechaIngreso)) + '</dd>' : '')
                     + '<dt>Ultimo cambio</dt><dd>' + esc(l.actualizado) + '</dd>'
+                    + (l.contenido && l.contenido.length ? '<dt>Contiene</dt><dd>' + l.contenido.length + ' bultos: ' + l.contenido.map(function (b) { return esc(b.codigo) + ' (' + esc(b.tracking) + ')'; }).join(', ') + '</dd>' : '')
                     + '</dl></div>';
             }, function (error) {
                 aviso(avisoCon, error.message, 'error');
@@ -355,19 +365,36 @@
                 + '  <p id="sal-aviso" class="aviso oculto"></p>'
                 + (orden.estado === 'pendiente' ? '  <button type="button" id="sal-finalizar" class="btn btn-primario btn-bloque" disabled>Finalizar salida</button>' : '')
                 + '</section>'
-                + '<section class="tarjeta"><h2>LPNs de la orden</h2><ul id="sal-lineas" class="lineas"></ul></section>'
+                + '<section class="tarjeta"><h2>Cargas de la salida</h2><div id="sal-cargas" class="lista"></div></section>'
             );
 
             var avisoSal = document.getElementById('sal-aviso');
 
+            var escaneado = {};
+            orden.lineas.forEach(function (l) { escaneado[l.codigo] = l.escaneado; });
+
+            // Carga a la que pertenece un codigo (para avisar "CRX-...: 5 de 11").
+            function cargaDe(codigo) {
+                return orden.cargas.find(function (c) { return c.codigos.indexOf(codigo) !== -1; });
+            }
+
             function pintar() {
-                var hechos = orden.lineas.filter(function (l) { return l.escaneado; }).length;
+                var hechos = orden.lineas.filter(function (l) { return escaneado[l.codigo]; }).length;
                 document.getElementById('sal-progreso').innerHTML = barraProgreso(hechos, orden.lineas.length);
-                document.getElementById('sal-lineas').innerHTML = orden.lineas
-                    .slice()
-                    .sort(function (a, b) { return a.escaneado - b.escaneado; })
-                    .map(function (l) {
-                        return '<li class="' + (l.escaneado ? 'hecho' : '') + '"><span>' + esc(l.codigo) + '</span><span>' + (l.escaneado ? '✓' : 'Falta') + '</span></li>';
+                // Por carga: las que faltan primero, con sus bultos pendientes a la vista.
+                document.getElementById('sal-cargas').innerHTML = orden.cargas
+                    .map(function (c) {
+                        var pendientes = c.codigos.filter(function (cod) { return !escaneado[cod]; });
+                        return { c: c, pendientes: pendientes, listos: c.codigos.length - pendientes.length };
+                    })
+                    .sort(function (a, b) { return (a.pendientes.length === 0) - (b.pendientes.length === 0); })
+                    .map(function (x) {
+                        var completa = x.pendientes.length === 0;
+                        return '<div class="fila' + (completa ? ' fila-completa' : '') + '">'
+                            + '<div class="fila-principal"><strong>' + esc(x.c.tracking) + '</strong><span>' + esc(x.c.cliente) + (x.c.marca ? ' · ' + esc(x.c.marca) : '') + '</span>'
+                            + (completa ? '<small>Completa</small>' : '<small>Faltan: ' + x.pendientes.map(esc).join(', ') + '</small>') + '</div>'
+                            + '<div class="fila-progreso">' + barraProgreso(x.listos, x.c.codigos.length) + '</div>'
+                            + '</div>';
                     }).join('');
 
                 var finalizar = document.getElementById('sal-finalizar');
@@ -385,13 +412,11 @@
 
             campoEscaneo(document.getElementById('zona-escaneo'), function (codigo) {
                 return window.Api.post('/salidas/' + encodeURIComponent(id) + '/escanear', { codigo: codigo }).then(function (r) {
-                    orden.lineas.forEach(function (l) {
-                        if (l.codigo === r.codigo) {
-                            l.escaneado = true;
-                        }
-                    });
+                    escaneado[r.codigo] = true;
                     pintar();
-                    aviso(avisoSal, r.codigo + ' cargado · ' + r.progreso.escaneadas + ' de ' + r.progreso.total, 'ok');
+                    var carga = cargaDe(r.codigo);
+                    var deCarga = carga ? carga.codigos.filter(function (cod) { return escaneado[cod]; }).length : 0;
+                    aviso(avisoSal, r.codigo + ' cargado' + (carga ? ' · ' + carga.tracking + ': ' + deCarga + ' de ' + carga.codigos.length : '') + ' · Total ' + r.progreso.escaneadas + ' de ' + r.progreso.total, 'ok');
                     window.Escaner.pitido(true);
                 }, function (error) {
                     aviso(avisoSal, error.message, 'error');
@@ -418,6 +443,152 @@
         });
     }
 
+    function vistaReempaques() {
+        html(cabecera('Reempaque', '/inicio') + '<section class="tarjeta"><h2>Ordenes de trafico</h2><div id="rep-lista" class="lista"><p class="vacio">Cargando...</p></div></section>');
+
+        window.Api.get('/reempaques').then(function (ordenes) {
+            document.getElementById('rep-lista').innerHTML = ordenes.length === 0
+                ? '<p class="vacio">No hay ordenes de reempaque pendientes.</p>'
+                : ordenes.map(function (o) {
+                    return '<a class="fila fila-enlace" href="#/reempaques/' + encodeURIComponent(o.id) + '">'
+                        + '<div class="fila-principal"><strong>' + esc(o.codigo) + ' · ' + esc(o.tipo) + '</strong><span>' + esc(o.cliente || '') + '</span>'
+                        + '<small>' + esc(o.instrucciones || 'Sin instruccion') + '</small></div>'
+                        + '<div class="fila-progreso">' + barraProgreso(o.progreso.empacados, o.progreso.total) + '</div>'
+                        + '</a>';
+                }).join('');
+        }, function (error) {
+            document.getElementById('rep-lista').innerHTML = '<p class="vacio">' + esc(error.message) + '</p>';
+        });
+    }
+
+    /**
+     * Bodega ejecuta la orden: abrir caja -> escanear lo que mete -> cerrar caja (se genera su
+     * etiqueta, que se imprime en la PC) -> ... -> terminar cuando todo quedo empacado.
+     */
+    function vistaReempaque(id) {
+        html(cabecera('Reempaque', '/reempaques') + '<p class="vacio">Cargando...</p>');
+        var ruta = '/reempaques/' + encodeURIComponent(id);
+
+        function accion(nombre, cuerpo) {
+            return window.Api.post(ruta + '/' + nombre, cuerpo || {});
+        }
+
+        function pintar(orden, avisoTexto, avisoTipo) {
+            limpiarVista.forEach(function (fn) { fn(); });
+            limpiarVista = [];
+
+            var abierta = orden.cajas.find(function (c) { return !c.cerrada; });
+            var cerradas = orden.cajas.filter(function (c) { return c.cerrada; });
+            var todoEmpacado = orden.pendientes.length === 0;
+
+            html(
+                cabecera(orden.codigo + ' · ' + orden.tipo, '/reempaques')
+                + '<section class="tarjeta">'
+                + '  <p class="sub">' + esc(orden.cliente || '') + '</p>'
+                + (orden.instrucciones ? '  <p class="aviso aviso-ok">Trafico: ' + esc(orden.instrucciones) + '</p>' : '')
+                + '  <div class="progreso-grande">' + barraProgreso(orden.progreso.empacados, orden.progreso.total) + '</div>'
+                + '  <p id="rep-aviso" class="aviso oculto"></p>'
+                + (abierta
+                    ? '  <h2>Caja abierta: ' + esc(abierta.codigo) + ' <span class="contador">' + abierta.contenido.length + ' bultos</span></h2>'
+                      + '  <div id="zona-escaneo"></div>'
+                      + '  <button type="button" id="rep-cerrar" class="btn btn-primario btn-bloque">Cerrar caja</button>'
+                      + (abierta.contenido.length === 0 ? '  <button type="button" id="rep-descartar" class="btn btn-claro btn-bloque">Descartar caja vacia</button>' : '')
+                      + (abierta.contenido.length > 0 ? '  <ul class="lineas">' + abierta.contenido.map(function (c) {
+                          return '<li class="hecho"><span>' + esc(c) + '</span><button type="button" class="btn-texto-oscuro" data-quitar="' + esc(c) + '">Quitar</button></li>';
+                      }).join('') + '</ul>' : '')
+                    : (todoEmpacado
+                        ? '  <button type="button" id="rep-terminar" class="btn btn-primario btn-bloque">Terminar reempaque</button>'
+                        : '  <button type="button" id="rep-abrir" class="btn btn-primario btn-bloque">Abrir caja nueva</button>'))
+                + '</section>'
+                + (orden.pendientes.length > 0
+                    ? '<section class="tarjeta"><h2>Por empacar <span class="contador">' + orden.pendientes.length + '</span></h2><ul class="lineas">'
+                      + orden.pendientes.map(function (p) { return '<li><span>' + esc(p.codigo) + '</span><span>' + esc(p.marca || '') + '</span></li>'; }).join('')
+                      + '</ul></section>'
+                    : '')
+                + (cerradas.length > 0
+                    ? '<section class="tarjeta"><h2>Cajas cerradas <span class="contador">' + cerradas.length + '</span></h2><div class="lista">'
+                      + cerradas.map(function (c) {
+                          return '<div class="fila fila-completa"><div class="fila-principal"><strong>' + esc(c.codigo) + '</strong>'
+                              + '<small>' + c.contenido.length + ' bultos · etiqueta lista para imprimir en la PC</small></div></div>';
+                      }).join('')
+                      + '</div></section>'
+                    : '')
+            );
+
+            var avisoRep = document.getElementById('rep-aviso');
+
+            if (avisoTexto) {
+                aviso(avisoRep, avisoTexto, avisoTipo);
+            }
+
+            function ejecutar(nombre, cuerpo, textoOk) {
+                return accion(nombre, cuerpo).then(function (r) {
+                    window.Escaner.pitido(true);
+                    pintar(r.orden, typeof textoOk === 'function' ? textoOk(r.resultado) : textoOk, 'ok');
+                }, function (error) {
+                    aviso(avisoRep, error.message, 'error');
+                    window.Escaner.pitido(false);
+                });
+            }
+
+            var abrir = document.getElementById('rep-abrir');
+            if (abrir) {
+                abrir.addEventListener('click', function () {
+                    ejecutar('abrir-caja', {}, function (r) { return 'Caja ' + r.codigo + ' abierta: escanee los bultos que mete.'; });
+                });
+            }
+
+            var cerrar = document.getElementById('rep-cerrar');
+            if (cerrar) {
+                cerrar.addEventListener('click', function () {
+                    ejecutar('cerrar-caja', {}, function (r) { return 'Caja ' + r.codigo + ' cerrada con ' + r.bultos + ' bultos. Imprima su etiqueta en la PC.'; });
+                });
+            }
+
+            var descartar = document.getElementById('rep-descartar');
+            if (descartar) {
+                descartar.addEventListener('click', function () {
+                    ejecutar('descartar-caja', {}, 'Caja descartada.');
+                });
+            }
+
+            var terminar = document.getElementById('rep-terminar');
+            if (terminar) {
+                terminar.addEventListener('click', function () {
+                    if (!confirm('¿Terminar el reempaque? Los bultos originales salen del inventario y quedan las cajas nuevas.')) {
+                        return;
+                    }
+                    accion('terminar').then(function () {
+                        alert('Reempaque ' + orden.codigo + ' terminado.');
+                        ir('/reempaques');
+                    }, function (error) {
+                        aviso(avisoRep, error.message, 'error');
+                    });
+                });
+            }
+
+            vista.querySelectorAll('[data-quitar]').forEach(function (boton) {
+                boton.addEventListener('click', function () {
+                    ejecutar('quitar', { codigo: boton.getAttribute('data-quitar') }, boton.getAttribute('data-quitar') + ' quitado de la caja.');
+                });
+            });
+
+            if (abierta) {
+                campoEscaneo(document.getElementById('zona-escaneo'), function (codigo) {
+                    return ejecutar('empacar', { codigo: codigo }, function (r) {
+                        return r.codigo + ' en la caja (' + r.enCaja + ') · ' + r.empacados + ' de ' + r.total + ' empacados';
+                    });
+                }, 'Escanee cada bulto que mete en la caja');
+            }
+        }
+
+        window.Api.get(ruta).then(function (orden) {
+            pintar(orden);
+        }, function (error) {
+            html(cabecera('Reempaque', '/reempaques') + '<p class="aviso aviso-error">' + esc(error.message) + '</p>');
+        });
+    }
+
     // ---------- navegacion ----------
 
     function enrutar() {
@@ -428,6 +599,7 @@
         document.getElementById('usuario-nombre').textContent = window.Api.sesion().nombre;
 
         var salida = ruta.match(/^\/salidas\/(.+)$/);
+        var reempaque = ruta.match(/^\/reempaques\/(.+)$/);
 
         if (ruta === '/recepcion') {
             vistaRecepcion();
@@ -437,6 +609,10 @@
             vistaSalidas();
         } else if (salida) {
             vistaSalida(decodeURIComponent(salida[1]));
+        } else if (ruta === '/reempaques') {
+            vistaReempaques();
+        } else if (reempaque) {
+            vistaReempaque(decodeURIComponent(reempaque[1]));
         } else {
             vistaInicio();
         }

@@ -27,7 +27,11 @@ use Courier\Cliente\Application\ListarClientes\ListarClientesHandler;
 use Courier\Cliente\Domain\ClienteRepositoryInterface;
 use Courier\Configuracion\Domain\ConfiguracionRepositoryInterface;
 use Courier\Notificacion\Application\NotificarIngresoCarga\NotificarIngresoCargaHandler;
+use Courier\Notificacion\Application\PrepararAvisoWhatsapp\PrepararAvisoWhatsappCommand;
+use Courier\Notificacion\Application\PrepararAvisoWhatsapp\PrepararAvisoWhatsappHandler;
 use Courier\Notificacion\Domain\NotificacionRepositoryInterface;
+use Courier\Notificacion\Domain\TelefonoWhatsapp;
+use Courier\Salida\Domain\SalidaOrdenRepositoryInterface;
 use Courier\Cliente\Application\ListarClientes\ListarClientesQuery;
 use Courier\Lpn\Application\EliminarLpnsDeCarga\EliminarLpnsDeCargaCommand;
 use Courier\Lpn\Application\EliminarLpnsDeCarga\EliminarLpnsDeCargaHandler;
@@ -259,6 +263,7 @@ final class CargaController extends BaseController
             'entrega' => $carga->datosEntrega(),
             'registradoPor' => $this->container()->get(UsuarioRepositoryInterface::class)->findById($carga->registradoPorUsuarioId())?->nombre(),
             'correos' => $this->container()->get(NotificacionRepositoryInterface::class)->listarPorCarga($carga->id()),
+            'whatsapp' => $this->datosWhatsapp($carga),
             'aviso' => $this->tomarAviso(),
             'error' => $error,
         ]);
@@ -300,6 +305,80 @@ final class CargaController extends BaseController
         $this->avisoCorreo('', $notificacion?->estadoEnvio()->value, $notificacion?->destinatarioEmail(), $notificacion?->errorMensaje());
 
         return redirect()->to('/cargas/' . $id);
+    }
+
+    /**
+     * Aviso al cliente por WhatsApp (ingreso o despacho): registra el aviso y redirige a
+     * https://wa.me/... con el mensaje listo. El formulario se abre en otra pestana.
+     */
+    public function avisarWhatsapp(string $id, string $tipo): RedirectResponse|string
+    {
+        if (!Csrf::verify($this->request->getPost('_csrf'))) {
+            return redirect()->to('/cargas/' . $id);
+        }
+
+        $carga = $this->container()->get(CargaRepositoryInterface::class)->findById($id);
+        $cliente = $carga !== null ? $this->container()->get(ClienteRepositoryInterface::class)->findById($carga->clienteId()) : null;
+
+        if ($carga === null || $cliente === null) {
+            $this->response->setStatusCode(404);
+
+            return 'Carga no encontrada.';
+        }
+
+        if ($tipo === PrepararAvisoWhatsappCommand::DESPACHO) {
+            $salida = $this->container()->get(SalidaOrdenRepositoryInterface::class)->ultimaConfirmadaConCarga($carga->id());
+
+            if ($salida === null) {
+                return $this->renderDetalle($id, 'Esta carga aun no ha salido en una salida confirmada.');
+            }
+
+            $datos = ['Bultos' => (string) $this->totalBultos($carga)] + $salida->datosParaCliente();
+        } else {
+            $tipo = PrepararAvisoWhatsappCommand::INGRESO;
+            $datos = [
+                'Fecha de ingreso' => $carga->fechaIngreso()->format('d/m/Y'),
+                'Proveedor' => $carga->proveedor(),
+                'Bultos' => (string) $this->totalBultos($carga),
+            ];
+        }
+
+        try {
+            $aviso = $this->container()->get(PrepararAvisoWhatsappHandler::class)->handle(new PrepararAvisoWhatsappCommand(
+                $carga->id(),
+                $tipo,
+                $cliente->telefono(),
+                $cliente->pais(),
+                $cliente->nombreCompleto(),
+                (string) $carga->trackingNumero(),
+                $datos,
+            ));
+        } catch (ValidationException $e) {
+            return $this->renderDetalle($id, $e->getMessage());
+        }
+
+        return redirect()->to($aviso['url']);
+    }
+
+    /** @return array{clienteId: string, telefono: ?string, telefonoValido: ?string, despachada: bool} */
+    private function datosWhatsapp(Carga $carga): array
+    {
+        $cliente = $this->container()->get(ClienteRepositoryInterface::class)->findById($carga->clienteId());
+        $telefono = TelefonoWhatsapp::desde($cliente?->telefono(), $cliente?->pais());
+
+        return [
+            'clienteId' => $carga->clienteId(),
+            'telefono' => $cliente?->telefono(),
+            'telefonoValido' => $telefono?->legible(),
+            'despachada' => $this->container()->get(SalidaOrdenRepositoryInterface::class)->ultimaConfirmadaConCarga($carga->id()) !== null,
+        ];
+    }
+
+    private function totalBultos(Carga $carga): string
+    {
+        $total = array_sum(array_map(static fn ($linea) => $linea->cantidad(), $carga->lineas()));
+
+        return rtrim(rtrim(number_format((float) $total, 2, '.', ''), '0'), '.');
     }
 
     /** Guarda en sesion el aviso que se muestra una vez en el detalle de la carga. */

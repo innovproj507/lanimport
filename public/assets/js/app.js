@@ -492,6 +492,22 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (fila) {
                     fila.querySelector('.salida-linea-estado').innerHTML =
                         '<span class="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">Escaneado</span>';
+                    fila.setAttribute('data-escaneado', '1');
+
+                    // Contador de la carga a la que pertenece el bulto ("5 / 11").
+                    var carga = fila.getAttribute('data-carga');
+                    var contador = document.querySelector('.salida-carga-contador[data-carga="' + carga + '"]');
+
+                    if (contador) {
+                        var hechos = document.querySelectorAll('#salida-tbody tr[data-carga="' + carga + '"][data-escaneado="1"]').length;
+                        var total = Number(contador.getAttribute('data-total'));
+                        contador.textContent = hechos + ' / ' + total;
+
+                        if (hechos >= total) {
+                            contador.closest('tr').classList.remove('bg-slate-50');
+                            contador.closest('tr').classList.add('bg-emerald-50');
+                        }
+                    }
                 }
 
                 if (progresoEl) {

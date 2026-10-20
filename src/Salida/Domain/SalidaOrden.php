@@ -15,7 +15,8 @@ final class SalidaOrden extends AggregateRoot
     /** @param array<int, SalidaLinea> $lineas */
     public function __construct(
         private readonly Uuid $id,
-        private readonly string $clienteId,
+        // Solo si todas las cargas son de un mismo cliente; null en una salida consolidada.
+        private readonly ?string $clienteId,
         private readonly ?string $aduaneroIdentificador,
         private EstadoSalidaOrden $estado,
         private readonly string $creadoPorUsuarioId,
@@ -68,10 +69,29 @@ final class SalidaOrden extends AggregateRoot
         return $this->doNumero !== null ? "DO.{$this->doNumero} / {$this->doAnio}" : (string) $this->codigo;
     }
 
+    /**
+     * Datos del despacho que se le informan al cliente (correo y WhatsApp), en orden.
+     *
+     * @return array<string, string|null> etiqueta => valor (null si no se cargo)
+     */
+    public function datosParaCliente(): array
+    {
+        $embarque = $this->embarque();
+
+        return [
+            'Documento de salida' => $this->etiquetaDo(),
+            'Contenedor' => $embarque->contenedorFormateado(),
+            'Naviera' => $embarque->navieraNombre,
+            'Barco' => $embarque->nombreBarco,
+            'Fecha estimada de salida (ETD)' => $embarque->fechaSalidaEtd?->format('d/m/Y'),
+            'Destino' => $embarque->destinoFinal,
+        ];
+    }
+
     /** @param array<int, SalidaLinea> $lineas */
     public static function crear(
         Uuid $id,
-        string $clienteId,
+        ?string $clienteId,
         ?string $aduaneroIdentificador,
         array $lineas,
         string $usuarioId,
@@ -145,7 +165,7 @@ final class SalidaOrden extends AggregateRoot
         return (string) $this->id;
     }
 
-    public function clienteId(): string
+    public function clienteId(): ?string
     {
         return $this->clienteId;
     }

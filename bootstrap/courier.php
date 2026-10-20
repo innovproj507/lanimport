@@ -31,6 +31,8 @@ use Courier\Naviera\Application\BuscarNavieras\BuscarNavierasHandler;
 use Courier\Naviera\Application\ListarNavieras\ListarNavierasHandler;
 use Courier\Naviera\Application\RegistrarNaviera\RegistrarNavieraHandler;
 use Courier\Naviera\Domain\NavieraRepositoryInterface;
+use Courier\Salida\Domain\CargasParaSalidaInterface;
+use Courier\Salida\Infrastructure\Persistence\PdoCargasParaSalida;
 use Courier\Naviera\Infrastructure\Persistence\PdoNavieraRepository;
 use Courier\Proveedor\Application\ActualizarProveedor\ActualizarProveedorHandler;
 use Courier\Proveedor\Application\BuscarProveedores\BuscarProveedoresHandler;
@@ -77,6 +79,7 @@ use Courier\Carga\Application\SincronizarEstadoCarga\SincronizarEstadoCargaHandl
 use Courier\Carga\Domain\ConteoBultosCargaInterface;
 use Courier\Carga\Infrastructure\Persistence\PdoConteoBultosCarga;
 use Courier\Notificacion\Application\NotificarDespachoCarga\NotificarDespachoCargaHandler;
+use Courier\Notificacion\Application\PrepararAvisoWhatsapp\PrepararAvisoWhatsappHandler;
 use Courier\Lpn\Application\EliminarLpnsDeCarga\EliminarLpnsDeCargaHandler;
 use Courier\Lpn\Application\GenerarLpnsParaCarga\GenerarLpnsParaCargaHandler;
 use Courier\Lpn\Application\ListarLpnsPorCarga\ListarLpnsPorCargaHandler;
@@ -128,7 +131,10 @@ use Courier\Factura\Application\VerFactura\VerFacturaHandler;
 use Courier\Factura\Domain\FacturaRepositoryInterface;
 use Courier\Factura\Infrastructure\Persistence\PdoFacturaRepository;
 use Courier\Reempaque\Application\CancelarReempaque\CancelarReempaqueHandler;
-use Courier\Reempaque\Application\CompletarReempaque\CompletarReempaqueHandler;
+use Courier\Reempaque\Application\AbrirCajaReempaque\AbrirCajaReempaqueHandler;
+use Courier\Reempaque\Application\CerrarCajaReempaque\CerrarCajaReempaqueHandler;
+use Courier\Reempaque\Application\EmpacarBultoReempaque\EmpacarBultoReempaqueHandler;
+use Courier\Reempaque\Application\TerminarReempaque\TerminarReempaqueHandler;
 use Courier\Reempaque\Application\ConsultarGenealogiaLpn\ConsultarGenealogiaLpnHandler;
 use Courier\Reempaque\Application\IniciarReempaque\IniciarReempaqueHandler;
 use Courier\Reempaque\Application\ListarReempaqueOrdenes\ListarReempaqueOrdenesHandler;
@@ -268,7 +274,10 @@ $container->set(CrearOrdenSalidaHandler::class, fn (Container $c) => new CrearOr
     $c->get(LpnRepositoryInterface::class),
     $c->get(SalidaOrdenRepositoryInterface::class),
     $c->get(UnitOfWork::class),
+    $c->get(NavieraRepositoryInterface::class),
 ));
+// Lectura para "Armar salida": cargas en bodega con el estado de sus bultos.
+$container->set(CargasParaSalidaInterface::class, fn (Container $c) => new PdoCargasParaSalida($c->get(PDO::class)));
 $container->set(RegistrarEscaneoSalidaHandler::class, fn (Container $c) => new RegistrarEscaneoSalidaHandler($c->get(SalidaOrdenRepositoryInterface::class)));
 $container->set(ConfirmarSalidaHandler::class, fn (Container $c) => new ConfirmarSalidaHandler(
     $c->get(SalidaOrdenRepositoryInterface::class),
@@ -293,12 +302,27 @@ $container->set(IniciarReempaqueHandler::class, fn (Container $c) => new Iniciar
     $c->get(ReempaqueOrdenRepositoryInterface::class),
     $c->get(UnitOfWork::class),
 ));
-$container->set(CompletarReempaqueHandler::class, fn (Container $c) => new CompletarReempaqueHandler(
+// Bodega ejecuta la orden caja por caja (app de bodega).
+$container->set(AbrirCajaReempaqueHandler::class, fn (Container $c) => new AbrirCajaReempaqueHandler(
     $c->get(ReempaqueOrdenRepositoryInterface::class),
     $c->get(LpnRepositoryInterface::class),
-    $c->get(GenealogiaLpnRepositoryInterface::class),
+    $c->get(UnitOfWork::class),
+));
+$container->set(EmpacarBultoReempaqueHandler::class, fn (Container $c) => new EmpacarBultoReempaqueHandler(
+    $c->get(ReempaqueOrdenRepositoryInterface::class),
+    $c->get(LpnRepositoryInterface::class),
+    $c->get(UnitOfWork::class),
+));
+$container->set(CerrarCajaReempaqueHandler::class, fn (Container $c) => new CerrarCajaReempaqueHandler(
+    $c->get(ReempaqueOrdenRepositoryInterface::class),
+    $c->get(LpnRepositoryInterface::class),
     $c->get(LpnBarcodeGeneratorInterface::class),
     $c->get(PdoEtiquetaRepository::class),
+    $c->get(UnitOfWork::class),
+));
+$container->set(TerminarReempaqueHandler::class, fn (Container $c) => new TerminarReempaqueHandler(
+    $c->get(ReempaqueOrdenRepositoryInterface::class),
+    $c->get(LpnRepositoryInterface::class),
     $c->get(UnitOfWork::class),
 ));
 $container->set(CancelarReempaqueHandler::class, fn (Container $c) => new CancelarReempaqueHandler(
@@ -402,6 +426,10 @@ $container->set(NotificarIngresoCargaHandler::class, fn (Container $c) => new No
     $c->get(ConfiguracionRepositoryInterface::class),
 ));
 
+$container->set(PrepararAvisoWhatsappHandler::class, fn (Container $c) => new PrepararAvisoWhatsappHandler(
+    $c->get(NotificacionRepositoryInterface::class),
+    $c->get(ConfiguracionRepositoryInterface::class),
+));
 $container->set(NotificarDespachoCargaHandler::class, fn (Container $c) => new NotificarDespachoCargaHandler(
     $c->get(EmailServiceInterface::class),
     $c->get(NotificacionRepositoryInterface::class),

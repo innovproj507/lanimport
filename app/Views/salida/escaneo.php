@@ -1,18 +1,23 @@
 <?php
 use App\Libraries\Csrf;
 /** @var \Courier\Salida\Domain\SalidaOrden $orden */
-/** @var string $clienteNombre */
+/** @var string $clienteNombre uno o varios clientes (salida consolidada) */
+/** @var array<int, array{cargaId: string, tracking: string, cliente: string, marca: ?string, total: int, escaneadas: int, pendientes: array<int, string>, codigos: array<int, string>}> $avance */
 /** @var array<int, \Courier\Naviera\Domain\Naviera> $navieras activas (+ la de la orden si esta inactiva) */
 /** @var string|null $mensaje */
 /** @var string|null $error */
 require_once __DIR__ . '/../partials/view_helpers.php';
 $pageTitle = 'Salida ' . $orden->etiquetaDo();
-$pageSubtitle = 'Cliente: ' . $clienteNombre;
+$pageSubtitle = (str_contains($clienteNombre, ', ') ? 'Clientes: ' : 'Cliente: ') . $clienteNombre;
 $backHref = '/salidas/historial';
 $headerActions = header_button('/salidas/' . $orden->id() . '/manifiesto', 'printer', 'Imprimir manifiesto', 'blue');
 require __DIR__ . '/../partials/header.php';
 
 $progreso = $orden->progreso();
+$lineasPorCodigo = [];
+foreach ($orden->lineas() as $l) {
+    $lineasPorCodigo[$l->codigoLpn()] = $l;
+}
 $confirmada = $orden->estado()->value === 'confirmada';
 $cancelada = $orden->estado()->value === 'cancelada';
 $embarque = $orden->embarque();
@@ -122,24 +127,47 @@ $claseInput = 'w-full rounded-lg border border-zinc-300 bg-white text-black px-3
 </div>
 
 <div class="bg-white rounded-xl shadow-sm p-6">
-    <table class="w-full text-sm">
-        <thead>
-            <tr class="text-left text-xs text-zinc-500 uppercase border-b border-slate-200">
-                <th class="py-2 pr-4">Codigo LPN</th>
-                <th class="py-2">Estado</th>
-            </tr>
-        </thead>
-        <tbody id="salida-tbody">
-            <?php foreach ($orden->lineas() as $linea): ?>
-                <tr class="border-b border-slate-200" data-codigo="<?= htmlspecialchars($linea->codigoLpn()) ?>">
-                    <td class="py-2 pr-4 font-mono font-medium text-black"><?= htmlspecialchars($linea->codigoLpn()) ?></td>
-                    <td class="py-2 salida-linea-estado">
-                        <?= $linea->escaneado() ? badge('Escaneado', 'emerald') : badge('Pendiente', 'slate') ?>
-                    </td>
+    <h2 class="font-semibold text-black mb-1">Cargas de esta salida</h2>
+    <p class="text-xs text-zinc-500 mb-4">Bodega escanea cada bulto al subirlo al contenedor. Las cargas con bultos pendientes aparecen primero.</p>
+    <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+            <thead>
+                <tr class="text-left text-xs text-zinc-500 uppercase border-b border-slate-200">
+                    <th class="py-2 pr-4">Carga / LPN</th>
+                    <th class="py-2 pr-4">Cliente</th>
+                    <th class="py-2 pr-4">Marca</th>
+                    <th class="py-2 text-right">Escaneados</th>
                 </tr>
-            <?php endforeach; ?>
-        </tbody>
-    </table>
+            </thead>
+            <tbody id="salida-tbody">
+                <?php foreach ($avance as $grupo): $completa = $grupo['escaneadas'] >= $grupo['total']; ?>
+                    <tr class="border-b border-slate-200 <?= $completa ? 'bg-emerald-50' : 'bg-slate-50' ?>" data-grupo-carga="<?= htmlspecialchars($grupo['cargaId']) ?>">
+                        <td class="py-2 pr-4 font-mono font-semibold text-black">
+                            <?php if (!str_starts_with($grupo['cargaId'], 'caja-')): ?>
+                                <a href="/cargas/<?= htmlspecialchars($grupo['cargaId']) ?>" class="hover:underline"><?= htmlspecialchars($grupo['tracking']) ?></a>
+                            <?php else: ?>
+                                <?= htmlspecialchars($grupo['tracking']) ?>
+                            <?php endif; ?>
+                        </td>
+                        <td class="py-2 pr-4 text-black"><?= htmlspecialchars($grupo['cliente']) ?></td>
+                        <td class="py-2 pr-4 text-zinc-700"><?= htmlspecialchars($grupo['marca'] ?? '—') ?></td>
+                        <td class="py-2 text-right font-semibold">
+                            <span class="salida-carga-contador" data-carga="<?= htmlspecialchars($grupo['cargaId']) ?>" data-total="<?= $grupo['total'] ?>"><?= $grupo['escaneadas'] ?> / <?= $grupo['total'] ?></span>
+                        </td>
+                    </tr>
+                    <?php foreach ($grupo['codigos'] as $codigo): $linea = $lineasPorCodigo[$codigo] ?? null; if ($linea === null) { continue; } ?>
+                        <tr class="border-b border-slate-100" data-codigo="<?= htmlspecialchars($linea->codigoLpn()) ?>" data-carga="<?= htmlspecialchars($grupo['cargaId']) ?>" data-escaneado="<?= $linea->escaneado() ? '1' : '0' ?>">
+                            <td class="py-1.5 pr-4 pl-6 font-mono text-zinc-700"><?= htmlspecialchars($linea->codigoLpn()) ?></td>
+                            <td class="py-1.5 pr-4" colspan="2"></td>
+                            <td class="py-1.5 text-right salida-linea-estado">
+                                <?= $linea->escaneado() ? badge('Escaneado', 'emerald') : badge('Pendiente', 'slate') ?>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                <?php endforeach; ?>
+            </tbody>
+        </table>
+    </div>
 </div>
 
 <?php require __DIR__ . '/../partials/footer.php'; ?>

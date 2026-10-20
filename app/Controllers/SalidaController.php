@@ -21,6 +21,7 @@ use Courier\Naviera\Application\ListarNavieras\ListarNavierasHandler;
 use Courier\Naviera\Application\ListarNavieras\ListarNavierasQuery;
 use Courier\Salida\Application\ActualizarEmbarqueSalida\ActualizarEmbarqueSalidaCommand;
 use Courier\Salida\Application\ActualizarEmbarqueSalida\ActualizarEmbarqueSalidaHandler;
+use Courier\Salida\Domain\CargasParaSalidaInterface;
 use Courier\Salida\Domain\SalidaOrdenRepositoryInterface;
 use Courier\Salida\Application\CancelarOrdenSalida\CancelarOrdenSalidaCommand;
 use Courier\Salida\Application\CancelarOrdenSalida\CancelarOrdenSalidaHandler;
@@ -39,65 +40,80 @@ use Courier\Shared\Domain\Exception\ValidationException;
 
 final class SalidaController extends BaseController
 {
+    /**
+     * "Armar salida": trafico elige el contenedor y las cargas que suben. Se ven todas las
+     * cargas en bodega; las que aun no tienen bultos listos aparecen deshabilitadas con el motivo.
+     */
     public function index(): string
     {
-        $clienteId = (string) ($this->request->getGet('cliente_id') ?? '');
-        $aduaneroIdentificador = (string) ($this->request->getGet('aduanero_identificador') ?? '');
-        $ubicacionId = (string) ($this->request->getGet('ubicacion_id') ?? '');
+        return $this->renderArmar(null, [], []);
+    }
 
-        $query = new BuscarInventarioQuery(
-            'available',
-            $ubicacionId !== '' ? $ubicacionId : null,
-            $clienteId !== '' ? $clienteId : null,
-            null,
-            $aduaneroIdentificador !== '' ? $aduaneroIdentificador : null,
-        );
+    /**
+     * @param array<int, string> $seleccionadas cargas marcadas (para no perderlas si hay un error)
+     * @param array<string, string> $embarque datos del contenedor ya escritos
+     */
+    private function renderArmar(?string $error, array $seleccionadas, array $embarque): string
+    {
+        if ($error !== null) {
+            $this->response->setStatusCode(422);
+        }
 
-        $lpns = $this->container()->get(BuscarInventarioHandler::class)->handle($query);
-        $clientes = $this->container()->get(ListarClientesHandler::class)->handle(new ListarClientesQuery());
-        $aduaneros = $this->container()->get(ListarAduanerosHandler::class)->handle(new ListarAduanerosQuery());
-
-        return view('salida/seleccion', [
-            'lpns' => $lpns,
-            'clientes' => $clientes,
-            'aduaneros' => $aduaneros,
-            'filtros' => [
-                'cliente_id' => $clienteId,
-                'aduanero_identificador' => $aduaneroIdentificador,
-                'ubicacion_id' => $ubicacionId,
-            ],
+        return view('salida/armar', [
+            'cargas' => $this->container()->get(CargasParaSalidaInterface::class)->listar(),
+            'cajas' => $this->container()->get(CargasParaSalidaInterface::class)->cajasListas(),
+            'navieras' => $this->container()->get(ListarNavierasHandler::class)->handle(new ListarNavierasQuery(true)),
+            'seleccionadas' => $seleccionadas,
+            'embarque' => $embarque,
+            'error' => $error,
         ]);
     }
 
     public function store(): RedirectResponse|string
     {
+        $cargaIds = $this->request->getPost('carga_ids') ?? [];
+        $cargaIds = is_array($cargaIds) ? array_values(array_unique(array_map('strval', $cargaIds))) : [];
+        // Cajas/paletas reempacadas marcadas: entran tal cual (su LPN).
+        $cajaIds = $this->request->getPost('caja_ids') ?? [];
+        $cajaIds = is_array($cajaIds) ? array_values(array_unique(array_map('strval', $cajaIds))) : [];
+        $embarque = [];
+
+        foreach (['numero_contenedor', 'numero_sello', 'naviera_id', 'nombre_barco', 'fecha_cargue', 'fecha_salida_etd', 'destino_final'] as $campo) {
+            $embarque[$campo] = trim((string) ($this->request->getPost($campo) ?? ''));
+        }
+
         if (!Csrf::verify($this->request->getPost('_csrf'))) {
-            return redirect()->to('/salidas');
+            return $this->renderArmar('Sesion expirada, intente de nuevo.', array_merge($cargaIds, $cajaIds), $embarque);
         }
 
         /** @var SessionManager $sessionManager */
         $sessionManager = $this->container()->get(SessionManager::class);
 
-        $clienteId = (string) ($this->request->getPost('cliente_id') ?? '');
-        $aduaneroIdentificador = (string) ($this->request->getPost('aduanero_identificador') ?? '');
-        $lpnIds = $this->request->getPost('lpn_ids') ?? [];
-        $lpnIds = is_array($lpnIds) ? array_map('strval', $lpnIds) : [];
-
         try {
-            $command = new CrearOrdenSalidaCommand(
-                $clienteId,
-                $lpnIds,
-                $aduaneroIdentificador !== '' ? $aduaneroIdentificador : null,
-                (string) $sessionManager->currentUsuarioId(),
-            );
+            // Por cada carga marcada entran sus bultos ya escaneados y libres; el resto queda en bodega.
+            $lpnIds = array_merge($this->container()->get(CargasParaSalidaInterface::class)->lpnsListos($cargaIds), $cajaIds);
 
-            $ordenId = $this->container()->get(CrearOrdenSalidaHandler::class)->handle($command);
+            $ordenId = $this->container()->get(CrearOrdenSalidaHandler::class)->handle(new CrearOrdenSalidaCommand(
+                null,
+                $lpnIds,
+                null,
+                (string) $sessionManager->currentUsuarioId(),
+                [
+                    'numeroContenedor' => $embarque['numero_contenedor'],
+                    'numeroSello' => $embarque['numero_sello'],
+                    'navieraId' => $embarque['naviera_id'],
+                    'nombreBarco' => $embarque['nombre_barco'],
+                    'fechaCargue' => $embarque['fecha_cargue'],
+                    'fechaSalidaEtd' => $embarque['fecha_salida_etd'],
+                    'destinoFinal' => $embarque['destino_final'],
+                ],
+            ));
+
+            $_SESSION['salida_mensaje'] = 'Salida creada con ' . count($lpnIds) . ' bultos (' . count($cargaIds) . ' carga(s)' . ($cajaIds !== [] ? ' y ' . count($cajaIds) . ' caja(s) reempacada(s)' : '') . '). Bodega ya puede escanearlos al cargar el contenedor.';
 
             return redirect()->to('/salidas/' . $ordenId);
         } catch (ValidationException $e) {
-            $this->response->setStatusCode(422);
-
-            return htmlspecialchars($e->getMessage());
+            return $this->renderArmar($e->getMessage(), array_merge($cargaIds, $cajaIds), $embarque);
         }
     }
 
@@ -111,16 +127,9 @@ final class SalidaController extends BaseController
             return 'Orden de salida no encontrada.';
         }
 
-        $clientes = $this->container()->get(ListarClientesHandler::class)->handle(new ListarClientesQuery());
-        $clienteNombre = '—';
-
-        foreach ($clientes as $cliente) {
-            if ($cliente->id() === $orden->clienteId()) {
-                $clienteNombre = $cliente->nombreCompleto();
-
-                break;
-            }
-        }
+        // Puede ser consolidada: los clientes salen de las cargas que lleva.
+        $repositorio = $this->container()->get(SalidaOrdenRepositoryInterface::class);
+        $clienteNombre = implode(', ', $repositorio->clientesPorOrden([$orden->id()])[$orden->id()] ?? ['—']);
 
         // Navieras activas, mas la de la orden aunque se haya desactivado despues.
         $navieras = $this->container()->get(ListarNavierasHandler::class)->handle(new ListarNavierasQuery(false));
@@ -134,6 +143,7 @@ final class SalidaController extends BaseController
         return view('salida/escaneo', [
             'orden' => $orden,
             'clienteNombre' => $clienteNombre,
+            'avance' => $repositorio->avancePorCarga($orden->id()),
             'navieras' => $navieras,
             'mensaje' => $mensaje,
             'error' => $error,
@@ -176,7 +186,8 @@ final class SalidaController extends BaseController
 
         return view('salida/manifiesto_imprimir', [
             'orden' => $orden,
-            'cliente' => $this->container()->get(ClienteRepositoryInterface::class)->findById($orden->clienteId()),
+            // Titulo: el cliente, o los clientes si la salida es consolidada.
+            'titulo' => implode(' / ', $this->container()->get(SalidaOrdenRepositoryInterface::class)->clientesPorOrden([$orden->id()])[$orden->id()] ?? []),
             'filas' => $this->container()->get(SalidaOrdenRepositoryInterface::class)->manifiesto($orden->id()),
             'empresa' => $this->container()->get(ConfiguracionRepositoryInterface::class)->datosEmpresa(),
         ]);
@@ -264,6 +275,8 @@ final class SalidaController extends BaseController
         return view('salida/historial', [
             'ordenes' => $ordenes,
             'mapaClientes' => $mapaClientes,
+            // Una salida consolidada lleva cargas de varios clientes.
+            'clientesPorOrden' => $this->container()->get(SalidaOrdenRepositoryInterface::class)->clientesPorOrden(array_map(static fn ($o) => $o->id(), $ordenes)),
             'clientes' => $clientes,
             'filtros' => ['estado' => $estado, 'cliente_id' => $clienteId],
         ]);

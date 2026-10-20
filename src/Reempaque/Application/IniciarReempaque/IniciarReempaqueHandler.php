@@ -29,10 +29,14 @@ final class IniciarReempaqueHandler implements CommandHandlerInterface
         assert($command instanceof IniciarReempaqueCommand);
 
         if ($command->origenLpnIds === []) {
-            throw new ValidationException('Debe seleccionar al menos un LPN origen para iniciar el reempaque.');
+            throw new ValidationException('Seleccione al menos una carga con bultos listos para reempacar.');
         }
 
-        $tipo = TipoReempaque::from($command->tipo);
+        $tipo = TipoReempaque::tryFrom($command->tipo);
+
+        if ($tipo === null || !in_array($tipo, TipoReempaque::seleccionables(), true)) {
+            throw new ValidationException('Seleccione el tipo de reempaque.');
+        }
         $origenes = [];
 
         foreach ($command->origenLpnIds as $lpnId) {
@@ -43,7 +47,7 @@ final class IniciarReempaqueHandler implements CommandHandlerInterface
             }
 
             if ($lpn->estado() !== EstadoLpn::AVAILABLE) {
-                throw new ValidationException("El LPN {$lpn->codigo()} no esta disponible.");
+                throw new ValidationException("El LPN {$lpn->codigo()} ya no esta disponible (otra orden lo tomo o cambio de estado). Recargue la pagina.");
             }
 
             if ($lpn->clienteId() !== $command->clienteId) {
@@ -60,6 +64,7 @@ final class IniciarReempaqueHandler implements CommandHandlerInterface
                 $command->clienteId,
                 array_map(fn ($lpn) => $lpn->id(), $origenes),
                 $command->usuarioId,
+                $command->instrucciones,
             );
 
             $this->ordenes->save($orden);

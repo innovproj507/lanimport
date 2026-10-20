@@ -38,7 +38,7 @@ final class PdoNotificacionRepository implements NotificacionRepositoryInterface
     public function listarPorCarga(string $cargaId): array
     {
         $stmt = $this->connection->prepare(
-            'SELECT destinatario_email, asunto, estado_envio, error_mensaje, created_at
+            'SELECT destinatario_email, canal, asunto, estado_envio, error_mensaje, created_at
              FROM notificaciones WHERE carga_id = :carga_id ORDER BY created_at DESC'
         );
         $stmt->execute([':carga_id' => $cargaId]);
@@ -46,6 +46,7 @@ final class PdoNotificacionRepository implements NotificacionRepositoryInterface
         return array_map(
             static fn (array $row) => [
                 'destinatario' => (string) $row['destinatario_email'],
+                'canal' => (string) $row['canal'],
                 'asunto' => (string) $row['asunto'],
                 'estado' => (string) $row['estado_envio'],
                 'error' => $row['error_mensaje'] !== null ? (string) $row['error_mensaje'] : null,

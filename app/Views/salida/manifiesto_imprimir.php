@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /** @var \Courier\Salida\Domain\SalidaOrden $orden */
-/** @var \Courier\Cliente\Domain\Cliente|null $cliente */
+/** @var string $titulo cliente(s) de la salida */
 /** @var array<int, array{cliente: string, marca: string, compania: string, tracking: ?string, bultos: int, kilos: float, m3: float, valor: float}> $filas */
 /** @var \Courier\Configuracion\Domain\DatosEmpresa $empresa */
 
@@ -26,7 +26,7 @@ $filasVacias = max(0, 8 - count($filas));
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Manifiesto <?= $e($orden->numeroDo()) ?> - <?= $e($cliente?->nombreCompleto()) ?></title>
+    <title>Manifiesto <?= $e($orden->numeroDo()) ?> - <?= $e($titulo) ?></title>
     <style>
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: Arial, Helvetica, sans-serif; background: #fff; color: #111; }
@@ -67,7 +67,7 @@ $filasVacias = max(0, 8 - count($filas));
 <div class="hoja">
     <div class="encabezado">
         <img src="/assets/images/logo.svg" alt="<?= $e($empresa->nombre) ?>">
-        <h1><?= $e(mb_strtoupper($cliente?->nombreCompleto() ?? '')) ?> (<?= $e($orden->numeroDo()) ?>)</h1>
+        <h1><?= $e(mb_strtoupper($titulo)) ?> (<?= $e($orden->numeroDo()) ?>)</h1>
     </div>
     <p class="datos">
         FECHA: <?= $e($fechaLarga($fecha)) ?>

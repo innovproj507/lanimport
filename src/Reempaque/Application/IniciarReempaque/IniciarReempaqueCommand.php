@@ -14,6 +14,8 @@ final class IniciarReempaqueCommand implements CommandInterface
         public readonly string $clienteId,
         public readonly array $origenLpnIds,
         public readonly string $usuarioId,
+        // Lo que trafico le indica a bodega, ej. "1 paleta con todo".
+        public readonly ?string $instrucciones = null,
     ) {
     }
 }

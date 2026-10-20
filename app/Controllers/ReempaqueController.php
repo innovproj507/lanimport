@@ -9,17 +9,10 @@ use CodeIgniter\HTTP\RedirectResponse;
 use Courier\Auth\Infrastructure\Security\SessionManager;
 use Courier\Cliente\Application\ListarClientes\ListarClientesHandler;
 use Courier\Cliente\Application\ListarClientes\ListarClientesQuery;
-use Courier\Lpn\Application\BuscarInventario\BuscarInventarioHandler;
-use Courier\Lpn\Application\BuscarInventario\BuscarInventarioQuery;
-use Courier\Lpn\Application\ListarUbicaciones\ListarUbicacionesHandler;
-use Courier\Lpn\Application\ListarUbicaciones\ListarUbicacionesQuery;
+use Courier\Cliente\Domain\ClienteRepositoryInterface;
 use Courier\Lpn\Domain\LpnRepositoryInterface;
 use Courier\Reempaque\Application\CancelarReempaque\CancelarReempaqueCommand;
 use Courier\Reempaque\Application\CancelarReempaque\CancelarReempaqueHandler;
-use Courier\Reempaque\Application\CompletarReempaque\CompletarReempaqueCommand;
-use Courier\Reempaque\Application\CompletarReempaque\CompletarReempaqueHandler;
-use Courier\Reempaque\Application\ConsultarGenealogiaLpn\ConsultarGenealogiaLpnHandler;
-use Courier\Reempaque\Application\ConsultarGenealogiaLpn\ConsultarGenealogiaLpnQuery;
 use Courier\Reempaque\Application\IniciarReempaque\IniciarReempaqueCommand;
 use Courier\Reempaque\Application\IniciarReempaque\IniciarReempaqueHandler;
 use Courier\Reempaque\Application\ListarReempaqueOrdenes\ListarReempaqueOrdenesHandler;
@@ -27,61 +20,87 @@ use Courier\Reempaque\Application\ListarReempaqueOrdenes\ListarReempaqueOrdenesQ
 use Courier\Reempaque\Application\VerReempaqueOrden\VerReempaqueOrdenHandler;
 use Courier\Reempaque\Application\VerReempaqueOrden\VerReempaqueOrdenQuery;
 use Courier\Reempaque\Domain\TipoReempaque;
+use Courier\Salida\Domain\CargasParaSalidaInterface;
 use Courier\Shared\Domain\Exception\NotFoundException;
 use Courier\Shared\Domain\Exception\ValidationException;
 
+/**
+ * Reempaque: trafico ordena que cargas de un cliente se reempacan (y como); bodega lo
+ * ejecuta en la app de la PDA caja por caja. Aqui trafico crea la orden, ve su avance e
+ * imprime las etiquetas de las cajas nuevas.
+ */
 final class ReempaqueController extends BaseController
 {
+    /** "Ordenar reempaque": cliente, sus cargas con bultos listos, tipo e instruccion para bodega. */
     public function index(): string
     {
-        $clienteId = (string) ($this->request->getGet('cliente_id') ?? '');
+        return $this->renderOrdenar((string) ($this->request->getGet('cliente_id') ?? ''), null, [], '', '');
+    }
 
-        $lpns = $clienteId !== ''
-            ? $this->container()->get(BuscarInventarioHandler::class)->handle(new BuscarInventarioQuery('available', null, $clienteId))
+    /** @param array<int, string> $seleccionadas */
+    private function renderOrdenar(string $clienteId, ?string $error, array $seleccionadas, string $tipo, string $instrucciones): string
+    {
+        if ($error !== null) {
+            $this->response->setStatusCode(422);
+        }
+
+        $cliente = $clienteId !== '' ? $this->container()->get(ClienteRepositoryInterface::class)->findById($clienteId) : null;
+        // Las cargas del cliente en bodega (mismo listado que "Armar salida").
+        $cargas = $cliente !== null
+            ? array_values(array_filter(
+                $this->container()->get(CargasParaSalidaInterface::class)->listar(),
+                static fn (array $c) => $c['clienteId'] === $clienteId,
+            ))
             : [];
 
-        $clientes = $this->container()->get(ListarClientesHandler::class)->handle(new ListarClientesQuery());
-
-        return view('reempaque/seleccion', [
-            'lpns' => $lpns,
-            'clientes' => $clientes,
-            'tipos' => TipoReempaque::cases(),
-            'filtros' => ['cliente_id' => $clienteId],
+        return view('reempaque/ordenar', [
+            'clientes' => $this->container()->get(ListarClientesHandler::class)->handle(new ListarClientesQuery()),
+            'cliente' => $cliente,
+            'cargas' => $cargas,
+            'tipos' => TipoReempaque::seleccionables(),
+            'seleccionadas' => $seleccionadas,
+            'tipo' => $tipo,
+            'instrucciones' => $instrucciones,
+            'error' => $error,
         ]);
     }
 
     public function store(): RedirectResponse|string
     {
+        $clienteId = (string) ($this->request->getPost('cliente_id') ?? '');
+        $tipo = (string) ($this->request->getPost('tipo') ?? '');
+        $instrucciones = trim((string) ($this->request->getPost('instrucciones') ?? ''));
+        $cargaIds = $this->request->getPost('carga_ids') ?? [];
+        $cargaIds = is_array($cargaIds) ? array_values(array_unique(array_map('strval', $cargaIds))) : [];
+
         if (!Csrf::verify($this->request->getPost('_csrf'))) {
-            return redirect()->to('/reempaques');
+            return $this->renderOrdenar($clienteId, 'Sesion expirada, intente de nuevo.', $cargaIds, $tipo, $instrucciones);
         }
 
         /** @var SessionManager $sessionManager */
         $sessionManager = $this->container()->get(SessionManager::class);
 
-        $clienteId = (string) ($this->request->getPost('cliente_id') ?? '');
-        $tipo = (string) ($this->request->getPost('tipo') ?? '');
-        $lpnIds = $this->request->getPost('lpn_ids') ?? [];
-        $lpnIds = is_array($lpnIds) ? array_map('strval', $lpnIds) : [];
-
         try {
-            $command = new IniciarReempaqueCommand(
+            // Entran los bultos ya escaneados y libres de cada carga marcada.
+            $lpnIds = $this->container()->get(CargasParaSalidaInterface::class)->lpnsListos($cargaIds);
+
+            $ordenId = $this->container()->get(IniciarReempaqueHandler::class)->handle(new IniciarReempaqueCommand(
                 $tipo,
                 $clienteId,
                 $lpnIds,
                 (string) $sessionManager->currentUsuarioId(),
-            );
+                $instrucciones !== '' ? $instrucciones : null,
+            ));
 
-            $ordenId = $this->container()->get(IniciarReempaqueHandler::class)->handle($command);
+            $_SESSION['reempaque_mensaje'] = 'Orden enviada a bodega con ' . count($lpnIds) . ' bultos. Bodega la ve en la app (Reempaque).';
 
             return redirect()->to('/reempaques/' . $ordenId);
         } catch (ValidationException $e) {
-            $this->response->setStatusCode(422);
-
-            return htmlspecialchars($e->getMessage());
+            return $this->renderOrdenar($clienteId, $e->getMessage(), $cargaIds, $tipo, $instrucciones);
         }
     }
 
+    /** Avance de la orden: bultos por empacar, cajas armadas (con su contenido) e impresion de etiquetas. */
     public function show(string $id): string
     {
         $orden = $this->container()->get(VerReempaqueOrdenHandler::class)->handle(new VerReempaqueOrdenQuery($id));
@@ -92,83 +111,36 @@ final class ReempaqueController extends BaseController
             return 'Orden de reempaque no encontrada.';
         }
 
-        $clientes = $this->container()->get(ListarClientesHandler::class)->handle(new ListarClientesQuery());
-        $clienteNombre = '—';
-
-        foreach ($clientes as $cliente) {
-            if ($cliente->id() === $orden->clienteId()) {
-                $clienteNombre = $cliente->nombreCompleto();
-
-                break;
-            }
-        }
-
-        $ubicaciones = $this->container()->get(ListarUbicacionesHandler::class)->handle(new ListarUbicacionesQuery());
-        $lpnRepository = $this->container()->get(LpnRepositoryInterface::class);
-
+        $lpns = $this->container()->get(LpnRepositoryInterface::class);
         $lpnsPorId = [];
 
         foreach (array_merge($orden->origenLpnIds(), $orden->destinoLpnIds()) as $lpnId) {
-            $lpnsPorId[$lpnId] = $lpnRepository->findById($lpnId);
+            $lpnsPorId[$lpnId] = $lpns->findById($lpnId);
         }
 
-        $genealogiaPorDestino = [];
-
-        foreach ($orden->destinoLpnIds() as $destinoId) {
-            $genealogiaPorDestino[$destinoId] = $this->container()->get(ConsultarGenealogiaLpnHandler::class)
-                ->handle(new ConsultarGenealogiaLpnQuery($destinoId));
-        }
+        $mensaje = $_SESSION['reempaque_mensaje'] ?? null;
+        unset($_SESSION['reempaque_mensaje']);
 
         return view('reempaque/detalle', [
             'orden' => $orden,
-            'clienteNombre' => $clienteNombre,
-            'ubicaciones' => $ubicaciones,
+            'cliente' => $this->container()->get(ClienteRepositoryInterface::class)->findById($orden->clienteId()),
             'lpnsPorId' => $lpnsPorId,
-            'genealogiaPorDestino' => $genealogiaPorDestino,
+            'mensaje' => $mensaje,
         ]);
-    }
-
-    public function completar(string $id): RedirectResponse
-    {
-        if (!Csrf::verify($this->request->getPost('_csrf'))) {
-            return redirect()->to('/reempaques/' . $id);
-        }
-
-        /** @var SessionManager $sessionManager */
-        $sessionManager = $this->container()->get(SessionManager::class);
-
-        $cantidadDestinos = (int) ($this->request->getPost('cantidad_destinos') ?? '1');
-        $ubicacionId = (string) ($this->request->getPost('ubicacion_id') ?? '');
-
-        try {
-            $command = new CompletarReempaqueCommand(
-                $id,
-                $cantidadDestinos,
-                $ubicacionId !== '' ? $ubicacionId : null,
-                (string) $sessionManager->currentUsuarioId(),
-            );
-
-            $this->container()->get(CompletarReempaqueHandler::class)->handle($command);
-        } catch (NotFoundException|ValidationException) {
-            // si la orden ya no esta pendiente, simplemente se vuelve a mostrar su estado actual
-        }
-
-        return redirect()->to('/reempaques/' . $id);
     }
 
     public function cancelar(string $id): RedirectResponse
     {
-        if (!Csrf::verify($this->request->getPost('_csrf'))) {
-            return redirect()->to('/reempaques');
+        if (Csrf::verify($this->request->getPost('_csrf'))) {
+            try {
+                $this->container()->get(CancelarReempaqueHandler::class)->handle(new CancelarReempaqueCommand($id));
+                $_SESSION['reempaque_mensaje'] = 'Orden cancelada: los bultos vuelven a estar libres y las cajas nuevas se descartaron.';
+            } catch (NotFoundException|ValidationException $e) {
+                $_SESSION['reempaque_mensaje'] = $e->getMessage();
+            }
         }
 
-        try {
-            $this->container()->get(CancelarReempaqueHandler::class)->handle(new CancelarReempaqueCommand($id));
-        } catch (NotFoundException|ValidationException) {
-            // si la orden ya no puede cancelarse, simplemente se vuelve al listado
-        }
-
-        return redirect()->to('/reempaques');
+        return redirect()->to('/reempaques/' . $id);
     }
 
     public function historial(): string
