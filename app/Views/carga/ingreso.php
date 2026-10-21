@@ -69,7 +69,8 @@ require __DIR__ . '/../partials/header.php';
                     <th class="py-2 pr-4 text-right">Bultos</th>
                     <th class="py-2 pr-4 text-right">Peso (kg)</th>
                     <th class="py-2 pr-4 text-right">Valor</th>
-                    <th class="py-2 pr-4">Estado</th>
+                    <th class="py-2 pr-4" title="Estado de la carga completa">Estado carga</th>
+                    <th class="py-2 pr-4" title="Cuantas etiquetas (LPN) de la carga hay en cada estado">Etiquetas (LPN)</th>
                     <th class="py-2 pr-4">Fecha</th>
                     <th class="py-2 text-right">Acciones</th>
                 </tr>

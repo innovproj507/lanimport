@@ -1,11 +1,13 @@
 <?php
 /** @var array<int, \Courier\Carga\Domain\Carga> $cargas */
 /** @var array<string, string> $nombresClientes */
+/** @var array<string, array<string, int>> $lpnsPorEstado cargaId => [estado de la etiqueta => cantidad] */
 require_once __DIR__ . '/../partials/view_helpers.php';
 $n = static fn (float $v, int $d = 2): string => number_format($v, $d, '.', ',');
+$lpnsPorEstado ??= [];
 if (empty($cargas)):
 ?>
-    <tr><td colspan="10" class="py-4 text-sm text-zinc-500">No se encontraron cargas.</td></tr>
+    <tr><td colspan="11" class="py-4 text-sm text-zinc-500">No se encontraron cargas.</td></tr>
 <?php else: foreach ($cargas as $carga):
     // Totales de la carga: suma de sus lineas (peso y valor son totales de linea).
     $bultos = 0.0;
@@ -25,7 +27,18 @@ if (empty($cargas)):
         <td class="py-2 pr-4 text-right text-zinc-700"><?= $n($bultos, 0) ?></td>
         <td class="py-2 pr-4 text-right text-black font-medium whitespace-nowrap"><?= $n($peso) ?></td>
         <td class="py-2 pr-4 text-right text-zinc-700 whitespace-nowrap"><?= $n($valor) ?></td>
-        <td class="py-2 pr-4"><?= badge_estado_carga($carga->estado()) ?></td>
+        <td class="py-2 pr-4 whitespace-nowrap"><?= badge_estado_carga($carga->estado()) ?></td>
+        <td class="py-2 pr-4">
+            <?php if (empty($lpnsPorEstado[$carga->id()])): ?>
+                <span class="text-xs text-zinc-400">Sin etiquetas</span>
+            <?php else: ?>
+                <div class="flex flex-wrap gap-1">
+                    <?php foreach ($lpnsPorEstado[$carga->id()] as $estadoLpn => $cantidad): ?>
+                        <span class="whitespace-nowrap"><?= badge_conteo_lpn($estadoLpn, $cantidad) ?></span>
+                    <?php endforeach; ?>
+                </div>
+            <?php endif; ?>
+        </td>
         <td class="py-2 pr-4 text-zinc-500"><?= htmlspecialchars($carga->fechaIngreso()->format('d/m/Y')) ?></td>
         <td class="py-2 text-right space-x-2 whitespace-nowrap">
             <?php if ($carga->facturaProveedorRuta()): ?>

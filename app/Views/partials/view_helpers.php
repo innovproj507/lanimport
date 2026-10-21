@@ -102,6 +102,23 @@ function badge_estado_carga(\Courier\Carga\Domain\CargaStatus $estado): string
     return badge($estado->label(), color_estado_carga($estado->value));
 }
 
+/** Color del estado de una etiqueta (LPN), el mismo en inventario, recepcion y lista de cargas. */
+function color_estado_lpn(string $estado): string
+{
+    return [
+        'receiving' => 'amber', 'available' => 'emerald', 'in_repack' => 'indigo',
+        'reserved' => 'blue', 'quarantine' => 'red', 'consumed' => 'slate',
+    ][$estado] ?? 'slate';
+}
+
+/** "12 Disponible": cuantas etiquetas de una carga hay en ese estado. */
+function badge_conteo_lpn(string $estado, int $cantidad): string
+{
+    $etiqueta = \Courier\Lpn\Domain\EstadoLpn::tryFrom($estado)?->label() ?? $estado;
+
+    return badge($cantidad . ' ' . $etiqueta, color_estado_lpn($estado));
+}
+
 function icon_button(string $href, string $icon, string $title, string $color = 'blue'): string
 {
     return '<a href="' . htmlspecialchars($href) . '" title="' . htmlspecialchars($title) . '" '

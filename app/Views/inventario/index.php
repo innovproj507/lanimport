@@ -218,7 +218,7 @@ $n = static fn (float $v, int $d = 2): string => number_format($v, $d, '.', ',')
                         <td class="py-2 pr-4 whitespace-nowrap"><?= $cargaGrupo ? badge_estado_carga($cargaGrupo->estado()) : '—' ?></td>
                         <td class="py-2 pr-4 space-x-1 whitespace-nowrap">
                             <?php foreach ($grupo['porEstado'] as $estadoValor => $cantidad): ?>
-                                <?= badge($cantidad . ' ' . ($estados[$estadoValor] ?? $estadoValor), $estadoColores[$estadoValor] ?? 'slate') ?>
+                                <?= badge_conteo_lpn($estadoValor, $cantidad) ?>
                             <?php endforeach; ?>
                         </td>
                         <td class="py-2 pr-4 text-zinc-500 whitespace-nowrap"><?= $cargaGrupo ? htmlspecialchars($cargaGrupo->fechaIngreso()->format('d/m/Y')) : '—' ?></td>

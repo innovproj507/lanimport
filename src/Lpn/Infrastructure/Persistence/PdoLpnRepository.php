@@ -214,6 +214,33 @@ final class PdoLpnRepository implements LpnRepositoryInterface
         return array_map(fn (array $row) => $this->hydrate($row), $stmt->fetchAll());
     }
 
+    public function conteoPorEstado(array $cargaIds): array
+    {
+        if ($cargaIds === []) {
+            return [];
+        }
+
+        $marcas = implode(',', array_fill(0, count($cargaIds), '?'));
+        $stmt = $this->connection->prepare(
+            "SELECT carga_id, estado, COUNT(*) AS cantidad FROM lpns WHERE carga_id IN ({$marcas}) GROUP BY carga_id, estado"
+        );
+        $stmt->execute(array_values($cargaIds));
+
+        // Orden fijo (el del flujo): en recepcion, disponible, reempaque, reservado, cuarentena, consumido.
+        $orden = array_flip(array_map(static fn (EstadoLpn $e) => $e->value, EstadoLpn::cases()));
+        $conteo = [];
+
+        foreach ($stmt->fetchAll() as $fila) {
+            $conteo[(string) $fila['carga_id']][(string) $fila['estado']] = (int) $fila['cantidad'];
+        }
+
+        foreach ($conteo as &$porEstado) {
+            uksort($porEstado, static fn (string $a, string $b) => ($orden[$a] ?? 99) <=> ($orden[$b] ?? 99));
+        }
+
+        return $conteo;
+    }
+
     public function resumenRecepcion(?string $cargaId = null): array
     {
         $sql = "SELECT c.id, c.tracking_numero, c.fecha_ingreso,

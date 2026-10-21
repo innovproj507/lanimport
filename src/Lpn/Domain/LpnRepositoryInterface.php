@@ -50,4 +50,12 @@ interface LpnRepositoryInterface
      * @return array<int, array{cargaId: string, tracking: string, cliente: string, marca: ?string, fechaIngreso: string, total: int, recibidos: int}>
      */
     public function resumenRecepcion(?string $cargaId = null): array;
+
+    /**
+     * Cuantas etiquetas (LPN) tiene cada carga en cada estado, para las listas de cargas.
+     *
+     * @param array<int, string> $cargaIds
+     * @return array<string, array<string, int>> cargaId => [estado => cantidad]
+     */
+    public function conteoPorEstado(array $cargaIds): array;
 }

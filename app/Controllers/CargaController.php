@@ -184,6 +184,7 @@ final class CargaController extends BaseController
             'perPage' => $resultado->perPage,
             'totalPages' => $resultado->totalPages(),
             'resumen' => $resultado->resumen,
+            'lpnsPorEstado' => $this->lpnsPorEstado($resultado->items),
             'nombresClientes' => $this->nombresClientes($clientes),
             'mostrarFormulario' => $error !== null,
         ]);
@@ -205,6 +206,7 @@ final class CargaController extends BaseController
 
         $html = view('carga/_tabla_filas', [
             'cargas' => $resultado->items,
+            'lpnsPorEstado' => $this->lpnsPorEstado($resultado->items),
             'nombresClientes' => $this->nombresClientes($clientes),
         ], ['debug' => false]);
 
@@ -218,6 +220,17 @@ final class CargaController extends BaseController
         $resumen = view('carga/_resumen', ['total' => $resultado->total, 'resumen' => $resultado->resumen], ['debug' => false]);
 
         return $this->response->setJSON(['html' => $html, 'paginacion' => $paginacion, 'resumen' => $resumen]);
+    }
+
+    /**
+     * Etiquetas (LPN) de cada carga por estado, para la columna "Etiquetas (LPN)" de la lista.
+     *
+     * @param array<int, Carga> $cargas
+     * @return array<string, array<string, int>>
+     */
+    private function lpnsPorEstado(array $cargas): array
+    {
+        return $this->container()->get(LpnRepositoryInterface::class)->conteoPorEstado(array_map(static fn (Carga $c) => $c->id(), $cargas));
     }
 
     private function perPageDesdeRequest(): int
