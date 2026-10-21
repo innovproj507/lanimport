@@ -242,8 +242,6 @@ $container->set(GenerarLpnsParaCargaHandler::class, fn (Container $c) => new Gen
     $c->get(LpnRepositoryInterface::class),
     $c->get(LpnBarcodeGeneratorInterface::class),
     $c->get(PdoEtiquetaRepository::class),
-    $c->get(ClienteRepositoryInterface::class),
-    $c->get(PaisRepositoryInterface::class),
     $c->get(EtiquetaLpnConfigRepositoryInterface::class),
     $c->get(UnitOfWork::class),
 ));

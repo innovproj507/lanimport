@@ -20,7 +20,7 @@ use App\Libraries\Csrf;
     </label>
     <label class="flex items-center gap-2 text-sm text-zinc-700">
         <input type="checkbox" name="mostrar_serie" class="plantilla-check rounded border-zinc-300 text-amber-500 focus:ring-amber-400" data-preview="prev-serie" <?= $etiquetaConfig->mostrarSerie() ? 'checked' : '' ?>>
-        Serie (bulto X/Y) &mdash; solo paises marcados en Paises
+        Serie (bulto X/Y) &mdash; en todas las etiquetas
     </label>
     <label class="flex items-center gap-2 text-sm text-zinc-700">
         <input type="checkbox" name="mostrar_descripcion" class="plantilla-check rounded border-zinc-300 text-amber-500 focus:ring-amber-400" data-preview="prev-desc" <?= $etiquetaConfig->mostrarDescripcion() ? 'checked' : '' ?>>

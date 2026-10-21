@@ -55,7 +55,7 @@ declare(strict_types=1);
     <p style="padding:24px;font-family:Arial,sans-serif;color:#64748b;">No hay LPNs generados para esta carga.</p>
 <?php else: foreach ($lpns as $lpn): ?>
     <div class="label">
-        <img src="/uploads/lpns/<?= htmlspecialchars((string) $lpn->codigo()) ?>.png" alt="Etiqueta <?= htmlspecialchars((string) $lpn->codigo()) ?>">
+        <img src="/uploads/lpns/<?= htmlspecialchars((string) $lpn->codigo()) ?>.png?v=<?= @filemtime(FCPATH . 'uploads/lpns/' . $lpn->codigo() . '.png') ?>" alt="Etiqueta <?= htmlspecialchars((string) $lpn->codigo()) ?>">
     </div>
 <?php endforeach; endif; ?>
 </body>

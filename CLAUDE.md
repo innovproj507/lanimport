@@ -170,7 +170,10 @@ The paper delivery form (empresa de transporte, chofer, placa, entregado por, ce
 
 ### Label printing
 
-Barcode and label images are generated server-side into `public/` (`PicqerBarcodeGeneratorService`, `LpnBarcodeGeneratorService`). Uploaded documents are also stored under `public/uploads`. Physical printing goes through a separate local "Agente de Impresion LAN" at `http://localhost:9898`, which `public/assets/js/local-print.js` calls. Its source (PowerShell, no dependencies) is in `herramientas/agente-impresion/`; users download it from the Impresoras page as `public/descargas/AgenteImpresionLAN.zip` and install it with `Instalar.bat`. After changing the agent, rebuild the ZIP with `powershell -ExecutionPolicy Bypass -File herramientas/empaquetar-agente.ps1`.
+Barcode and label images are generated server-side into `public/` (`PicqerBarcodeGeneratorService`, `LpnBarcodeGeneratorService`).
+
+- The LPN label's serie (bulto X/Y) depends only on the template (Configuracion > Etiqueta LPN, `lpn_etiqueta_config.mostrar_serie`), not on the client's country. `paises.mostrar_serie_etiqueta` is no longer used. Migration 061 regenerated the labels that had come out without it.
+- Images keep their file name when regenerated, so views link them with `url_archivo_publico()` (adds `?v=<mtime>`) to avoid stale caches. Uploaded documents are also stored under `public/uploads`. Physical printing goes through a separate local "Agente de Impresion LAN" at `http://localhost:9898`, which `public/assets/js/local-print.js` calls. Its source (PowerShell, no dependencies) is in `herramientas/agente-impresion/`; users download it from the Impresoras page as `public/descargas/AgenteImpresionLAN.zip` and install it with `Instalar.bat`. After changing the agent, rebuild the ZIP with `powershell -ExecutionPolicy Bypass -File herramientas/empaquetar-agente.ps1`.
 
 ### Cross-context rules (from the original project)
 

@@ -7,12 +7,10 @@ namespace Courier\Lpn\Application\GenerarLpnsParaCarga;
 use Courier\Carga\Domain\CargaRepositoryInterface;
 use Courier\Carga\Domain\Exception\CargaNotFoundException;
 use Courier\Carga\Infrastructure\Persistence\PdoEtiquetaRepository;
-use Courier\Cliente\Domain\ClienteRepositoryInterface;
 use Courier\Lpn\Domain\EtiquetaLpnConfigRepositoryInterface;
 use Courier\Lpn\Domain\Lpn;
 use Courier\Lpn\Domain\LpnBarcodeGeneratorInterface;
 use Courier\Lpn\Domain\LpnRepositoryInterface;
-use Courier\Pais\Domain\PaisRepositoryInterface;
 use Courier\Shared\Application\CommandHandlerInterface;
 use Courier\Shared\Application\CommandInterface;
 use Courier\Shared\Domain\Exception\ValidationException;
@@ -26,8 +24,6 @@ final class GenerarLpnsParaCargaHandler implements CommandHandlerInterface
         private readonly LpnRepositoryInterface $lpns,
         private readonly LpnBarcodeGeneratorInterface $barcodeGenerator,
         private readonly PdoEtiquetaRepository $etiquetas,
-        private readonly ClienteRepositoryInterface $clientes,
-        private readonly PaisRepositoryInterface $paises,
         private readonly EtiquetaLpnConfigRepositoryInterface $etiquetaConfig,
         private readonly UnitOfWork $unitOfWork,
     ) {
@@ -57,11 +53,9 @@ final class GenerarLpnsParaCargaHandler implements CommandHandlerInterface
             throw new ValidationException('La carga no tiene lineas con cantidad para generar LPNs.');
         }
 
-        $cliente = $this->clientes->findById($carga->clienteId());
-        $clientePais = $cliente?->pais() !== null ? $this->paises->findByNombre($cliente->pais()) : null;
-
+        // La serie (12/38) depende solo de la plantilla (Configuracion > Etiqueta LPN), no del pais del cliente.
         $etiquetaConfig = $this->etiquetaConfig->obtener();
-        $mostrarSerie = $etiquetaConfig->mostrarSerie() && ($clientePais?->mostrarSerieEtiqueta() ?? false);
+        $mostrarSerie = $etiquetaConfig->mostrarSerie();
         $proveedorNombreEtiqueta = $etiquetaConfig->mostrarProveedor() ? $carga->proveedor() : null;
 
         $sufijoTracking = substr((string) $carga->trackingNumero(), -6);

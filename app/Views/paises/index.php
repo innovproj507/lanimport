@@ -34,7 +34,6 @@ require __DIR__ . '/../partials/header.php';
             <tr class="text-left text-xs text-zinc-500 uppercase border-b border-slate-200">
                 <th class="py-2 pr-4">Identificador</th>
                 <th class="py-2 pr-4">Nombre</th>
-                <th class="py-2 pr-4">Serie en etiqueta</th>
                 <th class="py-2 text-right">Acciones</th>
             </tr>
         </thead>

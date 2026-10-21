@@ -75,14 +75,14 @@ $estadoColores = [
                     </td>
                     <td class="py-2">
                         <button type="button" class="lpn-ver-etiqueta-btn inline-block bg-white rounded p-1 border border-transparent hover:border-amber-400 transition"
-                                data-etiqueta="/uploads/lpns/<?= htmlspecialchars((string) $lpn->codigo()) ?>.png"
+                                data-etiqueta="<?= htmlspecialchars(url_archivo_publico('uploads/lpns/' . $lpn->codigo() . '.png')) ?>"
                                 data-codigo="<?= htmlspecialchars((string) $lpn->codigo()) ?>" title="Ver etiqueta completa">
-                            <img src="/uploads/lpns/<?= htmlspecialchars((string) $lpn->codigo()) ?>.png" alt="Etiqueta LPN" class="h-10">
+                            <img src="<?= htmlspecialchars(url_archivo_publico('uploads/lpns/' . $lpn->codigo() . '.png')) ?>" alt="Etiqueta LPN" class="h-10">
                         </button>
                     </td>
                     <td class="py-2 text-right">
                         <button type="button" class="lpn-imprimir-btn inline-flex items-center justify-center w-8 h-8 rounded-lg bg-white border border-zinc-300 text-zinc-700 hover:bg-slate-100 transition"
-                                data-etiqueta="/uploads/lpns/<?= htmlspecialchars((string) $lpn->codigo()) ?>.png" title="Imprimir etiqueta">
+                                data-etiqueta="<?= htmlspecialchars(url_archivo_publico('uploads/lpns/' . $lpn->codigo() . '.png')) ?>" title="Imprimir etiqueta">
                             <?= icon_small('printer') ?>
                         </button>
                     </td>

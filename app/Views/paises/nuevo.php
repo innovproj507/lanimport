@@ -25,13 +25,6 @@ require __DIR__ . '/../partials/header.php';
         <input type="text" name="nombre" required
                class="w-full rounded-lg border border-zinc-300 bg-white text-black px-3 py-2 focus:ring-2 focus:ring-amber-400 focus:outline-none">
     </div>
-    <div class="flex items-start gap-2">
-        <input type="checkbox" name="mostrar_serie_etiqueta" id="mostrar_serie_etiqueta" value="1"
-               class="mt-1 rounded border-zinc-300 text-amber-500 focus:ring-amber-400">
-        <label for="mostrar_serie_etiqueta" class="text-sm text-zinc-700">
-            Mostrar serie (bulto X/Y) en las etiquetas de LPN para clientes de este pais
-        </label>
-    </div>
     <div class="flex items-center gap-3">
         <button type="submit" class="inline-flex items-center gap-2 bg-amber-500 text-black rounded-lg px-6 py-2.5 font-medium hover:bg-amber-400 transition">
             <?= icon_small('check') ?><span>Registrar pais</span>

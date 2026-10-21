@@ -175,7 +175,7 @@ require __DIR__ . '/../partials/header.php';
             <?php endif; ?>
         </p>
         <div class="bg-white rounded-lg p-4">
-            <img id="etiqueta-carga-img" src="/uploads/etiquetas/<?= htmlspecialchars($view->trackingNumero) ?>.png" alt="Codigo de barras de la carga <?= htmlspecialchars($view->trackingNumero) ?>"
+            <img id="etiqueta-carga-img" src="<?= htmlspecialchars(url_archivo_publico('uploads/etiquetas/' . $view->trackingNumero . '.png')) ?>" alt="Codigo de barras de la carga <?= htmlspecialchars($view->trackingNumero) ?>"
                  class="max-w-full">
         </div>
         <button type="button" id="btn-imprimir-etiqueta" class="mt-3 inline-flex items-center gap-2 bg-white border border-zinc-300 text-zinc-700 rounded-lg px-4 py-2 text-sm font-medium hover:bg-slate-100 transition">

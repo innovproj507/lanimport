@@ -76,6 +76,18 @@ function badge(string $texto, string $color = 'slate'): string
         . htmlspecialchars($texto) . '</span>';
 }
 
+/**
+ * URL de un archivo de public/ con su fecha de modificacion (?v=): si la imagen se regenera con el
+ * mismo nombre (p.ej. una etiqueta), el navegador y el agente de impresion bajan la nueva, no la de cache.
+ */
+function url_archivo_publico(string $ruta): string
+{
+    $ruta = ltrim($ruta, '/');
+    $version = @filemtime(FCPATH . $ruta);
+
+    return '/' . $ruta . ($version ? '?v=' . $version : '');
+}
+
 /** Color del estado de una carga, el mismo en todas las pantallas (dashboard, lista de cargas, cliente). */
 function color_estado_carga(string $estado): string
 {
