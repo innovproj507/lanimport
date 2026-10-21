@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Controllers;
 
+use Courier\Aduanero\Application\ListarAduaneros\ListarAduanerosHandler;
+use Courier\Aduanero\Application\ListarAduaneros\ListarAduanerosQuery;
 use Courier\Carga\Domain\CargaRepositoryInterface;
 use Courier\Cliente\Application\ListarClientes\ListarClientesHandler;
 use Courier\Cliente\Application\ListarClientes\ListarClientesQuery;
@@ -20,12 +22,14 @@ final class InventarioController extends BaseController
         $ubicacionId = (string) ($this->request->getGet('ubicacion_id') ?? '');
         $clienteId = (string) ($this->request->getGet('cliente_id') ?? '');
         $cargaCodigo = (string) ($this->request->getGet('carga_codigo') ?? '');
+        $aduanero = trim((string) ($this->request->getGet('aduanero') ?? ''));
 
         $query = new BuscarInventarioQuery(
             $estado !== '' ? $estado : null,
             $ubicacionId !== '' ? $ubicacionId : null,
             $clienteId !== '' ? $clienteId : null,
             $cargaCodigo !== '' ? $cargaCodigo : null,
+            $aduanero !== '' ? $aduanero : null,
         );
 
         $lpns = $this->container()->get(BuscarInventarioHandler::class)->handle($query);
@@ -45,12 +49,14 @@ final class InventarioController extends BaseController
             'lpns' => $lpns,
             'ubicaciones' => $ubicaciones,
             'clientes' => $clientes,
+            'aduaneros' => $this->container()->get(ListarAduanerosHandler::class)->handle(new ListarAduanerosQuery()),
             'cargasPorId' => $cargasPorId,
             'filtros' => [
                 'estado' => $estado,
                 'ubicacion_id' => $ubicacionId,
                 'cliente_id' => $clienteId,
                 'carga_codigo' => $cargaCodigo,
+                'aduanero' => $aduanero,
             ],
         ]);
     }

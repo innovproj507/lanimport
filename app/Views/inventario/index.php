@@ -3,7 +3,8 @@
 /** @var array<int, \Courier\Lpn\Domain\Ubicacion> $ubicaciones */
 /** @var array<int, \Courier\Cliente\Domain\Cliente> $clientes */
 /** @var array<string, \Courier\Carga\Domain\Carga|null> $cargasPorId */
-/** @var array{estado: string, ubicacion_id: string, cliente_id: string, carga_codigo: string} $filtros */
+/** @var array<int, \Courier\Aduanero\Domain\Aduanero> $aduaneros */
+/** @var array{estado: string, ubicacion_id: string, cliente_id: string, carga_codigo: string, aduanero: string} $filtros */
 $pageTitle = 'Inventario';
 $pageSubtitle = 'LPNs en bodega';
 require __DIR__ . '/../partials/header.php';
@@ -55,6 +56,25 @@ foreach ($lpns as $lpn) {
     $estadoValor = $lpn->estado()->value;
     $grupos[$clave]['porEstado'][$estadoValor] = ($grupos[$clave]['porEstado'][$estadoValor] ?? 0) + 1;
 }
+
+// Como en Ingreso de Carga: bultos, peso, cubicaje y valor de cada carga (suma de sus lineas),
+// y los totales de todas las cargas listadas.
+$resumen = ['bultos' => 0.0, 'peso' => 0.0, 'pies3' => 0.0, 'valor' => 0.0];
+foreach ($grupos as $clave => $grupo) {
+    $datos = ['bultos' => 0.0, 'peso' => 0.0, 'pies3' => 0.0, 'valor' => 0.0];
+    foreach ($grupo['carga'] ? $grupo['carga']->lineas() : [] as $linea) {
+        $datos['bultos'] += $linea->cantidad();
+        $datos['peso'] += $linea->peso();
+        $datos['pies3'] += $linea->cubicajePies() * $linea->cantidad();
+        $datos['valor'] += $linea->valor();
+    }
+    $grupos[$clave]['datos'] = $datos;
+    foreach ($datos as $k => $v) {
+        $resumen[$k] += $v;
+    }
+}
+$cargasListadas = count(array_filter($grupos, static fn (array $g) => $g['carga'] !== null));
+$n = static fn (float $v, int $d = 2): string => number_format($v, $d, '.', ',');
 ?>
 
 <div class="bg-white rounded-xl shadow-sm p-6 mb-6">
@@ -89,6 +109,17 @@ foreach ($lpns as $lpn) {
             <?php foreach ($clientes as $cliente): ?>
                 <option value="<?= htmlspecialchars($cliente->id()) ?>" <?= $filtros['cliente_id'] === $cliente->id() ? 'selected' : '' ?>>
                     <?= htmlspecialchars($cliente->nombreCompleto()) ?>
+                </option>
+            <?php endforeach; ?>
+        </select>
+    </div>
+    <div>
+        <label class="block text-sm font-medium text-zinc-700 mb-1">Aduanero</label>
+        <select name="aduanero" class="rounded-lg border border-zinc-300 bg-white text-black px-3 py-2 text-sm">
+            <option value="">Todos</option>
+            <?php foreach ($aduaneros as $aduaneroOpcion): ?>
+                <option value="<?= htmlspecialchars($aduaneroOpcion->identificador()) ?>" <?= $filtros['aduanero'] === $aduaneroOpcion->identificador() ? 'selected' : '' ?>>
+                    <?= htmlspecialchars($aduaneroOpcion->nombre()) ?>
                 </option>
             <?php endforeach; ?>
         </select>
@@ -146,35 +177,53 @@ foreach ($lpns as $lpn) {
             </tbody>
         </table>
     <?php else: ?>
+        <div class="mb-4">
+            <?php $total = $cargasListadas; require __DIR__ . '/../carga/_resumen.php'; ?>
+        </div>
+        <div class="overflow-x-auto">
         <table class="w-full text-sm">
             <thead>
                 <tr class="text-left text-xs text-zinc-500 uppercase border-b border-slate-200">
                     <th class="py-2 pr-4">Carga (tracking)</th>
                     <th class="py-2 pr-4">Cliente</th>
-                    <th class="py-2 pr-4">Total LPNs</th>
-                    <th class="py-2">Por estado</th>
+                    <th class="py-2 pr-4">Proveedor</th>
+                    <th class="py-2 pr-4">Aduanero</th>
+                    <th class="py-2 pr-4 text-right">Bultos</th>
+                    <th class="py-2 pr-4 text-right">Peso (kg)</th>
+                    <th class="py-2 pr-4 text-right">Valor</th>
+                    <th class="py-2 pr-4">Estado</th>
+                    <th class="py-2 pr-4 text-right">LPNs</th>
+                    <th class="py-2 pr-4">Por estado</th>
+                    <th class="py-2 pr-4">Fecha</th>
                     <th class="py-2 text-right">Acciones</th>
                 </tr>
             </thead>
             <tbody>
-                <?php foreach ($grupos as $grupo): ?>
+                <?php foreach ($grupos as $grupo): $cargaGrupo = $grupo['carga']; ?>
                     <tr class="border-b border-slate-200">
-                        <td class="py-2 pr-4 text-zinc-700">
-                            <?php if ($grupo['carga']): ?>
-                                <a href="/cargas/<?= htmlspecialchars($grupo['carga']->id()) ?>" class="font-mono text-amber-600 hover:underline">
-                                    <?= htmlspecialchars((string) $grupo['carga']->trackingNumero()) ?>
+                        <td class="py-2 pr-4 text-zinc-700 whitespace-nowrap">
+                            <?php if ($cargaGrupo): ?>
+                                <a href="/cargas/<?= htmlspecialchars($cargaGrupo->id()) ?>" class="font-mono text-amber-600 hover:underline">
+                                    <?= htmlspecialchars((string) $cargaGrupo->trackingNumero()) ?>
                                 </a>
                             <?php else: ?>
                                 <span class="text-zinc-500">Sin carga asociada</span>
                             <?php endif; ?>
                         </td>
                         <td class="py-2 pr-4 text-zinc-700"><?= htmlspecialchars($mapaClientes[$grupo['clienteId']] ?? '—') ?></td>
-                        <td class="py-2 pr-4 font-medium text-black"><?= $grupo['total'] ?></td>
-                        <td class="py-2 space-x-1">
+                        <td class="py-2 pr-4 text-zinc-700"><?= htmlspecialchars($cargaGrupo ? $cargaGrupo->proveedor() : '—') ?></td>
+                        <td class="py-2 pr-4 text-zinc-700"><?= htmlspecialchars($cargaGrupo?->aduanero()?->nombre() ?? '—') ?></td>
+                        <td class="py-2 pr-4 text-right text-zinc-700"><?= $n($grupo['datos']['bultos'], 0) ?></td>
+                        <td class="py-2 pr-4 text-right text-black font-medium whitespace-nowrap"><?= $n($grupo['datos']['peso']) ?></td>
+                        <td class="py-2 pr-4 text-right text-zinc-700 whitespace-nowrap"><?= $n($grupo['datos']['valor']) ?></td>
+                        <td class="py-2 pr-4 whitespace-nowrap"><?= $cargaGrupo ? badge_estado_carga($cargaGrupo->estado()) : '—' ?></td>
+                        <td class="py-2 pr-4 text-right font-medium text-black"><?= $grupo['total'] ?></td>
+                        <td class="py-2 pr-4 space-x-1 whitespace-nowrap">
                             <?php foreach ($grupo['porEstado'] as $estadoValor => $cantidad): ?>
                                 <?= badge($cantidad . ' ' . ($estados[$estadoValor] ?? $estadoValor), $estadoColores[$estadoValor] ?? 'slate') ?>
                             <?php endforeach; ?>
                         </td>
+                        <td class="py-2 pr-4 text-zinc-500 whitespace-nowrap"><?= $cargaGrupo ? htmlspecialchars($cargaGrupo->fechaIngreso()->format('d/m/Y')) : '—' ?></td>
                         <td class="py-2 text-right whitespace-nowrap space-x-2">
                             <?php if ($grupo['carga'] && $grupo['carga']->facturaProveedorRuta()): ?>
                                 <a href="/<?= htmlspecialchars($grupo['carga']->facturaProveedorRuta()) ?>" target="_blank" title="Ver factura del proveedor"
@@ -191,6 +240,7 @@ foreach ($lpns as $lpn) {
                 <?php endforeach; ?>
             </tbody>
         </table>
+        </div>
     <?php endif; ?>
 </div>
 
