@@ -65,7 +65,7 @@ require __DIR__ . '/../partials/header.php';
     </p>
 </div>
 
-<script src="/assets/js/local-print.js"></script>
+<script src="/assets/js/local-print.js?v=<?= @filemtime(FCPATH . 'assets/js/local-print.js') ?>"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
     var puntoEstado = document.getElementById('agente-estado-punto');

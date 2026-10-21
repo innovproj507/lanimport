@@ -21,7 +21,10 @@ casero al IoT Box de Odoo.
 2. Descomprimir el ZIP y dar **doble clic en `Instalar.bat`**.
    Si Windows muestra "Windows protegio su PC", elegir *Mas informacion* > *Ejecutar de todas formas*.
 3. El agente queda copiado en `%LOCALAPPDATA%\AgenteImpresionLAN` y arranca solo
-   cada vez que el usuario inicia sesion en Windows (sin ventana visible).
+   cada vez que el usuario inicia sesion en Windows (sin ventana visible). Si se cierra,
+   Windows lo vuelve a levantar en 1 a 5 minutos (la tarea revisa cada 5 minutos).
+   Si el sistema dice "No se pudo conectar con el Agente de Impresion", esperar ese tiempo
+   o volver a dar doble clic en `Instalar.bat`.
    La carpeta descargada se puede borrar.
 4. Volver a **Impresoras** en el sistema, recargar la pagina, elegir la impresora
    de etiquetas y pulsar **Guardar**.

@@ -185,7 +185,7 @@ require __DIR__ . '/../partials/header.php';
     </div>
 </div>
 
-<script src="/assets/js/local-print.js"></script>
+<script src="/assets/js/local-print.js?v=<?= @filemtime(FCPATH . 'assets/js/local-print.js') ?>"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
     var btn = document.getElementById('btn-imprimir-etiqueta');

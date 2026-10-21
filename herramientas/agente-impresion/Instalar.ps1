@@ -55,16 +55,24 @@ $modo = 'tarea'
 
 try {
     $accion = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument $argumentos
-    $disparador = New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME
+    # Arranca al iniciar sesion y, ademas, cada 5 minutos: si el agente se cerro, vuelve a levantarlo
+    # (si ya esta corriendo, IgnoreNew no abre otro). Si el proceso falla, Windows lo reinicia al minuto.
+    $disparadores = @(
+        (New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME),
+        (New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1) -RepetitionInterval (New-TimeSpan -Minutes 5))
+    )
     $configuracion = New-ScheduledTaskSettingsSet `
         -AllowStartIfOnBatteries `
         -DontStopIfGoingOnBatteries `
         -StartWhenAvailable `
+        -MultipleInstances IgnoreNew `
+        -RestartCount 999 `
+        -RestartInterval (New-TimeSpan -Minutes 1) `
         -ExecutionTimeLimit ([TimeSpan]::Zero)
 
     Register-ScheduledTask -TaskName $nombreTarea `
         -Action $accion `
-        -Trigger $disparador `
+        -Trigger $disparadores `
         -Settings $configuracion `
         -Description 'Agente local de impresion para el sistema LAN Import - Export S.A. (permite imprimir etiquetas desde el navegador).' `
         | Out-Null
@@ -82,7 +90,7 @@ try {
 }
 
 if ($modo -eq 'tarea') {
-    Write-Host "Instalado como tarea programada. Arrancara automaticamente al iniciar sesion." -ForegroundColor Green
+    Write-Host "Instalado como tarea programada. Arranca al iniciar sesion y se vuelve a levantar solo si se cierra." -ForegroundColor Green
     Write-Host "Iniciandolo ahora..."
     Start-ScheduledTask -TaskName $nombreTarea
 } else {

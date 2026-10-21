@@ -29,6 +29,11 @@ var LocalPrint = (function () {
         });
     }
 
+    // Sin respuesta del agente (no instalado o cerrado), fetch solo dice "Failed to fetch".
+    var SIN_AGENTE = 'No se pudo conectar con el Agente de Impresion LAN en este equipo. '
+        + 'Si ya esta instalado, espere un minuto (se vuelve a abrir solo) o reinicie la sesion de Windows; '
+        + 'si no, descarguelo desde Impresoras e instalelo.';
+
     function imprimirImagen(printerName, imageUrl) {
         if (!printerName) {
             return Promise.reject(new Error('No hay impresora de etiquetas configurada.'));
@@ -38,6 +43,8 @@ var LocalPrint = (function () {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ impresora: printerName, url: imageUrl })
+        }).catch(function () {
+            throw new Error(SIN_AGENTE);
         }).then(function (response) {
             return response.json().then(function (data) {
                 if (!response.ok || data.error) {
