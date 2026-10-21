@@ -181,6 +181,10 @@ $routes->post('salidas/(:segment)/finalizar', 'SalidaController::finalizar/$1', 
 $routes->post('salidas/(:segment)/cancelar', 'SalidaController::cancelar/$1', ['filter' => $planificaSalida]);
 $routes->get('salidas/(:segment)/agregar', 'SalidaController::agregarForm/$1', ['filter' => $planificaSalida]);
 $routes->post('salidas/(:segment)/agregar', 'SalidaController::agregar/$1', ['filter' => $planificaSalida]);
+// Unir este DO a otro del mismo contenedor, pasar una carga a otro DO o devolverla a bodega.
+$routes->post('salidas/(:segment)/unir', 'SalidaController::unir/$1', ['filter' => $planificaSalida]);
+$routes->post('salidas/(:segment)/mover-carga', 'SalidaController::moverCarga/$1', ['filter' => $planificaSalida]);
+$routes->post('salidas/(:segment)/devolver-carga', 'SalidaController::devolverCarga/$1', ['filter' => $planificaSalida]);
 $routes->post('salidas/(:segment)/embarque','SalidaController::guardarEmbarque/$1', ['filter' => $planificaSalida]);
 $routes->get('salidas/(:segment)/manifiesto', 'SalidaController::manifiesto/$1', ['filter' => $bodegaFilter]);
 $routes->get('salidas/(:segment)/reporte', 'SalidaController::reporte/$1', ['filter' => $bodegaFilter]);

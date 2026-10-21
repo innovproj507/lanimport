@@ -88,7 +88,7 @@ final class PdoSalidaOrdenRepository implements SalidaOrdenRepositoryInterface
     private function update(SalidaOrden $orden): void
     {
         $stmt = $this->connection->prepare(
-            'UPDATE salida_ordenes SET estado = :estado, confirmed_at = :confirmed_at, cliente_id = :cliente_id,
+            'UPDATE salida_ordenes SET estado = :estado, nota = :nota, confirmed_at = :confirmed_at, cliente_id = :cliente_id,
                 numero_contenedor = :numero_contenedor, numero_sello = :numero_sello, naviera_id = :naviera_id,
                 nombre_barco = :nombre_barco, fecha_cargue = :fecha_cargue, fecha_salida_etd = :fecha_salida_etd,
                 destino_final = :destino_final
@@ -98,9 +98,18 @@ final class PdoSalidaOrdenRepository implements SalidaOrdenRepositoryInterface
         $stmt->execute([
             ':id' => $orden->id(),
             ':estado' => $orden->estado()->value,
+            ':nota' => $orden->nota(),
             ':confirmed_at' => $orden->confirmedAt()?->format('Y-m-d H:i:s'),
             ':cliente_id' => $orden->clienteId(),
         ] + $this->parametrosEmbarque($orden));
+
+        // Lineas que se sacaron (pasaron a otro DO o volvieron a bodega) se borran de esta salida.
+        $lpnIds = array_map(static fn ($linea) => $linea->lpnId(), $orden->lineas());
+        $marcas = implode(',', array_fill(0, count($lpnIds), '?'));
+        $borrar = $this->connection->prepare(
+            'DELETE FROM salida_lineas WHERE salida_orden_id = ?' . ($lpnIds !== [] ? " AND lpn_id NOT IN ({$marcas})" : '')
+        );
+        $borrar->execute(array_merge([$orden->id()], $lpnIds));
 
         // Lineas nuevas (cargas agregadas a una salida pendiente) se insertan; las demas se actualizan.
         $upsertLinea = $this->connection->prepare(
@@ -401,6 +410,7 @@ final class PdoSalidaOrdenRepository implements SalidaOrdenRepositoryInterface
                 'fechaSalidaEtd' => $row['fecha_salida_etd'] ?? null,
                 'destinoFinal' => $row['destino_final'] ?? null,
             ]),
+            isset($row['nota']) && $row['nota'] !== null ? (string) $row['nota'] : null,
         );
     }
 }

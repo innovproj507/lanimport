@@ -29,7 +29,91 @@ final class SalidaOrden extends AggregateRoot
         private ?int $doAnio = null,
         private ?int $doNumero = null,
         private ?DatosEmbarque $embarque = null,
+        // Por que se cancelo, si fue al unirla a otra (p.ej. "Unida a DO.3 / 2026").
+        private ?string $nota = null,
     ) {
+    }
+
+    public function nota(): ?string
+    {
+        return $this->nota;
+    }
+
+    /**
+     * Saca bultos de esta salida para pasarlos a otra (unir DOs del mismo contenedor, o corregir
+     * una carga que se unio por error). Solo mientras esta pendiente; conservan su escaneo.
+     *
+     * @param array<int, string> $lpnIds
+     * @return array<int, SalidaLinea> las lineas que salieron
+     */
+    public function sacarLineas(array $lpnIds): array
+    {
+        if ($this->estado !== EstadoSalidaOrden::PENDIENTE) {
+            throw new ValidationException("La salida {$this->etiquetaDo()} esta " . mb_strtolower($this->estado->label()) . ': ya no se le pueden sacar cargas.');
+        }
+
+        $sacadas = [];
+        $quedan = [];
+
+        foreach ($this->lineas as $linea) {
+            if (in_array($linea->lpnId(), $lpnIds, true)) {
+                $sacadas[] = $linea;
+            } else {
+                $quedan[] = $linea;
+            }
+        }
+
+        if ($sacadas === []) {
+            throw new ValidationException('Esos bultos no estan en esta salida.');
+        }
+
+        $this->lineas = $quedan;
+
+        return $sacadas;
+    }
+
+    /**
+     * Recibe bultos que vienen de otra salida, con su escaneo. A una salida pendiente, como
+     * agregar cargas; a una ya confirmada (bodega la finalizo antes de terminar de cargar el
+     * contenedor) solo si todos vienen escaneados: suben como despachados.
+     *
+     * @param array<int, SalidaLinea> $lineas
+     * @param array<int, string> $clienteIds
+     */
+    public function recibirLineas(array $lineas, array $clienteIds): void
+    {
+        if ($this->estado === EstadoSalidaOrden::CONFIRMADA) {
+            $sinEscanear = array_filter($lineas, static fn (SalidaLinea $l) => !$l->escaneado());
+
+            if ($sinEscanear !== []) {
+                throw new ValidationException("La salida {$this->etiquetaDo()} ya esta confirmada: solo se le pueden unir bultos ya escaneados. Faltan " . count($sinEscanear) . ' por escanear.');
+            }
+
+            $this->estado = EstadoSalidaOrden::PENDIENTE;
+            $confirmada = $this->confirmedAt;
+
+            try {
+                $this->agregarLineas($lineas, $clienteIds);
+            } finally {
+                $this->estado = EstadoSalidaOrden::CONFIRMADA;
+                $this->confirmedAt = $confirmada;
+            }
+
+            return;
+        }
+
+        $this->agregarLineas($lineas, $clienteIds);
+    }
+
+    /** Se queda sin cargas al unirla a otra: se cancela con la nota de a donde fueron. */
+    public function cerrarSinCargas(string $nota): void
+    {
+        if ($this->lineas !== []) {
+            throw new ValidationException("La salida {$this->etiquetaDo()} todavia tiene cargas.");
+        }
+
+        $this->cancelar();
+        $this->nota = mb_substr($nota, 0, 255);
     }
 
     /** Contenedor, sello, naviera, barco, fechas y destino; se puede completar o corregir mientras no este cancelada. */

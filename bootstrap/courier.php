@@ -157,6 +157,8 @@ use Courier\Salida\Application\CancelarOrdenSalida\CancelarOrdenSalidaHandler;
 use Courier\Salida\Application\ConfirmarSalida\ConfirmarSalidaHandler;
 use Courier\Salida\Application\CrearOrdenSalida\CrearOrdenSalidaHandler;
 use Courier\Salida\Application\AgregarCargasSalida\AgregarCargasSalidaHandler;
+use Courier\Salida\Application\DevolverCargaSalida\DevolverCargaSalidaHandler;
+use Courier\Salida\Application\MoverCargasSalida\MoverCargasSalidaHandler;
 use Courier\Salida\Application\ListarOrdenesSalida\ListarOrdenesSalidaHandler;
 use Courier\Salida\Application\RegistrarEscaneoSalida\RegistrarEscaneoSalidaHandler;
 use Courier\Salida\Application\VerOrdenSalida\VerOrdenSalidaHandler;
@@ -296,6 +298,18 @@ $container->set(ConfirmarSalidaHandler::class, fn (Container $c) => new Confirma
     $c->get(SincronizarEstadoCargaHandler::class),
 ));
 $container->set(CancelarOrdenSalidaHandler::class, fn (Container $c) => new CancelarOrdenSalidaHandler(
+    $c->get(SalidaOrdenRepositoryInterface::class),
+    $c->get(LpnRepositoryInterface::class),
+    $c->get(UnitOfWork::class),
+));
+// Unir DOs del mismo contenedor / sacar una carga de un DO (a otro DO, o de vuelta a bodega).
+$container->set(MoverCargasSalidaHandler::class, fn (Container $c) => new MoverCargasSalidaHandler(
+    $c->get(SalidaOrdenRepositoryInterface::class),
+    $c->get(LpnRepositoryInterface::class),
+    $c->get(UnitOfWork::class),
+    $c->get(SincronizarEstadoCargaHandler::class),
+));
+$container->set(DevolverCargaSalidaHandler::class, fn (Container $c) => new DevolverCargaSalidaHandler(
     $c->get(SalidaOrdenRepositoryInterface::class),
     $c->get(LpnRepositoryInterface::class),
     $c->get(UnitOfWork::class),

@@ -32,6 +32,10 @@ use Courier\Salida\Application\CancelarOrdenSalida\CancelarOrdenSalidaHandler;
 use Courier\Salida\Application\ConfirmarSalida\ConfirmarSalidaCommand;
 use Courier\Salida\Application\ConfirmarSalida\ConfirmarSalidaHandler;
 use Courier\Salida\Application\CrearOrdenSalida\CrearOrdenSalidaCommand;
+use Courier\Salida\Application\DevolverCargaSalida\DevolverCargaSalidaCommand;
+use Courier\Salida\Application\DevolverCargaSalida\DevolverCargaSalidaHandler;
+use Courier\Salida\Application\MoverCargasSalida\MoverCargasSalidaCommand;
+use Courier\Salida\Application\MoverCargasSalida\MoverCargasSalidaHandler;
 use Courier\Salida\Application\AgregarCargasSalida\AgregarCargasSalidaCommand;
 use Courier\Salida\Application\AgregarCargasSalida\AgregarCargasSalidaHandler;
 use Courier\Salida\Domain\SalidaOrden;
@@ -244,6 +248,7 @@ final class SalidaController extends BaseController
             'avance' => $repositorio->avancePorCarga($orden->id()),
             'navieras' => $navieras,
             'fotos' => $this->container()->get(FotoEvidenciaRepositoryInterface::class)->listar(TipoEvidencia::Salida, $orden->id()),
+            'otrasSalidas' => $orden->estado()->value === 'pendiente' ? $this->otrasSalidas($orden) : [],
             'mensaje' => $mensaje,
             'error' => $error,
         ]);
@@ -434,6 +439,110 @@ final class SalidaController extends BaseController
         }
 
         return redirect()->to('/salidas');
+    }
+
+    /** Une este DO a otro del mismo contenedor: pasan todas sus cargas (con lo escaneado) y este se cancela. */
+    public function unir(string $id): RedirectResponse
+    {
+        $destinoId = trim((string) $this->request->getPost('destino_id'));
+
+        return $this->moverCargas($id, $destinoId !== '' ? $destinoId : null, null, true);
+    }
+
+    /** Pasa una carga de este DO a otro (o a un DO nuevo), por ejemplo si se unio por error. */
+    public function moverCarga(string $id): RedirectResponse
+    {
+        $destino = trim((string) $this->request->getPost('destino_id'));
+        $grupo = trim((string) $this->request->getPost('grupo'));
+
+        return $this->moverCargas($id, $destino === 'nuevo' || $destino === '' ? null : $destino, [$grupo], false);
+    }
+
+    /** @param array<int, string>|null $grupos */
+    private function moverCargas(string $id, ?string $destinoId, ?array $grupos, bool $unir): RedirectResponse
+    {
+        if (!Csrf::verify($this->request->getPost('_csrf'))) {
+            return redirect()->to('/salidas/' . $id);
+        }
+
+        if ($unir && $destinoId === null) {
+            $_SESSION['salida_error'] = 'Elija el DO al que se une esta salida.';
+
+            return redirect()->to('/salidas/' . $id);
+        }
+
+        try {
+            /** @var SalidaOrden $destino */
+            $destino = $this->container()->get(MoverCargasSalidaHandler::class)->handle(new MoverCargasSalidaCommand(
+                $id,
+                $destinoId,
+                $grupos,
+                (string) $this->container()->get(SessionManager::class)->currentUsuarioId(),
+            ));
+        } catch (NotFoundException|ValidationException|\Courier\Shared\Domain\Exception\DomainException $e) {
+            $_SESSION['salida_error'] = $e->getMessage();
+
+            return redirect()->to('/salidas/' . $id);
+        }
+
+        $origen = $this->container()->get(SalidaOrdenRepositoryInterface::class)->findById($id);
+
+        if ($unir || $origen === null || $origen->lineas() === []) {
+            // El DO de origen quedo sin cargas (cancelado): se sigue en el destino.
+            $_SESSION['salida_mensaje'] = ($unir ? 'DO unido' : 'Carga movida') . " a {$destino->etiquetaDo()}"
+                . ($origen !== null ? " ({$origen->etiquetaDo()} quedo cancelado: {$origen->nota()})" : '') . '. Lo ya escaneado se conserva.';
+
+            return redirect()->to('/salidas/' . $destino->id());
+        }
+
+        $_SESSION['salida_mensaje'] = "Carga movida a {$destino->etiquetaDo()}. Lo ya escaneado se conserva.";
+
+        return redirect()->to('/salidas/' . $id);
+    }
+
+    /** Saca una carga del DO y la devuelve a bodega (sus bultos vuelven a estar disponibles). */
+    public function devolverCarga(string $id): RedirectResponse
+    {
+        if (!Csrf::verify($this->request->getPost('_csrf'))) {
+            return redirect()->to('/salidas/' . $id);
+        }
+
+        try {
+            $bultos = $this->container()->get(DevolverCargaSalidaHandler::class)->handle(new DevolverCargaSalidaCommand(
+                $id,
+                trim((string) $this->request->getPost('grupo')),
+            ));
+            $_SESSION['salida_mensaje'] = "Se devolvieron {$bultos} bultos a bodega: vuelven a estar disponibles para otra salida.";
+        } catch (NotFoundException|ValidationException|\Courier\Shared\Domain\Exception\DomainException $e) {
+            $_SESSION['salida_error'] = $e->getMessage();
+        }
+
+        return redirect()->to('/salidas/' . $id);
+    }
+
+    /**
+     * Otros DO a los que se puede unir este o mover una carga: pendientes, y los confirmados
+     * mas recientes (por si bodega finalizo el contenedor antes de terminar de cargarlo).
+     *
+     * @return array<int, array{id: string, etiqueta: string, estado: string, contenedor: ?string, clientes: string}>
+     */
+    private function otrasSalidas(SalidaOrden $orden): array
+    {
+        $repositorio = $this->container()->get(SalidaOrdenRepositoryInterface::class);
+        $ordenes = array_merge(
+            $repositorio->search(['estado' => 'pendiente']),
+            array_slice($repositorio->search(['estado' => 'confirmada']), 0, 20),
+        );
+        $ordenes = array_values(array_filter($ordenes, static fn (SalidaOrden $o) => $o->id() !== $orden->id()));
+        $clientes = $repositorio->clientesPorOrden(array_map(static fn (SalidaOrden $o) => $o->id(), $ordenes));
+
+        return array_map(static fn (SalidaOrden $o) => [
+            'id' => $o->id(),
+            'etiqueta' => $o->etiquetaDo(),
+            'estado' => $o->estado()->value,
+            'contenedor' => $o->embarque()->contenedorFormateado(),
+            'clientes' => implode(', ', $clientes[$o->id()] ?? []),
+        ], $ordenes);
     }
 
     public function historial(): string

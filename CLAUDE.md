@@ -119,6 +119,11 @@ The paper delivery form (empresa de transporte, chofer, placa, entregado por, ce
   - Bodega takes no decisions on salidas. It views, scans, finalizes and adds photos. Armar, agregar, cancelar and editing the embarque use the route filter `$planificaSalida` (operaciones/gerente/admin), and the buttons are hidden for bodega.
   - `CrearOrdenSalidaHandler` validates the container before creating anything, and stores it with the order.
 - More cargas can be added to a **pending** DO (same container): `GET|POST /salidas/{id}/agregar` reuses `salida/armar.php` with `$ordenDestino` (no container form). `AgregarCargasSalidaHandler` reserves the new LPNs, and `SalidaOrden::agregarLineas()` holds the rules: pending only, no repeated LPN, and the DO becomes consolidated (`cliente_id` NULL) if a new client comes in. The repository upserts `salida_lineas`, so scans already done are kept.
+- **Unir / sacar (one DO = one container):** on a pending DO, Trafico can unir it to another DO of the same container (`POST /salidas/{id}/unir`), or per carga "Sacar" it, either moving it to another pending DO or a new one (`mover-carga`) or returning it to bodega (`devolver-carga`).
+  - `MoverCargasSalidaHandler` moves the lines **with their scan state** (`SalidaOrden::sacarLineas()` / `recibirLineas()`). An origin left empty is cancelled with `salida_ordenes.nota` ("Unida a DO.3 / 2026", migration 062).
+  - A **confirmed** DO (finalized before the container was fully loaded) can receive only fully scanned lines. Those LPNs are consumed and their cargas synced, as in `ConfirmarSalidaHandler`.
+  - `DevolverCargaSalidaHandler` releases the LPNs back to `available`.
+  - The repository's `update()` deletes lines that are no longer in the order.
 - A DO can mix clients (consolidated): `salida_ordenes.cliente_id` is NULL then (migration 057), and set only when all LPNs belong to one client.
   - Client names come from `SalidaOrdenRepositoryInterface::clientesPorOrden()`.
   - The scan screens (web and PDA) group by carga via `avancePorCarga()`.
