@@ -16,7 +16,7 @@ final class SalidaOrden extends AggregateRoot
     public function __construct(
         private readonly Uuid $id,
         // Solo si todas las cargas son de un mismo cliente; null en una salida consolidada.
-        private readonly ?string $clienteId,
+        private ?string $clienteId,
         private readonly ?string $aduaneroIdentificador,
         private EstadoSalidaOrden $estado,
         private readonly string $creadoPorUsuarioId,
@@ -110,6 +110,39 @@ final class SalidaOrden extends AggregateRoot
             null,
             $lineas,
         );
+    }
+
+    /**
+     * Suben mas cargas al mismo contenedor: solo mientras la salida esta pendiente (bodega
+     * aun no la finalizo). Si las nuevas son de otro cliente, la salida pasa a consolidada.
+     *
+     * @param array<int, SalidaLinea> $lineas
+     * @param array<int, string> $clienteIds clientes de los LPNs que se agregan
+     */
+    public function agregarLineas(array $lineas, array $clienteIds): void
+    {
+        if ($this->estado !== EstadoSalidaOrden::PENDIENTE) {
+            throw new ValidationException("La salida {$this->etiquetaDo()} esta " . mb_strtolower($this->estado->label()) . ": ya no se le pueden agregar cargas.");
+        }
+
+        if ($lineas === []) {
+            throw new ValidationException('Seleccione al menos una carga con bultos listos para agregar.');
+        }
+
+        $existentes = array_map(static fn (SalidaLinea $l) => $l->lpnId(), $this->lineas);
+
+        foreach ($lineas as $linea) {
+            if (in_array($linea->lpnId(), $existentes, true)) {
+                throw new ValidationException("El LPN {$linea->codigoLpn()} ya esta en esta salida.");
+            }
+
+            $this->lineas[] = $linea;
+            $existentes[] = $linea->lpnId();
+        }
+
+        if ($this->clienteId !== null && array_diff(array_unique($clienteIds), [$this->clienteId]) !== []) {
+            $this->clienteId = null;
+        }
     }
 
     public function registrarEscaneo(string $codigoLpn): void

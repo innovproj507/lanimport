@@ -88,7 +88,7 @@ final class PdoSalidaOrdenRepository implements SalidaOrdenRepositoryInterface
     private function update(SalidaOrden $orden): void
     {
         $stmt = $this->connection->prepare(
-            'UPDATE salida_ordenes SET estado = :estado, confirmed_at = :confirmed_at,
+            'UPDATE salida_ordenes SET estado = :estado, confirmed_at = :confirmed_at, cliente_id = :cliente_id,
                 numero_contenedor = :numero_contenedor, numero_sello = :numero_sello, naviera_id = :naviera_id,
                 nombre_barco = :nombre_barco, fecha_cargue = :fecha_cargue, fecha_salida_etd = :fecha_salida_etd,
                 destino_final = :destino_final
@@ -99,15 +99,19 @@ final class PdoSalidaOrdenRepository implements SalidaOrdenRepositoryInterface
             ':id' => $orden->id(),
             ':estado' => $orden->estado()->value,
             ':confirmed_at' => $orden->confirmedAt()?->format('Y-m-d H:i:s'),
+            ':cliente_id' => $orden->clienteId(),
         ] + $this->parametrosEmbarque($orden));
 
+        // Lineas nuevas (cargas agregadas a una salida pendiente) se insertan; las demas se actualizan.
         $upsertLinea = $this->connection->prepare(
-            'UPDATE salida_lineas SET escaneado = :escaneado, escaneado_at = :escaneado_at
-             WHERE salida_orden_id = :salida_orden_id AND lpn_id = :lpn_id'
+            'INSERT INTO salida_lineas (id, salida_orden_id, lpn_id, escaneado, escaneado_at)
+             VALUES (:id, :salida_orden_id, :lpn_id, :escaneado, :escaneado_at)
+             ON DUPLICATE KEY UPDATE escaneado = VALUES(escaneado), escaneado_at = VALUES(escaneado_at)'
         );
 
         foreach ($orden->lineas() as $linea) {
             $upsertLinea->execute([
+                ':id' => (string) Uuid::generate(),
                 ':escaneado' => $linea->escaneado() ? 1 : 0,
                 ':escaneado_at' => $linea->escaneadoAt()?->format('Y-m-d H:i:s'),
                 ':salida_orden_id' => $orden->id(),

@@ -156,6 +156,7 @@ use Courier\Reporte\Infrastructure\Persistence\PdoResumenDashboardRepository;
 use Courier\Salida\Application\CancelarOrdenSalida\CancelarOrdenSalidaHandler;
 use Courier\Salida\Application\ConfirmarSalida\ConfirmarSalidaHandler;
 use Courier\Salida\Application\CrearOrdenSalida\CrearOrdenSalidaHandler;
+use Courier\Salida\Application\AgregarCargasSalida\AgregarCargasSalidaHandler;
 use Courier\Salida\Application\ListarOrdenesSalida\ListarOrdenesSalidaHandler;
 use Courier\Salida\Application\RegistrarEscaneoSalida\RegistrarEscaneoSalidaHandler;
 use Courier\Salida\Application\VerOrdenSalida\VerOrdenSalidaHandler;
@@ -281,6 +282,11 @@ $container->set(CrearOrdenSalidaHandler::class, fn (Container $c) => new CrearOr
     $c->get(SalidaOrdenRepositoryInterface::class),
     $c->get(UnitOfWork::class),
     $c->get(NavieraRepositoryInterface::class),
+));
+$container->set(AgregarCargasSalidaHandler::class, fn (Container $c) => new AgregarCargasSalidaHandler(
+    $c->get(LpnRepositoryInterface::class),
+    $c->get(SalidaOrdenRepositoryInterface::class),
+    $c->get(UnitOfWork::class),
 ));
 // Lectura para "Armar salida": cargas en bodega con el estado de sus bultos.
 $container->set(CargasParaSalidaInterface::class, fn (Container $c) => new PdoCargasParaSalida($c->get(PDO::class)));

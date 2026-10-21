@@ -13,10 +13,18 @@ use App\Libraries\Csrf;
 /** @var array<int, string> $seleccionadas */
 /** @var array<string, string> $embarque */
 /** @var string|null $error */
+/** @var \Courier\Salida\Domain\SalidaOrden|null $ordenDestino si viene, se agregan cargas a esa salida pendiente */
 require_once __DIR__ . '/../partials/view_helpers.php';
-$pageTitle = 'Armar salida';
-$pageSubtitle = 'Contenedor y cargas que suben; bodega las escanea al cargar';
-$backHref = '/salidas/historial';
+$ordenDestino ??= null;
+if ($ordenDestino !== null) {
+    $pageTitle = 'Agregar cargas a ' . $ordenDestino->etiquetaDo();
+    $pageSubtitle = 'Mismo contenedor: los bultos nuevos se suman a la salida y bodega los escanea';
+    $backHref = '/salidas/' . $ordenDestino->id();
+} else {
+    $pageTitle = 'Armar salida';
+    $pageSubtitle = 'Contenedor y cargas que suben; bodega las escanea al cargar';
+    $backHref = '/salidas/historial';
+}
 require __DIR__ . '/../partials/header.php';
 
 $valor = static fn (string $campo): string => htmlspecialchars($embarque[$campo] ?? '');
@@ -29,9 +37,19 @@ $listas = count(array_filter($cargas, static fn (array $c) => $c['listos'] > 0))
     <div class="bg-red-500/10 text-red-600 text-sm rounded-lg px-4 py-3 mb-4 border border-red-500/30"><?= htmlspecialchars($error) ?></div>
 <?php endif; ?>
 
-<form method="post" action="/salidas" id="form-armar-salida">
+<form method="post" action="<?= $ordenDestino !== null ? '/salidas/' . htmlspecialchars($ordenDestino->id()) . '/agregar' : '/salidas' ?>" id="form-armar-salida">
     <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
 
+    <?php if ($ordenDestino !== null): $progresoDestino = $ordenDestino->progreso(); ?>
+    <div class="bg-white rounded-xl shadow-sm p-6 mb-6">
+        <?= card_header('truck', 'Salida ' . $ordenDestino->etiquetaDo(), 'sky') ?>
+        <div class="flex flex-wrap gap-x-8 gap-y-2 text-sm text-zinc-700">
+            <span>Contenedor: <strong class="text-black font-mono"><?= htmlspecialchars($ordenDestino->embarque()->contenedorFormateado() ?? '—') ?></strong></span>
+            <span>Naviera: <strong class="text-black"><?= htmlspecialchars($ordenDestino->embarque()->navieraNombre ?? '—') ?></strong></span>
+            <span>Ya lleva: <strong class="text-black"><?= $progresoDestino['total'] ?></strong> bultos (<?= $progresoDestino['escaneadas'] ?> escaneados)</span>
+        </div>
+    </div>
+    <?php else: ?>
     <div class="bg-white rounded-xl shadow-sm p-6 mb-6">
         <?= card_header('truck', '1. Contenedor', 'sky') ?>
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -71,10 +89,11 @@ $listas = count(array_filter($cargas, static fn (array $c) => $c['listos'] > 0))
         </div>
         <p class="text-xs text-zinc-500 mt-3">Se puede completar o corregir despues, mientras la salida no este cancelada.</p>
     </div>
+    <?php endif; ?>
 
     <div class="bg-white rounded-xl shadow-sm p-6 mb-4">
         <div class="flex flex-wrap items-start justify-between gap-4 mb-4">
-            <?= card_header('box', '2. Cargas que suben al contenedor', 'amber') ?>
+            <?= card_header('box', $ordenDestino !== null ? 'Cargas que se agregan al contenedor' : '2. Cargas que suben al contenedor', 'amber') ?>
             <div class="flex flex-wrap items-center gap-3">
                 <input type="search" id="armar-buscar" placeholder="Buscar cliente, marca, tracking o compania..."
                        class="w-72 rounded-lg border border-zinc-300 bg-white text-black px-3 py-2 text-sm focus:ring-2 focus:ring-amber-400 focus:outline-none">
@@ -208,7 +227,7 @@ $listas = count(array_filter($cargas, static fn (array $c) => $c['listos'] > 0))
             </div>
             <button type="submit" id="armar-crear" disabled
                     class="inline-flex items-center gap-2 bg-amber-500 text-black rounded-lg px-6 py-2.5 font-medium hover:bg-amber-400 transition disabled:opacity-40 disabled:cursor-not-allowed">
-                <?= icon_small('check') ?><span>Crear salida (DO)</span>
+                <?= icon_small('check') ?><span><?= $ordenDestino !== null ? 'Agregar a ' . htmlspecialchars($ordenDestino->numeroDo()) : 'Crear salida (DO)' ?></span>
             </button>
         </div>
     </div>
@@ -287,7 +306,7 @@ document.addEventListener('DOMContentLoaded', function () {
     soloListas.addEventListener('change', filtrar);
     document.getElementById('form-armar-salida').addEventListener('submit', function () {
         crear.disabled = true;
-        crear.querySelector('span').textContent = 'Creando...';
+        crear.querySelector('span').textContent = <?= $ordenDestino !== null ? "'Agregando...'" : "'Creando...'" ?>;
     });
 
     totales();

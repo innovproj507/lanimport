@@ -31,6 +31,9 @@ use Courier\Salida\Application\CancelarOrdenSalida\CancelarOrdenSalidaHandler;
 use Courier\Salida\Application\ConfirmarSalida\ConfirmarSalidaCommand;
 use Courier\Salida\Application\ConfirmarSalida\ConfirmarSalidaHandler;
 use Courier\Salida\Application\CrearOrdenSalida\CrearOrdenSalidaCommand;
+use Courier\Salida\Application\AgregarCargasSalida\AgregarCargasSalidaCommand;
+use Courier\Salida\Application\AgregarCargasSalida\AgregarCargasSalidaHandler;
+use Courier\Salida\Domain\SalidaOrden;
 use Courier\Salida\Application\CrearOrdenSalida\CrearOrdenSalidaHandler;
 use Courier\Salida\Application\ListarOrdenesSalida\ListarOrdenesSalidaHandler;
 use Courier\Salida\Application\ListarOrdenesSalida\ListarOrdenesSalidaQuery;
@@ -55,8 +58,9 @@ final class SalidaController extends BaseController
     /**
      * @param array<int, string> $seleccionadas cargas marcadas (para no perderlas si hay un error)
      * @param array<string, string> $embarque datos del contenedor ya escritos
+     * @param SalidaOrden|null $ordenDestino si viene, se agregan cargas a esa salida en vez de crear otra
      */
-    private function renderArmar(?string $error, array $seleccionadas, array $embarque): string
+    private function renderArmar(?string $error, array $seleccionadas, array $embarque, ?SalidaOrden $ordenDestino = null): string
     {
         if ($error !== null) {
             $this->response->setStatusCode(422);
@@ -68,8 +72,60 @@ final class SalidaController extends BaseController
             'navieras' => $this->container()->get(ListarNavierasHandler::class)->handle(new ListarNavierasQuery(true)),
             'seleccionadas' => $seleccionadas,
             'embarque' => $embarque,
+            'ordenDestino' => $ordenDestino,
             'error' => $error,
         ]);
+    }
+
+    /** Agregar cargas a una salida pendiente: la misma lista de "Armar salida", sin el contenedor. */
+    public function agregarForm(string $id): RedirectResponse|string
+    {
+        $orden = $this->container()->get(SalidaOrdenRepositoryInterface::class)->findById($id);
+
+        if ($orden === null) {
+            $this->response->setStatusCode(404);
+
+            return 'Orden de salida no encontrada.';
+        }
+
+        if ($orden->estado()->value !== 'pendiente') {
+            $_SESSION['salida_error'] = "La salida {$orden->etiquetaDo()} esta " . mb_strtolower($orden->estado()->label()) . ": ya no se le pueden agregar cargas.";
+
+            return redirect()->to('/salidas/' . $orden->id());
+        }
+
+        return $this->renderArmar(null, [], [], $orden);
+    }
+
+    public function agregar(string $id): RedirectResponse|string
+    {
+        $orden = $this->container()->get(SalidaOrdenRepositoryInterface::class)->findById($id);
+
+        if ($orden === null) {
+            $this->response->setStatusCode(404);
+
+            return 'Orden de salida no encontrada.';
+        }
+
+        $cargaIds = $this->request->getPost('carga_ids') ?? [];
+        $cargaIds = is_array($cargaIds) ? array_values(array_unique(array_map('strval', $cargaIds))) : [];
+        $cajaIds = $this->request->getPost('caja_ids') ?? [];
+        $cajaIds = is_array($cajaIds) ? array_values(array_unique(array_map('strval', $cajaIds))) : [];
+
+        if (!Csrf::verify($this->request->getPost('_csrf'))) {
+            return $this->renderArmar('Sesion expirada, intente de nuevo.', array_merge($cargaIds, $cajaIds), [], $orden);
+        }
+
+        try {
+            $lpnIds = array_merge($this->container()->get(CargasParaSalidaInterface::class)->lpnsListos($cargaIds), $cajaIds);
+            $bultos = $this->container()->get(AgregarCargasSalidaHandler::class)->handle(new AgregarCargasSalidaCommand($orden->id(), $lpnIds));
+
+            $_SESSION['salida_mensaje'] = "Se agregaron {$bultos} bultos (" . count($cargaIds) . ' carga(s)' . ($cajaIds !== [] ? ' y ' . count($cajaIds) . ' caja(s) reempacada(s)' : '') . ") a {$orden->etiquetaDo()}. Bodega debe escanearlos antes de finalizar.";
+
+            return redirect()->to('/salidas/' . $orden->id());
+        } catch (ValidationException $e) {
+            return $this->renderArmar($e->getMessage(), array_merge($cargaIds, $cajaIds), [], $orden);
+        }
     }
 
     public function store(): RedirectResponse|string
