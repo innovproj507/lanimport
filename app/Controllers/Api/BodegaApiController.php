@@ -9,7 +9,6 @@ use Courier\Auth\Infrastructure\Security\SessionManager;
 use Courier\Carga\Domain\CargaRepositoryInterface;
 use Courier\Cliente\Domain\ClienteRepositoryInterface;
 use Courier\Evidencia\Domain\FotoEvidenciaRepositoryInterface;
-use Courier\Evidencia\Domain\TipoEvidencia;
 use Courier\Lpn\Application\ConfirmarRecepcionLpn\ConfirmarRecepcionLpnCommand;
 use Courier\Lpn\Application\ConfirmarRecepcionLpn\ConfirmarRecepcionLpnHandler;
 use Courier\Lpn\Application\ListarUbicaciones\ListarUbicacionesHandler;
@@ -172,8 +171,12 @@ final class BodegaApiController extends BaseApiController
                 'escaneado' => $l->escaneado(),
             ], $orden->lineas());
             // Para escanear carga por carga en la PDA.
-            $datos['cargas'] = $this->container()->get(SalidaOrdenRepositoryInterface::class)->avancePorCarga($orden->id());
-            $datos['fotos'] = count($this->container()->get(FotoEvidenciaRepositoryInterface::class)->listar(TipoEvidencia::Salida, $orden->id()));
+            // Con las fotos que ya tiene cada carga en esta salida (las fotos son por carga del cliente).
+            $fotos = $this->container()->get(FotoEvidenciaRepositoryInterface::class)->contarSalidaPorCarga($orden->id());
+            $datos['cargas'] = array_map(
+                static fn (array $c) => $c + ['fotos' => $fotos[$c['cargaId']] ?? 0],
+                $this->container()->get(SalidaOrdenRepositoryInterface::class)->avancePorCarga($orden->id()),
+            );
 
             return $this->success($datos);
         } catch (Throwable $e) {

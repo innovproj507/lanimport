@@ -25,6 +25,13 @@ interface SalidaOrdenRepositoryInterface
      */
     public function avancePorCarga(string $ordenId): array;
 
+    /**
+     * Salidas no canceladas que llevan bultos (LPNs) de la carga, la mas reciente primero.
+     *
+     * @return array<int, array{id: string, etiquetaDo: string}>
+     */
+    public function ordenesConCarga(string $cargaId): array;
+
     /** Ultima salida confirmada que llevo bultos (LPNs) de la carga, o null si aun no sale. */
     public function ultimaConfirmadaConCarga(string $cargaId): ?SalidaOrden;
 

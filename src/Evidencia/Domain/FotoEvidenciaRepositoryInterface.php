@@ -13,11 +13,19 @@ interface FotoEvidenciaRepositoryInterface
     public function delete(string $id): void;
 
     /**
-     * Fotos de un momento (recepcion de una carga o salida de una orden), las mas recientes primero.
+     * Fotos de recepcion de una carga, o de una salida (todas sus cargas, o solo $cargaId).
+     * Las mas recientes primero.
      *
-     * @return array<int, array{id: string, ruta: string, usuario: ?string, fecha: string}>
+     * @return array<int, array{id: string, ruta: string, usuario: ?string, fecha: string, cargaId: ?string}>
      */
-    public function listar(TipoEvidencia $tipo, string $referenciaId): array;
+    public function listar(TipoEvidencia $tipo, string $referenciaId, ?string $cargaId = null): array;
+
+    /**
+     * Fotos de salida de una carga, en todas las salidas en que subio.
+     *
+     * @return array<int, array{id: string, ruta: string, usuario: ?string, fecha: string, cargaId: ?string, salidaOrdenId: string, etiquetaDo: string}>
+     */
+    public function listarSalidasDeCarga(string $cargaId): array;
 
     /**
      * Cuantas fotos de recepcion tiene cada carga.
@@ -26,4 +34,11 @@ interface FotoEvidenciaRepositoryInterface
      * @return array<string, int>
      */
     public function contarRecepcionPorCargas(array $cargaIds): array;
+
+    /**
+     * Cuantas fotos tiene cada carga en una salida.
+     *
+     * @return array<string, int>
+     */
+    public function contarSalidaPorCarga(string $salidaOrdenId): array;
 }

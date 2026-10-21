@@ -60,25 +60,72 @@ final class PdoFotoEvidenciaRepository implements FotoEvidenciaRepositoryInterfa
         $this->connection->prepare('DELETE FROM fotos_evidencia WHERE id = :id')->execute([':id' => $id]);
     }
 
-    public function listar(TipoEvidencia $tipo, string $referenciaId): array
+    public function listar(TipoEvidencia $tipo, string $referenciaId, ?string $cargaId = null): array
     {
         $columna = $tipo === TipoEvidencia::Recepcion ? 'carga_id' : 'salida_orden_id';
+        $parametros = [':tipo' => $tipo->value, ':referencia' => $referenciaId];
+        $filtroCarga = '';
+
+        if ($tipo === TipoEvidencia::Salida && $cargaId !== null) {
+            $filtroCarga = ' AND f.carga_id = :carga';
+            $parametros[':carga'] = $cargaId;
+        }
 
         $stmt = $this->connection->prepare(
-            "SELECT f.id, f.ruta_archivo, f.created_at, u.nombre AS usuario
+            "SELECT f.id, f.ruta_archivo, f.created_at, f.carga_id, u.nombre AS usuario
              FROM fotos_evidencia f
              LEFT JOIN usuarios u ON u.id = f.usuario_id
-             WHERE f.tipo = :tipo AND f.{$columna} = :referencia
+             WHERE f.tipo = :tipo AND f.{$columna} = :referencia{$filtroCarga}
              ORDER BY f.created_at DESC, f.id"
         );
-        $stmt->execute([':tipo' => $tipo->value, ':referencia' => $referenciaId]);
+        $stmt->execute($parametros);
 
-        return array_map(static fn (array $row) => [
+        return array_map(self::fila(...), $stmt->fetchAll());
+    }
+
+    public function listarSalidasDeCarga(string $cargaId): array
+    {
+        $stmt = $this->connection->prepare(
+            "SELECT f.id, f.ruta_archivo, f.created_at, f.carga_id, f.salida_orden_id, u.nombre AS usuario,
+                    s.do_numero, s.do_anio, s.codigo
+             FROM fotos_evidencia f
+             JOIN salida_ordenes s ON s.id = f.salida_orden_id
+             LEFT JOIN usuarios u ON u.id = f.usuario_id
+             WHERE f.tipo = 'salida' AND f.carga_id = :carga
+             ORDER BY f.created_at DESC, f.id"
+        );
+        $stmt->execute([':carga' => $cargaId]);
+
+        return array_map(static fn (array $row) => self::fila($row) + [
+            'salidaOrdenId' => (string) $row['salida_orden_id'],
+            'etiquetaDo' => $row['do_numero'] !== null ? "DO.{$row['do_numero']} / {$row['do_anio']}" : (string) $row['codigo'],
+        ], $stmt->fetchAll());
+    }
+
+    public function contarSalidaPorCarga(string $salidaOrdenId): array
+    {
+        $stmt = $this->connection->prepare(
+            "SELECT carga_id, COUNT(*) FROM fotos_evidencia
+             WHERE tipo = 'salida' AND salida_orden_id = :orden AND carga_id IS NOT NULL GROUP BY carga_id"
+        );
+        $stmt->execute([':orden' => $salidaOrdenId]);
+
+        return array_map('intval', $stmt->fetchAll(PDO::FETCH_KEY_PAIR));
+    }
+
+    /**
+     * @param array<string, mixed> $row
+     * @return array{id: string, ruta: string, usuario: ?string, fecha: string, cargaId: ?string}
+     */
+    private static function fila(array $row): array
+    {
+        return [
             'id' => (string) $row['id'],
             'ruta' => (string) $row['ruta_archivo'],
             'usuario' => $row['usuario'] !== null ? (string) $row['usuario'] : null,
             'fecha' => (string) $row['created_at'],
-        ], $stmt->fetchAll());
+            'cargaId' => $row['carga_id'] !== null ? (string) $row['carga_id'] : null,
+        ];
     }
 
     public function contarRecepcionPorCargas(array $cargaIds): array

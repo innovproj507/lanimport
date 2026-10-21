@@ -75,6 +75,13 @@ This is the single composition root. It builds a lazy-singleton `Courier\Shared\
 
 The paper delivery form (empresa de transporte, chofer, placa, entregado por, cedula, tipo de mercancia) is part of the carga itself: the `Carga\Domain\ValueObject\DatosEntrega` value object is stored in the `entrega_*` columns of `cargas` and filled in the "Datos de entrega" section of the Ingreso/Editar forms (`carga/_datos_entrega.php`). "Verificado por" is the user who registered the carga. `GET /cargas/{id}/comprobante` prints the signable comprobante. The former actas module, its table and the `recepcion` role were removed (migration 053).
 
+### Numero de tracking
+
+- Cargas use `LAN-AAAA-XXXXXX` (`Carga\Domain\ValueObject\TrackingNumero::PREFIJO`).
+- The former prefix was `CRX`. Migration 060 (`060_tracking_crx_a_lan.php`) renamed every carga, keeping the rest of the number, and regenerated its barcode image.
+- A CRX number from an old email or printed label still works: `TrackingNumero` and `TrackingNumero::normalizarBusqueda()` (used by the carga and inventory searches) translate it to LAN, and `'`/`?`/`_` scanner separators become `-`.
+- LPN codes only use the 6-character suffix (`LPN-XXXXXX-N`), so they never changed.
+
 ### Estado de la carga sigue a los bultos
 
 - A new carga stays `ingresado` (no longer jumps to `en_bodega` on registration).
@@ -136,11 +143,18 @@ The paper delivery form (empresa de transporte, chofer, placa, entregado por, ce
 
 ### Fotos de evidencia (recepcion y salida)
 
-- Table `fotos_evidencia` (migration 059): `tipo` = `recepcion` (linked to `carga_id`) or `salida` (linked to `salida_orden_id`). Files live in `public/uploads/evidencias/AAAA/MM/<uuid>.<ext>` (`Evidencia\Infrastructure\Storage\FotoEvidenciaStorage`).
-- One API for PDA and web: `GET|POST bodega/api/{cargas|salidas}/{id}/fotos` (`Api\FotoEvidenciaApiController`, multipart field `foto`, CSRF in `X-CSRF-Token`). `SubirFotoEvidenciaHandler` accepts only real images (getimagesize: JPG/PNG/WEBP, max 10 MB).
+- Photos are **per client carga** (all its bultos/pallets from several angles), never per barcode/LPN.
+- Table `fotos_evidencia` (migration 059): `tipo` = `recepcion` (`carga_id`) or `salida` (`salida_orden_id` **and** `carga_id`: that carga when loaded into that DO). Files live in `public/uploads/evidencias/AAAA/MM/<uuid>.<ext>` (`Evidencia\Infrastructure\Storage\FotoEvidenciaStorage`).
+- One API for PDA and web (`Api\FotoEvidenciaApiController`, multipart field `foto`, CSRF in `X-CSRF-Token`):
+  - `GET|POST bodega/api/cargas/{cargaId}/fotos`: recepcion photos.
+  - `GET|POST bodega/api/salidas/{ordenId}/fotos?carga={cargaId}`: that carga's photos in that salida. The carga is required and must be in the DO. Reempaque boxes (`caja-*` groups) get no photos.
+- `SubirFotoEvidenciaHandler` accepts only real images (getimagesize: JPG/PNG/WEBP, max 10 MB).
 - `public/assets/js/fotos-evidencia.js` shrinks each photo on the device (longest side 1600 px, JPEG 0.8) before uploading; both the PDA and the web gallery use it.
-- PDA: each carga in Recepcion has a "📷 n" button, and each salida has a "Fotos de evidencia" section, both open `#/fotos/{cargas|salidas}/{id}/{titulo}` (Tomar foto / Galeria).
-- Web: gallery partial `evidencia/_fotos.php` in the carga detail (recepcion) and the salida page. Upload: operaciones/bodega/gerente/admin. Delete (`POST fotos-evidencia/{id}/eliminar`): gerente/admin only.
+- PDA: a "📷 n" button on each carga in Recepcion (`#/fotos/cargas/{cargaId}/{titulo}`) and on each carga of a salida (`#/fotos/salidas/{ordenId}/{cargaId}/{titulo}`), with Tomar foto / Galeria.
+- Web: the partial `evidencia/_fotos.php` shows groups.
+  - Carga detail: Recepcion, plus one group per salida the carga is in (`SalidaOrdenRepositoryInterface::ordenesConCarga()`).
+  - Salida page: one group per carga.
+  - Upload: operaciones/bodega/gerente/admin. Delete (`POST fotos-evidencia/{id}/eliminar`, returns to the page it came from): gerente/admin only.
 
 ### Carga masiva (Excel/CSV)
 

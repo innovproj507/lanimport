@@ -11,6 +11,7 @@ final class SubirFotoEvidenciaCommand implements CommandInterface
     /**
      * @param string $tipo 'recepcion' (referencia = carga) o 'salida' (referencia = orden de salida)
      * @param string $archivoTemporal tmp_name de la subida
+     * @param string|null $cargaId en una salida, la carga del cliente que se fotografio (obligatoria)
      */
     public function __construct(
         public readonly string $tipo,
@@ -18,6 +19,7 @@ final class SubirFotoEvidenciaCommand implements CommandInterface
         public readonly string $archivoTemporal,
         public readonly int $tamano,
         public readonly ?string $usuarioId,
+        public readonly ?string $cargaId = null,
     ) {
     }
 }

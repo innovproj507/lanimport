@@ -6,13 +6,13 @@
  *  - Enter / Tab (por key o por keyCode, que algunas PDA envian como "Unidentified").
  *  - Salto de linea o tabulador escrito dentro del valor.
  *  - Sin sufijo: si el texto ya tiene forma de codigo del sistema (LPN-XXXXXX-N o
- *    CRX-AAAA-XXXXXX) y el lector dejo de escribir, se envia solo.
+ *    LAN-AAAA-XXXXXX, o CRX-AAAA-XXXXXX de cargas anteriores) y el lector dejo de escribir, se envia solo.
  *
  * Uso: LectorCodigos.conectar(input, function (codigo) { ... }, { autoEnviar: function () { return true; } })
  */
 var LectorCodigos = (function () {
     // Con separadores que el lector puede cambiar segun la distribucion del teclado (- ' ? espacio).
-    var FORMATO_CODIGO = /^\s*(LPN.?[0-9A-F]{6}.?\d{1,4}|CRX.?\d{4}.?[0-9A-F]{6})\s*$/i;
+    var FORMATO_CODIGO = /^\s*(LPN.?[0-9A-F]{6}.?\d{1,4}|(?:LAN|CRX).?\d{4}.?[0-9A-F]{6})\s*$/i;
     var PAUSA_MS = 450;
 
     function conectar(input, alLeer, opciones) {

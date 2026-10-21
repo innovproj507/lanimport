@@ -17,7 +17,7 @@ use Courier\Shared\Domain\Exception\ValidationException;
 use Courier\Shared\Domain\ValueObject\Uuid;
 
 /**
- * Guarda una foto de evidencia de la recepcion de una carga o de una salida.
+ * Guarda una foto de evidencia de una carga: al recibirla, o al subirla al contenedor de una salida.
  * La app la reduce antes de subirla; aqui solo se acepta si es una imagen real.
  */
 final class SubirFotoEvidenciaHandler implements CommandHandlerInterface
@@ -45,8 +45,21 @@ final class SubirFotoEvidenciaHandler implements CommandHandlerInterface
             throw new NotFoundException('Carga no encontrada.');
         }
 
-        if ($tipo === TipoEvidencia::Salida && $this->salidas->findById($command->referenciaId) === null) {
-            throw new NotFoundException('Orden de salida no encontrada.');
+        if ($tipo === TipoEvidencia::Salida) {
+            if ($this->salidas->findById($command->referenciaId) === null) {
+                throw new NotFoundException('Orden de salida no encontrada.');
+            }
+
+            // Las fotos de salida son por carga del cliente, y de una carga que va en esa salida.
+            $cargasDeLaSalida = array_column($this->salidas->avancePorCarga($command->referenciaId), 'cargaId');
+
+            if ($command->cargaId === null || $command->cargaId === '') {
+                throw new ValidationException('Indique de que carga es la foto.');
+            }
+
+            if (str_starts_with($command->cargaId, 'caja-') || !in_array($command->cargaId, $cargasDeLaSalida, true)) {
+                throw new ValidationException('Esa carga no va en esta salida.');
+            }
         }
 
         if ($command->tamano <= 0 || !is_file($command->archivoTemporal)) {
@@ -69,7 +82,7 @@ final class SubirFotoEvidenciaHandler implements CommandHandlerInterface
 
         $foto = $tipo === TipoEvidencia::Recepcion
             ? FotoEvidencia::deRecepcion($id, $command->referenciaId, $ruta, $command->usuarioId)
-            : FotoEvidencia::deSalida($id, $command->referenciaId, $ruta, $command->usuarioId);
+            : FotoEvidencia::deSalida($id, $command->referenciaId, (string) $command->cargaId, $ruta, $command->usuarioId);
 
         try {
             $this->fotos->save($foto);

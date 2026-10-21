@@ -267,7 +267,8 @@ final class PdoCargaRepository implements CargaRepositoryInterface
         $page = max(1, $page);
         $perPage = max(1, $perPage);
         $offset = ($page - 1) * $perPage;
-        $term = trim($term);
+        // Un tracking viejo (CRX-...) busca su numero actual (LAN-...).
+        $term = TrackingNumero::normalizarBusqueda(trim($term));
 
         $where = '1=1';
         $params = [];

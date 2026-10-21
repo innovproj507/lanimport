@@ -200,6 +200,24 @@ final class PdoSalidaOrdenRepository implements SalidaOrdenRepositoryInterface
         return $porCarga;
     }
 
+    public function ordenesConCarga(string $cargaId): array
+    {
+        $stmt = $this->connection->prepare(
+            "SELECT DISTINCT so.id, so.do_numero, so.do_anio, so.codigo, so.created_at
+             FROM salida_ordenes so
+             JOIN salida_lineas sl ON sl.salida_orden_id = so.id
+             JOIN lpns l ON l.id = sl.lpn_id
+             WHERE l.carga_id = :carga_id AND so.estado <> 'cancelada'
+             ORDER BY so.created_at DESC"
+        );
+        $stmt->execute([':carga_id' => $cargaId]);
+
+        return array_map(static fn (array $r) => [
+            'id' => (string) $r['id'],
+            'etiquetaDo' => $r['do_numero'] !== null ? "DO.{$r['do_numero']} / {$r['do_anio']}" : (string) $r['codigo'],
+        ], $stmt->fetchAll());
+    }
+
     public function ultimaConfirmadaConCarga(string $cargaId): ?SalidaOrden
     {
         $stmt = $this->connection->prepare(

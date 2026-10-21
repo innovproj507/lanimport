@@ -318,9 +318,23 @@ document.addEventListener('DOMContentLoaded', function () {
 </div>
 
 <?php
-$fotosTitulo = 'Fotos de recepcion';
-$fotosAyuda = 'Estado en que llego la mercancia. Bodega las toma desde la app movil al recibir; tambien se pueden agregar aqui.';
-$fotosUrlSubir = '/bodega/api/cargas/' . $view->cargaId . '/fotos';
+// Fotos de toda la carga (sus bultos/paletas desde varios angulos): al recibirla y en cada salida.
+$fotosTitulo = 'Fotos de la carga';
+$fotosAyuda = 'Bodega las toma desde la app movil al recibir la carga y al subirla al contenedor; tambien se pueden agregar aqui.';
+$fotosGrupos = [[
+    'titulo' => 'Recepcion',
+    'subtitulo' => 'Estado en que llego la mercancia',
+    'urlSubir' => '/bodega/api/cargas/' . $view->cargaId . '/fotos',
+    'fotos' => $fotos['recepcion'],
+]];
+foreach ($fotos['salidas'] as $salidaFotos) {
+    $fotosGrupos[] = [
+        'titulo' => 'Salida ' . $salidaFotos['etiquetaDo'],
+        'subtitulo' => 'Al subirla al contenedor',
+        'urlSubir' => '/bodega/api/salidas/' . $salidaFotos['salidaOrdenId'] . '/fotos?carga=' . $view->cargaId,
+        'fotos' => $salidaFotos['fotos'],
+    ];
+}
 $fotosVolver = '/cargas/' . $view->cargaId;
 require __DIR__ . '/../evidencia/_fotos.php';
 ?>

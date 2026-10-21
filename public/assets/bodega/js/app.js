@@ -367,11 +367,9 @@
                 + '  <p id="sal-aviso" class="aviso oculto"></p>'
                 + (orden.estado === 'pendiente' ? '  <button type="button" id="sal-finalizar" class="btn btn-primario btn-bloque" disabled>Finalizar salida</button>' : '')
                 + '</section>'
-                + '<section class="tarjeta"><h2>Cargas de la salida</h2><div id="sal-cargas" class="lista"></div></section>'
-                + '<section class="tarjeta"><h2>Fotos de evidencia <span class="contador">' + (orden.fotos || 0) + '</span></h2>'
-                + '  <p class="sub">Contenedor, sello y carga estibada.</p>'
-                + '  <a class="btn btn-claro btn-bloque" href="#' + rutaFotos('salidas', orden.id, orden.do) + '">📷 Tomar fotos de la salida</a>'
-                + '</section>'
+                + '<section class="tarjeta"><h2>Cargas de la salida</h2>'
+                + '  <p class="sub">📷 Fotos de la carga de cada cliente al subirla al contenedor.</p>'
+                + '  <div id="sal-cargas" class="lista"></div></section>'
             );
 
             var avisoSal = document.getElementById('sal-aviso');
@@ -379,7 +377,7 @@
             var escaneado = {};
             orden.lineas.forEach(function (l) { escaneado[l.codigo] = l.escaneado; });
 
-            // Carga a la que pertenece un codigo (para avisar "CRX-...: 5 de 11").
+            // Carga a la que pertenece un codigo (para avisar "LAN-...: 5 de 11").
             function cargaDe(codigo) {
                 return orden.cargas.find(function (c) { return c.codigos.indexOf(codigo) !== -1; });
             }
@@ -399,7 +397,10 @@
                         return '<div class="fila' + (completa ? ' fila-completa' : '') + '">'
                             + '<div class="fila-principal"><strong>' + esc(x.c.tracking) + '</strong><span>' + esc(x.c.cliente) + (x.c.marca ? ' · ' + esc(x.c.marca) : '') + '</span>'
                             + (completa ? '<small>Completa</small>' : '<small>Faltan: ' + x.pendientes.map(esc).join(', ') + '</small>') + '</div>'
-                            + '<div class="fila-progreso">' + barraProgreso(x.listos, x.c.codigos.length) + '</div>'
+                            + '<div class="fila-progreso">' + barraProgreso(x.listos, x.c.codigos.length)
+                            // Las cajas reempacadas no tienen carga propia: las fotos son por carga del cliente.
+                            + (x.c.cargaId.indexOf('caja-') === 0 ? '' : '<a class="btn-foto" href="#' + rutaFotos('salidas', orden.id, x.c.tracking + ' · ' + x.c.cliente, x.c.cargaId) + '">📷 ' + (x.c.fotos || 0) + '</a>')
+                            + '</div>'
                             + '</div>';
                     }).join('');
 
@@ -597,24 +598,29 @@
 
     // ---------- fotos de evidencia ----------
 
-    /** #/fotos/{cargas|salidas}/{id}/{titulo}: el titulo (tracking o DO) solo es para mostrarlo. */
-    function rutaFotos(recurso, id, titulo) {
-        return '/fotos/' + recurso + '/' + encodeURIComponent(id) + '/' + encodeURIComponent(titulo || '');
+    /**
+     * Fotos de la carga de un cliente: #/fotos/cargas/{cargaId}/{titulo} (recepcion) o
+     * #/fotos/salidas/{ordenId}/{cargaId}/{titulo} (al subirla al contenedor). El titulo solo se muestra.
+     */
+    function rutaFotos(recurso, id, titulo, cargaId) {
+        return '/fotos/' + recurso + '/' + encodeURIComponent(id) + (cargaId ? '/' + encodeURIComponent(cargaId) : '') + '/' + encodeURIComponent(titulo || '');
     }
 
     /**
-     * Fotos de la recepcion de una carga o de una salida: tomar con la camara (o elegir de la
-     * galeria), se reducen en el equipo y se suben una por una (js/fotos-evidencia.js).
+     * Fotos de toda la carga del cliente (sus bultos/paletas desde varios angulos, no una por etiqueta):
+     * tomar con la camara o elegir de la galeria; se reducen en el equipo y se suben una por una
+     * (js/fotos-evidencia.js).
      */
-    function vistaFotos(recurso, id, titulo) {
+    function vistaFotos(recurso, id, titulo, cargaId) {
         var esSalida = recurso === 'salidas';
         var volver = esSalida ? '/salidas/' + encodeURIComponent(id) : '/recepcion';
-        var url = window.BLAN_CONFIG.apiBase + '/' + recurso + '/' + encodeURIComponent(id) + '/fotos';
+        var ruta = '/' + recurso + '/' + encodeURIComponent(id) + '/fotos' + (esSalida ? '?carga=' + encodeURIComponent(cargaId) : '');
+        var url = window.BLAN_CONFIG.apiBase + ruta;
 
         html(
-            cabecera(esSalida ? 'Fotos de la salida' : 'Fotos de recepcion', volver)
+            cabecera(esSalida ? 'Fotos al cargar' : 'Fotos de recepcion', volver)
             + '<section class="tarjeta">'
-            + '  <p class="sub">' + esc(titulo) + (esSalida ? ' · contenedor, sello y carga estibada' : ' · estado en que llego la mercancia') + '</p>'
+            + '  <p class="sub"><strong>' + esc(titulo) + '</strong><br>' + (esSalida ? 'La carga del cliente al subirla al contenedor' : 'Estado en que llego la mercancia') + ': tome varias fotos desde diferentes angulos.</p>'
             + '  <div class="fotos-acciones">'
             + '    <label class="btn btn-primario">📷 Tomar foto<input id="foto-camara" type="file" accept="image/*" capture="environment" class="oculto"></label>'
             + '    <label class="btn btn-claro">🖼 Galeria<input id="foto-galeria" type="file" accept="image/*" multiple class="oculto"></label>'
@@ -666,7 +672,7 @@
         document.getElementById('foto-camara').addEventListener('change', function () { subir(this); });
         document.getElementById('foto-galeria').addEventListener('change', function () { subir(this); });
 
-        window.Api.get('/' + recurso + '/' + encodeURIComponent(id) + '/fotos').then(pintar, function (error) {
+        window.Api.get(ruta).then(pintar, function (error) {
             document.getElementById('fotos-lista').innerHTML = '<p class="vacio">' + esc(error.message) + '</p>';
         });
     }
@@ -682,10 +688,13 @@
 
         var salida = ruta.match(/^\/salidas\/(.+)$/);
         var reempaque = ruta.match(/^\/reempaques\/(.+)$/);
-        var fotos = ruta.match(/^\/fotos\/(cargas|salidas)\/([^/]+)\/?(.*)$/);
+        var fotosCarga = ruta.match(/^\/fotos\/cargas\/([^/]+)\/?(.*)$/);
+        var fotosSalida = ruta.match(/^\/fotos\/salidas\/([^/]+)\/([^/]+)\/?(.*)$/);
 
-        if (fotos) {
-            vistaFotos(fotos[1], decodeURIComponent(fotos[2]), decodeURIComponent(fotos[3]));
+        if (fotosCarga) {
+            vistaFotos('cargas', decodeURIComponent(fotosCarga[1]), decodeURIComponent(fotosCarga[2]));
+        } else if (fotosSalida) {
+            vistaFotos('salidas', decodeURIComponent(fotosSalida[1]), decodeURIComponent(fotosSalida[3]), decodeURIComponent(fotosSalida[2]));
         } else if (ruta === '/recepcion') {
             vistaRecepcion();
         } else if (ruta === '/consulta') {

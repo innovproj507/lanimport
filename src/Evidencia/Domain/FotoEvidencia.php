@@ -8,8 +8,9 @@ use Courier\Shared\Domain\ValueObject\Uuid;
 use DateTimeImmutable;
 
 /**
- * Foto de evidencia: de una carga al recibirla en bodega, o de una orden de salida
- * al cargar el contenedor. Solo guarda la ruta del archivo; la imagen esta en disco.
+ * Foto de evidencia de la carga de un cliente (todos sus bultos/paletas, desde varios angulos;
+ * no una por etiqueta): al recibirla en bodega, o al subirla al contenedor de una salida
+ * (entonces lleva tambien la orden). Solo guarda la ruta del archivo; la imagen esta en disco.
  */
 final class FotoEvidencia
 {
@@ -29,9 +30,9 @@ final class FotoEvidencia
         return new self($id, TipoEvidencia::Recepcion, $cargaId, null, $rutaArchivo, $usuarioId, new DateTimeImmutable());
     }
 
-    public static function deSalida(Uuid $id, string $salidaOrdenId, string $rutaArchivo, ?string $usuarioId): self
+    public static function deSalida(Uuid $id, string $salidaOrdenId, string $cargaId, string $rutaArchivo, ?string $usuarioId): self
     {
-        return new self($id, TipoEvidencia::Salida, null, $salidaOrdenId, $rutaArchivo, $usuarioId, new DateTimeImmutable());
+        return new self($id, TipoEvidencia::Salida, $cargaId, $salidaOrdenId, $rutaArchivo, $usuarioId, new DateTimeImmutable());
     }
 
     public static function reconstituir(

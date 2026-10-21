@@ -96,7 +96,7 @@ foreach ($lpns as $lpn) {
     <div>
         <label class="block text-sm font-medium text-zinc-700 mb-1">Tracking de carga</label>
         <input type="text" name="carga_codigo" value="<?= htmlspecialchars($filtros['carga_codigo']) ?>"
-               placeholder="CRX-..." class="rounded-lg border border-zinc-300 bg-white text-black px-3 py-2 text-sm">
+               placeholder="LAN-..." class="rounded-lg border border-zinc-300 bg-white text-black px-3 py-2 text-sm">
     </div>
     <button type="submit" class="inline-flex items-center gap-2 bg-amber-500 text-black rounded-lg px-4 py-2 text-sm font-medium hover:bg-amber-400 transition">
         <?= icon_small('filter') ?><span>Filtrar</span>

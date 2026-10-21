@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Courier\Lpn\Infrastructure\Persistence;
 
+use Courier\Carga\Domain\ValueObject\TrackingNumero;
 use Courier\Lpn\Domain\EstadoLpn;
 use Courier\Lpn\Domain\Lpn;
 use Courier\Lpn\Domain\LpnRepositoryInterface;
@@ -191,7 +192,7 @@ final class PdoLpnRepository implements LpnRepositoryInterface
 
         if (!empty($filtros['cargaCodigo'])) {
             $where[] = 'c.tracking_numero LIKE :carga_codigo';
-            $params[':carga_codigo'] = '%' . $filtros['cargaCodigo'] . '%';
+            $params[':carga_codigo'] = '%' . TrackingNumero::normalizarBusqueda((string) $filtros['cargaCodigo']) . '%';
         }
 
         if (!empty($filtros['aduaneroIdentificador'])) {

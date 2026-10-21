@@ -27,7 +27,12 @@ final class FotoEvidenciaController extends BaseController
             /** @var FotoEvidencia $foto */
             $foto = $this->container()->get(EliminarFotoEvidenciaHandler::class)->handle(new EliminarFotoEvidenciaCommand($id));
 
-            return redirect()->to($foto->cargaId() !== null ? '/cargas/' . $foto->cargaId() : '/salidas/' . $foto->salidaOrdenId());
+            // Vuelve a la pagina donde se borro (detalle de la carga o de la salida).
+            if ($volver !== '/dashboard') {
+                return redirect()->to($volver);
+            }
+
+            return redirect()->to($foto->salidaOrdenId() !== null ? '/salidas/' . $foto->salidaOrdenId() : '/cargas/' . $foto->cargaId());
         } catch (NotFoundException) {
             return redirect()->to($volver);
         }

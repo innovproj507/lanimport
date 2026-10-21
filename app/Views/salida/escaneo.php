@@ -173,9 +173,28 @@ $claseInput = 'w-full rounded-lg border border-zinc-300 bg-white text-black px-3
 </div>
 
 <?php
+// Fotos por carga del cliente (sus bultos/paletas desde varios angulos), no por etiqueta.
 $fotosTitulo = 'Fotos de la salida';
-$fotosAyuda = 'Evidencia del despacho: contenedor, sello y carga estibada. Bodega las toma desde la app movil; tambien se pueden agregar aqui.';
-$fotosUrlSubir = '/bodega/api/salidas/' . $orden->id() . '/fotos';
+$fotosAyuda = 'Una galeria por carga: bodega fotografia la carga de cada cliente al subirla al contenedor (app movil); tambien se pueden agregar aqui.';
+$fotosPorCarga = [];
+foreach ($fotos as $foto) {
+    $fotosPorCarga[$foto['cargaId'] ?? ''][] = $foto;
+}
+$fotosGrupos = [];
+foreach ($avance as $grupo) {
+    if (str_starts_with($grupo['cargaId'], 'caja-')) {
+        continue;
+    }
+    $fotosGrupos[] = [
+        'titulo' => $grupo['tracking'] . ' · ' . $grupo['cliente'],
+        'subtitulo' => ($grupo['marca'] ? 'Marca ' . $grupo['marca'] . ' · ' : '') . $grupo['total'] . ' bultos',
+        'urlSubir' => $cancelada ? null : '/bodega/api/salidas/' . $orden->id() . '/fotos?carga=' . $grupo['cargaId'],
+        'fotos' => $fotosPorCarga[$grupo['cargaId']] ?? [],
+    ];
+}
+if (!empty($fotosPorCarga[''])) {
+    $fotosGrupos[] = ['titulo' => 'Sin carga asignada', 'subtitulo' => null, 'urlSubir' => null, 'fotos' => $fotosPorCarga['']];
+}
 $fotosVolver = '/salidas/' . $orden->id();
 require __DIR__ . '/../evidencia/_fotos.php';
 ?>

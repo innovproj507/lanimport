@@ -267,10 +267,36 @@ final class CargaController extends BaseController
             'registradoPor' => $this->container()->get(UsuarioRepositoryInterface::class)->findById($carga->registradoPorUsuarioId())?->nombre(),
             'correos' => $this->container()->get(NotificacionRepositoryInterface::class)->listarPorCarga($carga->id()),
             'whatsapp' => $this->datosWhatsapp($carga),
-            'fotos' => $this->container()->get(FotoEvidenciaRepositoryInterface::class)->listar(TipoEvidencia::Recepcion, $carga->id()),
+            'fotos' => $this->fotosDeCarga($carga->id()),
             'aviso' => $this->tomarAviso(),
             'error' => $error,
         ]);
+    }
+
+    /**
+     * Fotos de evidencia de la carga: las de recepcion y, por cada salida en que subio, las de esa salida.
+     * Las salidas en que la carga va aparecen aunque aun no tengan fotos, para poder agregarlas.
+     *
+     * @return array{recepcion: array<int, array<string, mixed>>, salidas: array<int, array{salidaOrdenId: string, etiquetaDo: string, fotos: array<int, array<string, mixed>>}>}
+     */
+    private function fotosDeCarga(string $cargaId): array
+    {
+        $repositorio = $this->container()->get(FotoEvidenciaRepositoryInterface::class);
+        $salidas = [];
+
+        foreach ($this->container()->get(SalidaOrdenRepositoryInterface::class)->ordenesConCarga($cargaId) as $orden) {
+            $salidas[$orden['id']] = ['salidaOrdenId' => $orden['id'], 'etiquetaDo' => $orden['etiquetaDo'], 'fotos' => []];
+        }
+
+        foreach ($repositorio->listarSalidasDeCarga($cargaId) as $foto) {
+            $salidas[$foto['salidaOrdenId']] ??= ['salidaOrdenId' => $foto['salidaOrdenId'], 'etiquetaDo' => $foto['etiquetaDo'], 'fotos' => []];
+            $salidas[$foto['salidaOrdenId']]['fotos'][] = $foto;
+        }
+
+        return [
+            'recepcion' => $repositorio->listar(TipoEvidencia::Recepcion, $cargaId),
+            'salidas' => array_values($salidas),
+        ];
     }
 
     /** Reenvia al cliente el correo de "su carga ingreso a bodega" (p.ej. tras corregir el SMTP). */
