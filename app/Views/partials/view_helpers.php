@@ -76,6 +76,20 @@ function badge(string $texto, string $color = 'slate'): string
         . htmlspecialchars($texto) . '</span>';
 }
 
+/** Color del estado de una carga, el mismo en todas las pantallas (dashboard, lista de cargas, cliente). */
+function color_estado_carga(string $estado): string
+{
+    return [
+        'ingresado' => 'blue', 'en_bodega' => 'amber', 'en_transito' => 'indigo', 'en_aduana' => 'violet',
+        'liberado' => 'teal', 'listo_entrega' => 'emerald', 'entregado' => 'slate', 'retenido' => 'red',
+    ][$estado] ?? 'slate';
+}
+
+function badge_estado_carga(\Courier\Carga\Domain\CargaStatus $estado): string
+{
+    return badge($estado->label(), color_estado_carga($estado->value));
+}
+
 function icon_button(string $href, string $icon, string $title, string $color = 'blue'): string
 {
     return '<a href="' . htmlspecialchars($href) . '" title="' . htmlspecialchars($title) . '" '

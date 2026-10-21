@@ -61,7 +61,7 @@ $estadoColor = $estadoColores[$cliente->estado()->value] ?? 'slate';
                 <?php foreach ($cargas as $carga): ?>
                     <tr class="border-b border-slate-200">
                         <td class="py-2 pr-4 font-medium text-black"><?= htmlspecialchars((string) $carga->trackingNumero()) ?></td>
-                        <td class="py-2 pr-4"><?= badge($carga->estado()->label(), 'amber') ?></td>
+                        <td class="py-2 pr-4"><?= badge_estado_carga($carga->estado()) ?></td>
                         <td class="py-2 text-zinc-500"><?= htmlspecialchars($carga->createdAt()->format('d/m/Y')) ?></td>
                     </tr>
                 <?php endforeach; ?>

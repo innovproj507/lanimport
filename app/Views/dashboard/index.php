@@ -96,10 +96,6 @@ $estiloBulto = [
     'quarantine' => ['icono' => 'shield', 'color' => 'red'],
     'consumed' => ['icono' => 'truck', 'color' => 'slate'],
 ];
-$coloresEstadoCarga = [
-    'ingresado' => 'blue', 'en_bodega' => 'amber', 'en_transito' => 'indigo', 'en_aduana' => 'violet',
-    'liberado' => 'teal', 'listo_entrega' => 'emerald', 'entregado' => 'slate', 'retenido' => 'red',
-];
 $formatoFecha = static fn (string $fecha): string => (new DateTimeImmutable($fecha))->format('d/m/Y');
 ?>
 
@@ -285,7 +281,7 @@ $formatoFecha = static fn (string $fecha): string => (new DateTimeImmutable($fec
         <?php else: ?>
             <ul class="divide-y divide-slate-100">
                 <?php foreach (array_slice($resumen->cargasRecientes, 0, 5) as $carga): ?>
-                    <?php $color = $coloresEstadoCarga[$carga['estado']] ?? 'slate'; ?>
+                    <?php $color = color_estado_carga($carga['estado']); ?>
                     <li class="py-2.5 flex items-center gap-3 text-sm">
                         <span class="w-8 h-8 rounded-lg bg-<?= $color ?>-500 text-white flex items-center justify-center shrink-0"><?= icon_small('box') ?></span>
                         <div class="min-w-0 flex-1">
