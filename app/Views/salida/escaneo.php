@@ -169,8 +169,16 @@ $opcionSalida = static fn (array $s): string => $s['etiqueta']
 <?php endif; ?>
 
 <div class="bg-white rounded-xl shadow-sm p-6">
-    <h2 class="font-semibold text-black mb-1">Cargas de esta salida</h2>
-    <p class="text-xs text-zinc-500 mb-4">Bodega escanea cada bulto al subirlo al contenedor. Las cargas con bultos pendientes aparecen primero.</p>
+    <div class="flex flex-wrap items-start justify-between gap-3 mb-4">
+        <div>
+            <h2 class="font-semibold text-black mb-1">Cargas de esta salida <span class="text-zinc-400 font-normal">· <?= count($avance) ?></span></h2>
+            <p class="text-xs text-zinc-500">Bodega escanea cada bulto al subirlo al contenedor. Las cargas con bultos pendientes aparecen primero. Use <strong>+</strong> para ver los LPN de una carga.</p>
+        </div>
+        <div class="flex gap-2 text-xs">
+            <button type="button" id="salida-expandir-todo" class="rounded-lg border border-zinc-300 px-3 py-1.5 text-zinc-700 hover:bg-slate-100">Ver todos los LPN</button>
+            <button type="button" id="salida-contraer-todo" class="rounded-lg border border-zinc-300 px-3 py-1.5 text-zinc-700 hover:bg-slate-100">Ocultar LPN</button>
+        </div>
+    </div>
     <div class="overflow-x-auto">
         <table class="w-full text-sm">
             <thead>
@@ -185,6 +193,9 @@ $opcionSalida = static fn (array $s): string => $s['etiqueta']
                 <?php foreach ($avance as $grupo): $completa = $grupo['escaneadas'] >= $grupo['total']; ?>
                     <tr class="border-b border-slate-200 <?= $completa ? 'bg-emerald-50' : 'bg-slate-50' ?>" data-grupo-carga="<?= htmlspecialchars($grupo['cargaId']) ?>">
                         <td class="py-2 pr-4 font-mono font-semibold text-black">
+                            <?php // + / - : muestra u oculta los LPN de esta carga (ocultos al abrir). ?>
+                            <button type="button" class="salida-toggle inline-flex items-center justify-center w-6 h-6 mr-2 rounded border border-zinc-300 bg-white text-zinc-700 font-sans font-bold leading-none hover:bg-slate-100 align-middle"
+                                    data-toggle-carga="<?= htmlspecialchars($grupo['cargaId']) ?>" aria-expanded="false" title="Ver / ocultar los LPN">+</button>
                             <?php if (!str_starts_with($grupo['cargaId'], 'caja-')): ?>
                                 <a href="/cargas/<?= htmlspecialchars($grupo['cargaId']) ?>" class="hover:underline"><?= htmlspecialchars($grupo['tracking']) ?></a>
                             <?php else: ?>
@@ -223,7 +234,7 @@ $opcionSalida = static fn (array $s): string => $s['etiqueta']
                         </td>
                     </tr>
                     <?php foreach ($grupo['codigos'] as $codigo): $linea = $lineasPorCodigo[$codigo] ?? null; if ($linea === null) { continue; } ?>
-                        <tr class="border-b border-slate-100" data-codigo="<?= htmlspecialchars($linea->codigoLpn()) ?>" data-carga="<?= htmlspecialchars($grupo['cargaId']) ?>" data-escaneado="<?= $linea->escaneado() ? '1' : '0' ?>">
+                        <tr class="hidden border-b border-slate-100" data-codigo="<?= htmlspecialchars($linea->codigoLpn()) ?>" data-carga="<?= htmlspecialchars($grupo['cargaId']) ?>" data-escaneado="<?= $linea->escaneado() ? '1' : '0' ?>">
                             <td class="py-1.5 pr-4 pl-6 font-mono text-zinc-700"><?= htmlspecialchars($linea->codigoLpn()) ?></td>
                             <td class="py-1.5 pr-4" colspan="2"></td>
                             <td class="py-1.5 text-right salida-linea-estado">
@@ -236,6 +247,41 @@ $opcionSalida = static fn (array $s): string => $s['etiqueta']
         </table>
     </div>
 </div>
+
+<script>
+// LPN de cada carga plegados: + los muestra, - los oculta (las filas siguen en la pagina para el escaneo).
+document.addEventListener('DOMContentLoaded', function () {
+    var tbody = document.getElementById('salida-tbody');
+
+    if (!tbody) {
+        return;
+    }
+
+    function mostrar(boton, abrir) {
+        var carga = boton.getAttribute('data-toggle-carga');
+        tbody.querySelectorAll('tr[data-carga="' + carga + '"]').forEach(function (fila) {
+            fila.classList.toggle('hidden', !abrir);
+        });
+        boton.textContent = abrir ? '−' : '+';
+        boton.setAttribute('aria-expanded', abrir ? 'true' : 'false');
+    }
+
+    tbody.addEventListener('click', function (evento) {
+        var boton = evento.target.closest('.salida-toggle');
+
+        if (boton) {
+            mostrar(boton, boton.getAttribute('aria-expanded') !== 'true');
+        }
+    });
+
+    document.getElementById('salida-expandir-todo').addEventListener('click', function () {
+        tbody.querySelectorAll('.salida-toggle').forEach(function (b) { mostrar(b, true); });
+    });
+    document.getElementById('salida-contraer-todo').addEventListener('click', function () {
+        tbody.querySelectorAll('.salida-toggle').forEach(function (b) { mostrar(b, false); });
+    });
+});
+</script>
 
 <?php
 // Fotos por carga del cliente (sus bultos/paletas desde varios angulos), no por etiqueta.
