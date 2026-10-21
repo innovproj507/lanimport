@@ -733,7 +733,8 @@ document.addEventListener('DOMContentLoaded', function () {
         var largo = parseFloat(row.querySelector('.carga-linea-largo').value) || 0;
         var cubicaje = (ancho * alto * largo) / 28316.846592;
 
-        row.querySelector('.carga-linea-cubicaje').value = cubicaje.toFixed(6);
+        // Sin medidas queda en blanco (no "0.000000").
+        row.querySelector('.carga-linea-cubicaje').value = cubicaje > 0 ? cubicaje.toFixed(6) : '';
     }
 
     function bindFila(row) {
@@ -765,9 +766,7 @@ document.addEventListener('DOMContentLoaded', function () {
         var nuevaFila = rows[rows.length - 1].cloneNode(true);
 
         nuevaFila.querySelectorAll('input').forEach(function (input) {
-            if (input.classList.contains('carga-linea-cubicaje')) {
-                input.value = '0.000000';
-            } else if (input.name === 'linea_cantidad[]') {
+            if (input.name === 'linea_cantidad[]') {
                 input.value = '1';
             } else {
                 input.value = '';

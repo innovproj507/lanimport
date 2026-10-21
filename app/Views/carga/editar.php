@@ -158,7 +158,7 @@ $lineas = $carga->lineas();
                                 <input type="number" step="0.01" min="0" name="linea_largo[]" class="carga-linea-largo w-full rounded-lg border border-zinc-300 bg-white text-black px-2 py-1.5 text-sm">
                             </td>
                             <td class="py-2 pr-3">
-                                <input type="number" step="0.000001" min="0" name="linea_cubicaje[]" value="0.000000" title="Se calcula automaticamente segun W/H/L, pero puede editarlo manualmente."
+                                <input type="number" step="0.000001" min="0" name="linea_cubicaje[]" value="" title="Se calcula automaticamente segun W/H/L, pero puede editarlo manualmente."
                                        class="carga-linea-cubicaje w-full rounded-lg border border-zinc-300 bg-white text-black px-2 py-1.5 text-sm">
                             </td>
                             <td class="py-2 pr-3">
@@ -197,7 +197,7 @@ $lineas = $carga->lineas();
                                 <input type="number" step="0.01" min="0" name="linea_largo[]" value="<?= htmlspecialchars((string) $linea->largo()) ?>" class="carga-linea-largo w-full rounded-lg border border-zinc-300 bg-white text-black px-2 py-1.5 text-sm">
                             </td>
                             <td class="py-2 pr-3">
-                                <input type="number" step="0.000001" min="0" name="linea_cubicaje[]" value="<?= htmlspecialchars(number_format($linea->cubicajePies(), 6, '.', '')) ?>" title="Se calcula automaticamente segun W/H/L, pero puede editarlo manualmente."
+                                <input type="number" step="0.000001" min="0" name="linea_cubicaje[]" value="<?= $linea->cubicajePies() > 0 ? htmlspecialchars(number_format($linea->cubicajePies(), 6, '.', '')) : '' ?>" title="Se calcula automaticamente segun W/H/L, pero puede editarlo manualmente."
                                        class="carga-linea-cubicaje w-full rounded-lg border border-zinc-300 bg-white text-black px-2 py-1.5 text-sm">
                             </td>
                             <td class="py-2 pr-3">
