@@ -26,6 +26,11 @@ interface CargaRepositoryInterface
 
     public function existsTrackingNumero(TrackingNumero $numero): bool;
 
-    /** @return array{items: array<int, Carga>, total: int} */
-    public function searchPaginado(string $term, ?string $estado, int $page, int $perPage): array;
+    /**
+     * Lista de cargas (Ingreso de Carga) con filtros, y los totales de todas las cargas filtradas
+     * (no solo de la pagina): bultos, peso (kg), cubicaje (p3) y valor de sus lineas.
+     *
+     * @return array{items: array<int, Carga>, total: int, resumen: array{bultos: float, peso: float, pies3: float, valor: float}}
+     */
+    public function searchPaginado(string $term, ?string $estado, int $page, int $perPage, ?string $aduaneroIdentificador = null): array;
 }

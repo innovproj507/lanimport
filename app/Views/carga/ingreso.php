@@ -38,6 +38,12 @@ require __DIR__ . '/../partials/header.php';
                         <option value="<?= htmlspecialchars($estadoOpcion->value) ?>"><?= htmlspecialchars($estadoOpcion->label()) ?></option>
                     <?php endforeach; ?>
                 </select>
+                <select id="cargas-aduanero-filtro" class="rounded-lg border border-zinc-300 bg-white text-black px-2 py-1.5 text-sm focus:ring-2 focus:ring-amber-400 focus:outline-none">
+                    <option value="">Todos los aduaneros</option>
+                    <?php foreach ($aduaneros as $aduaneroOpcion): ?>
+                        <option value="<?= htmlspecialchars($aduaneroOpcion->identificador()) ?>"><?= htmlspecialchars($aduaneroOpcion->nombre()) ?></option>
+                    <?php endforeach; ?>
+                </select>
                 <div class="flex items-center gap-2 text-sm text-zinc-600">
                     <label for="cargas-per-page">Mostrar</label>
                     <select id="cargas-per-page" class="rounded-lg border border-zinc-300 bg-white text-black px-2 py-1.5 text-sm focus:ring-2 focus:ring-amber-400 focus:outline-none">
@@ -49,12 +55,20 @@ require __DIR__ . '/../partials/header.php';
                 </div>
             </div>
         </div>
+        <div id="cargas-resumen" class="mb-4">
+            <?php require __DIR__ . '/_resumen.php'; ?>
+        </div>
+        <div class="overflow-x-auto">
         <table class="w-full text-sm">
             <thead>
                 <tr class="text-left text-xs text-zinc-500 uppercase border-b border-slate-200">
                     <th class="py-2 pr-4">Tracking</th>
                     <th class="py-2 pr-4">Cliente</th>
                     <th class="py-2 pr-4">Proveedor</th>
+                    <th class="py-2 pr-4">Aduanero</th>
+                    <th class="py-2 pr-4 text-right">Bultos</th>
+                    <th class="py-2 pr-4 text-right">Peso (kg)</th>
+                    <th class="py-2 pr-4 text-right">Valor</th>
                     <th class="py-2 pr-4">Estado</th>
                     <th class="py-2 pr-4">Fecha</th>
                     <th class="py-2 text-right">Acciones</th>
@@ -64,6 +78,7 @@ require __DIR__ . '/../partials/header.php';
                 <?php require __DIR__ . '/_tabla_filas.php'; ?>
             </tbody>
         </table>
+        </div>
         <div id="cargas-paginacion">
             <?php require __DIR__ . '/_paginacion.php'; ?>
         </div>

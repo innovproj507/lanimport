@@ -2,14 +2,29 @@
 /** @var array<int, \Courier\Carga\Domain\Carga> $cargas */
 /** @var array<string, string> $nombresClientes */
 require_once __DIR__ . '/../partials/view_helpers.php';
+$n = static fn (float $v, int $d = 2): string => number_format($v, $d, '.', ',');
 if (empty($cargas)):
 ?>
-    <tr><td colspan="6" class="py-4 text-sm text-zinc-500">No se encontraron cargas.</td></tr>
-<?php else: foreach ($cargas as $carga): ?>
+    <tr><td colspan="10" class="py-4 text-sm text-zinc-500">No se encontraron cargas.</td></tr>
+<?php else: foreach ($cargas as $carga):
+    // Totales de la carga: suma de sus lineas (peso y valor son totales de linea).
+    $bultos = 0.0;
+    $peso = 0.0;
+    $valor = 0.0;
+    foreach ($carga->lineas() as $linea) {
+        $bultos += $linea->cantidad();
+        $peso += $linea->peso();
+        $valor += $linea->valor();
+    }
+    ?>
     <tr class="border-b border-slate-200">
-        <td class="py-2 pr-4 font-mono text-black"><?= htmlspecialchars((string) $carga->trackingNumero()) ?></td>
+        <td class="py-2 pr-4 font-mono text-black whitespace-nowrap"><?= htmlspecialchars((string) $carga->trackingNumero()) ?></td>
         <td class="py-2 pr-4 text-zinc-700"><?= htmlspecialchars($nombresClientes[$carga->clienteId()] ?? '—') ?></td>
         <td class="py-2 pr-4 text-zinc-700"><?= htmlspecialchars($carga->proveedor()) ?></td>
+        <td class="py-2 pr-4 text-zinc-700"><?= htmlspecialchars($carga->aduanero()?->nombre() ?? '—') ?></td>
+        <td class="py-2 pr-4 text-right text-zinc-700"><?= $n($bultos, 0) ?></td>
+        <td class="py-2 pr-4 text-right text-black font-medium whitespace-nowrap"><?= $n($peso) ?></td>
+        <td class="py-2 pr-4 text-right text-zinc-700 whitespace-nowrap"><?= $n($valor) ?></td>
         <td class="py-2 pr-4"><?= badge($carga->estado()->label(), 'amber') ?></td>
         <td class="py-2 pr-4 text-zinc-500"><?= htmlspecialchars($carga->fechaIngreso()->format('d/m/Y')) ?></td>
         <td class="py-2 text-right space-x-2 whitespace-nowrap">

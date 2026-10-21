@@ -262,7 +262,7 @@ final class PdoCargaRepository implements CargaRepositoryInterface
     }
 
     /** @return array{items: array<int, Carga>, total: int} */
-    public function searchPaginado(string $term, ?string $estado, int $page, int $perPage): array
+    public function searchPaginado(string $term, ?string $estado, int $page, int $perPage, ?string $aduaneroIdentificador = null): array
     {
         $page = max(1, $page);
         $perPage = max(1, $perPage);
@@ -287,11 +287,26 @@ final class PdoCargaRepository implements CargaRepositoryInterface
             $params[':estado'] = $estado;
         }
 
+        if ($aduaneroIdentificador !== null && $aduaneroIdentificador !== '') {
+            $where .= ' AND ca.aduanero_identificador = :aduanero';
+            $params[':aduanero'] = $aduaneroIdentificador;
+        }
+
         $countStmt = $this->connection->prepare(
             "SELECT COUNT(*) FROM cargas ca JOIN clientes c ON c.id = ca.cliente_id WHERE {$where}"
         );
         $countStmt->execute($params);
         $total = (int) $countStmt->fetchColumn();
+
+        // Totales de todas las cargas filtradas (peso y valor son totales de linea; el p3 es por pieza).
+        $resumenStmt = $this->connection->prepare(
+            "SELECT COALESCE(SUM(cl.cantidad), 0) AS bultos, COALESCE(SUM(cl.peso), 0) AS peso, COALESCE(SUM(cl.valor), 0) AS valor,
+                    COALESCE(SUM(COALESCE(cl.cubicaje_p3, cl.ancho * cl.alto * cl.largo / 28316.846592) * cl.cantidad), 0) AS pies3
+             FROM carga_lineas cl
+             WHERE cl.carga_id IN (SELECT ca.id FROM cargas ca JOIN clientes c ON c.id = ca.cliente_id WHERE {$where})"
+        );
+        $resumenStmt->execute($params);
+        $resumen = array_map('floatval', $resumenStmt->fetch(PDO::FETCH_ASSOC) ?: ['bultos' => 0, 'peso' => 0, 'pies3' => 0, 'valor' => 0]);
 
         $stmt = $this->connection->prepare(
             "SELECT ca.* FROM cargas ca JOIN clientes c ON c.id = ca.cliente_id WHERE {$where}
@@ -308,7 +323,7 @@ final class PdoCargaRepository implements CargaRepositoryInterface
 
         $items = array_map(fn (array $row) => $this->hydrate($row), $stmt->fetchAll());
 
-        return ['items' => $items, 'total' => $total];
+        return ['items' => $items, 'total' => $total, 'resumen' => $resumen];
     }
 
     /** @param array<string, mixed> $row */

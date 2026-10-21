@@ -536,7 +536,12 @@ function initBusquedaPaginada(opciones) {
     var perPageSelect = document.getElementById(opciones.perPageId);
     var tbody = document.getElementById(opciones.tbodyId);
     var paginacion = document.getElementById(opciones.paginacionId);
-    var filtroSelect = opciones.filtroId ? document.getElementById(opciones.filtroId) : null;
+    // Filtros (selects): uno con filtroId/filtroParam, o varios con filtros: [{id, param}].
+    var filtros = (opciones.filtros || (opciones.filtroId ? [{ id: opciones.filtroId, param: opciones.filtroParam || 'filtro' }] : []))
+        .map(function (f) { return { select: document.getElementById(f.id), param: f.param }; })
+        .filter(function (f) { return f.select; });
+    // Opcional: bloque de totales que el servidor devuelve como "resumen".
+    var resumen = opciones.resumenId ? document.getElementById(opciones.resumenId) : null;
 
     if (!input || !tbody || !perPageSelect || !paginacion) {
         return;
@@ -548,15 +553,19 @@ function initBusquedaPaginada(opciones) {
         params.set('page', String(page));
         params.set('per_page', perPageSelect.value);
 
-        if (filtroSelect) {
-            params.set(opciones.filtroParam || 'filtro', filtroSelect.value);
-        }
+        filtros.forEach(function (f) {
+            params.set(f.param, f.select.value);
+        });
 
         fetch(opciones.url + '?' + params.toString())
             .then(function (response) { return response.json(); })
             .then(function (data) {
                 tbody.innerHTML = data.html;
                 paginacion.innerHTML = data.paginacion;
+
+                if (resumen && data.resumen !== undefined) {
+                    resumen.innerHTML = data.resumen;
+                }
             });
     }
 
@@ -574,11 +583,11 @@ function initBusquedaPaginada(opciones) {
         cargar(1);
     });
 
-    if (filtroSelect) {
-        filtroSelect.addEventListener('change', function () {
+    filtros.forEach(function (f) {
+        f.select.addEventListener('change', function () {
             cargar(1);
         });
-    }
+    });
 
     var timer = null;
 
@@ -615,8 +624,11 @@ document.addEventListener('DOMContentLoaded', function () {
         tbodyId: 'cargas-tbody',
         paginacionId: 'cargas-paginacion',
         botonClase: '.cargas-pagina-btn',
-        filtroId: 'cargas-estado-filtro',
-        filtroParam: 'estado',
+        filtros: [
+            { id: 'cargas-estado-filtro', param: 'estado' },
+            { id: 'cargas-aduanero-filtro', param: 'aduanero' }
+        ],
+        resumenId: 'cargas-resumen',
         url: '/cargas/buscar'
     });
 

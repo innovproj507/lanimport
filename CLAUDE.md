@@ -57,6 +57,10 @@ This is the single composition root. It builds a lazy-singleton `Courier\Shared\
   - `buscar()` returns JSON `{html, paginacion}` rendered from the `_tabla_filas.php` and `_paginacion.php` partials (`per_page` ∈ 5/10/25).
   - `app.js` binds the search input to that URL.
   - Follow `PaisController` when adding a new one.
+  - Cargas (`/cargas/ingreso`) adds more:
+    - filters by estado **and** aduanero (`initBusquedaPaginada({filtros: [{id, param}]})`);
+    - columns Aduanero, Bultos, Peso and Valor (summed from each carga's lines);
+    - a totals block (`carga/_resumen.php`, `resumenId`) for **all** filtered cargas, not just the page, from `searchPaginado()['resumen']`.
 
 ### API layer (`/api/v1`, JWT)
 

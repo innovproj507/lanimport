@@ -13,6 +13,7 @@ final class BuscarCargasQuery implements QueryInterface
         public readonly ?string $estado = null,
         public readonly int $page = 1,
         public readonly int $perPage = 10,
+        public readonly ?string $aduaneroIdentificador = null,
     ) {
     }
 }

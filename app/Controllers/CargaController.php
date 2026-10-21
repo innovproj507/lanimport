@@ -183,6 +183,7 @@ final class CargaController extends BaseController
             'page' => $resultado->page,
             'perPage' => $resultado->perPage,
             'totalPages' => $resultado->totalPages(),
+            'resumen' => $resultado->resumen,
             'nombresClientes' => $this->nombresClientes($clientes),
             'mostrarFormulario' => $error !== null,
         ]);
@@ -192,11 +193,12 @@ final class CargaController extends BaseController
     {
         $termino = (string) ($this->request->getGet('q') ?? '');
         $estado = (string) ($this->request->getGet('estado') ?? '');
+        $aduanero = trim((string) ($this->request->getGet('aduanero') ?? ''));
         $page = max(1, (int) ($this->request->getGet('page') ?? 1));
         $perPage = $this->perPageDesdeRequest();
 
         $resultado = $this->container()->get(BuscarCargasHandler::class)->handle(
-            new BuscarCargasQuery($termino, $estado !== '' ? $estado : null, $page, $perPage)
+            new BuscarCargasQuery($termino, $estado !== '' ? $estado : null, $page, $perPage, $aduanero !== '' ? $aduanero : null)
         );
 
         $clientes = $this->container()->get(ListarClientesHandler::class)->handle(new ListarClientesQuery());
@@ -213,7 +215,9 @@ final class CargaController extends BaseController
             'totalPages' => $resultado->totalPages(),
         ], ['debug' => false]);
 
-        return $this->response->setJSON(['html' => $html, 'paginacion' => $paginacion]);
+        $resumen = view('carga/_resumen', ['total' => $resultado->total, 'resumen' => $resultado->resumen], ['debug' => false]);
+
+        return $this->response->setJSON(['html' => $html, 'paginacion' => $paginacion, 'resumen' => $resumen]);
     }
 
     private function perPageDesdeRequest(): int
