@@ -150,4 +150,24 @@ final class PdoCargasParaSalida implements CargasParaSalidaInterface
 
         return array_map('strval', $stmt->fetchAll(PDO::FETCH_COLUMN));
     }
+
+    public function lpnsListosPorCarga(array $cargaIds): array
+    {
+        if ($cargaIds === []) {
+            return [];
+        }
+
+        $marcas = implode(',', array_fill(0, count($cargaIds), '?'));
+        $stmt = $this->connection->prepare(
+            "SELECT carga_id, id FROM lpns WHERE estado = 'available' AND carga_id IN ({$marcas}) ORDER BY carga_id, orden_en_carga, codigo"
+        );
+        $stmt->execute(array_values($cargaIds));
+
+        $porCarga = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $fila) {
+            $porCarga[(string) $fila['carga_id']][] = (string) $fila['id'];
+        }
+
+        return $porCarga;
+    }
 }

@@ -38,4 +38,13 @@ interface CargasParaSalidaInterface
      * @return array<int, string> ids de LPN
      */
     public function lpnsListos(array $cargaIds): array;
+
+    /**
+     * LPNs escaneados y libres de cada carga, en orden de consecutivo (1/115, 2/115...), para
+     * que trafico suba solo una parte de la carga en un contenedor (los primeros N).
+     *
+     * @param array<int, string> $cargaIds
+     * @return array<string, array<int, string>> cargaId => ids de LPN
+     */
+    public function lpnsListosPorCarga(array $cargaIds): array;
 }

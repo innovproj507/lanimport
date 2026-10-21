@@ -17,6 +17,7 @@ use Courier\Lpn\Application\BuscarInventario\BuscarInventarioHandler;
 use Courier\Lpn\Application\BuscarInventario\BuscarInventarioQuery;
 use Courier\Cliente\Domain\ClienteRepositoryInterface;
 use Courier\Configuracion\Domain\ConfiguracionRepositoryInterface;
+use Courier\Carga\Domain\CargaRepositoryInterface;
 use Courier\Carga\Infrastructure\Importacion\EscritorXlsx;
 use Courier\Evidencia\Domain\FotoEvidenciaRepositoryInterface;
 use Courier\Evidencia\Domain\TipoEvidencia;
@@ -66,15 +67,52 @@ final class SalidaController extends BaseController
             $this->response->setStatusCode(422);
         }
 
+        $cantidades = $this->request->getPost('cantidad');
+
         return view('salida/armar', [
             'cargas' => $this->container()->get(CargasParaSalidaInterface::class)->listar(),
             'cajas' => $this->container()->get(CargasParaSalidaInterface::class)->cajasListas(),
             'navieras' => $this->container()->get(ListarNavierasHandler::class)->handle(new ListarNavierasQuery(true)),
             'seleccionadas' => $seleccionadas,
+            // "Bultos a subir" ya escritos (si hubo un error), por carga.
+            'cantidades' => is_array($cantidades) ? array_map('intval', $cantidades) : [],
             'embarque' => $embarque,
             'ordenDestino' => $ordenDestino,
             'error' => $error,
         ]);
+    }
+
+    /**
+     * Bultos que suben de cada carga marcada: trafico puede subir solo una parte ("Bultos a subir",
+     * campo cantidad[cargaId]); entran los primeros N listos por consecutivo y el resto queda en
+     * bodega para otro contenedor. Sin cantidad, entran todos los listos.
+     *
+     * @param array<int, string> $cargaIds
+     * @return array<int, string> ids de LPN
+     */
+    private function lpnsDeCargasMarcadas(array $cargaIds): array
+    {
+        $listos = $this->container()->get(CargasParaSalidaInterface::class)->lpnsListosPorCarga($cargaIds);
+        $cantidades = $this->request->getPost('cantidad');
+        $cantidades = is_array($cantidades) ? $cantidades : [];
+        $lpnIds = [];
+
+        foreach ($cargaIds as $cargaId) {
+            $disponibles = $listos[$cargaId] ?? [];
+            $pedida = isset($cantidades[$cargaId]) && trim((string) $cantidades[$cargaId]) !== '' ? (int) $cantidades[$cargaId] : count($disponibles);
+
+            if ($pedida < 1 || $pedida > count($disponibles)) {
+                $tracking = (string) ($this->container()->get(CargaRepositoryInterface::class)->findById($cargaId)?->trackingNumero() ?? 'la carga');
+
+                throw new ValidationException(count($disponibles) === 0
+                    ? "La carga {$tracking} ya no tiene bultos listos para salir. Recargue la pagina."
+                    : "La carga {$tracking} tiene " . count($disponibles) . " bultos listos: indique entre 1 y " . count($disponibles) . " bultos a subir.");
+            }
+
+            array_push($lpnIds, ...array_slice($disponibles, 0, $pedida));
+        }
+
+        return $lpnIds;
     }
 
     /** Agregar cargas a una salida pendiente: la misma lista de "Armar salida", sin el contenedor. */
@@ -117,7 +155,7 @@ final class SalidaController extends BaseController
         }
 
         try {
-            $lpnIds = array_merge($this->container()->get(CargasParaSalidaInterface::class)->lpnsListos($cargaIds), $cajaIds);
+            $lpnIds = array_merge($this->lpnsDeCargasMarcadas($cargaIds), $cajaIds);
             $bultos = $this->container()->get(AgregarCargasSalidaHandler::class)->handle(new AgregarCargasSalidaCommand($orden->id(), $lpnIds));
 
             $_SESSION['salida_mensaje'] = "Se agregaron {$bultos} bultos (" . count($cargaIds) . ' carga(s)' . ($cajaIds !== [] ? ' y ' . count($cajaIds) . ' caja(s) reempacada(s)' : '') . ") a {$orden->etiquetaDo()}. Bodega debe escanearlos antes de finalizar.";
@@ -149,8 +187,9 @@ final class SalidaController extends BaseController
         $sessionManager = $this->container()->get(SessionManager::class);
 
         try {
-            // Por cada carga marcada entran sus bultos ya escaneados y libres; el resto queda en bodega.
-            $lpnIds = array_merge($this->container()->get(CargasParaSalidaInterface::class)->lpnsListos($cargaIds), $cajaIds);
+            // Por cada carga marcada entran sus bultos escaneados y libres (o solo los N que indico
+            // trafico); el resto queda en bodega.
+            $lpnIds = array_merge($this->lpnsDeCargasMarcadas($cargaIds), $cajaIds);
 
             $ordenId = $this->container()->get(CrearOrdenSalidaHandler::class)->handle(new CrearOrdenSalidaCommand(
                 null,

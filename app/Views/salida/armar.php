@@ -11,6 +11,7 @@ use App\Libraries\Csrf;
  */
 /** @var array<int, \Courier\Naviera\Domain\Naviera> $navieras */
 /** @var array<int, string> $seleccionadas */
+/** @var array<string, int> $cantidades "Bultos a subir" ya escritos por carga (si hubo un error) */
 /** @var array<string, string> $embarque */
 /** @var string|null $error */
 /** @var \Courier\Salida\Domain\SalidaOrden|null $ordenDestino si viene, se agregan cargas a esa salida pendiente */
@@ -104,7 +105,8 @@ $listas = count(array_filter($cargas, static fn (array $c) => $c['listos'] > 0))
             </div>
         </div>
         <p class="text-xs text-zinc-500 mb-4">
-            Se marcan cargas completas: suben sus bultos ya escaneados en bodega. Si una carga tiene bultos sin escanear, esos se quedan en bodega como saldo.
+            Al marcar una carga suben sus bultos ya escaneados; en <strong>Bultos a subir</strong> se puede poner menos (por ejemplo 25 de 115) y el resto queda en bodega para otro contenedor.
+            Los bultos sin escanear tambien se quedan en bodega como saldo.
             Las cargas en gris aun no pueden salir; el motivo esta en la ultima columna.
         </p>
 
@@ -120,7 +122,7 @@ $listas = count(array_filter($cargas, static fn (array $c) => $c['listos'] > 0))
                             <th class="py-2 pr-3">Cliente</th>
                             <th class="py-2 pr-3">Marca</th>
                             <th class="py-2 pr-3">Compania</th>
-                            <th class="py-2 pr-3 text-right">Bultos</th>
+                            <th class="py-2 pr-3 text-right" title="Al marcar una carga se puede indicar cuantos de sus bultos suben a este contenedor">Bultos a subir</th>
                             <th class="py-2 pr-3 text-right">Kilos</th>
                             <th class="py-2 pr-3 text-right">Valor</th>
                             <th class="py-2 pr-3 text-right">Dias</th>
@@ -173,8 +175,17 @@ $listas = count(array_filter($cargas, static fn (array $c) => $c['listos'] > 0))
                                 <td class="py-2 pr-3"><?= htmlspecialchars($c['marca'] ?? '—') ?></td>
                                 <td class="py-2 pr-3"><?= htmlspecialchars($c['proveedor']) ?></td>
                                 <td class="py-2 pr-3 text-right whitespace-nowrap">
-                                    <?php if ($puede && $c['listos'] < $c['bultos']): ?>
-                                        <span class="font-semibold text-black"><?= $n($c['listos']) ?></span> de <?= $n($c['bultos']) ?>
+                                    <?php if ($puede): ?>
+                                        <?php // Trafico decide cuantos bultos de la carga suben a este contenedor; el resto queda en bodega. ?>
+                                        <input type="number" name="cantidad[<?= htmlspecialchars($c['cargaId']) ?>]" min="1" max="<?= $c['listos'] ?>" step="1"
+                                               value="<?= (int) ($cantidades[$c['cargaId']] ?? $c['listos']) ?>" data-listos="<?= $c['listos'] ?>"
+                                               title="Bultos de esta carga que suben a este contenedor (de <?= $c['listos'] ?> listos)"
+                                               class="armar-cantidad w-20 rounded-lg border border-zinc-300 bg-white text-black text-right px-2 py-1 text-sm focus:ring-2 focus:ring-amber-400 focus:outline-none disabled:bg-slate-100 disabled:text-zinc-400"
+                                               <?= $marcada ? '' : 'disabled' ?>>
+                                        <span class="text-xs text-zinc-500">de <?= $n($c['listos']) ?></span>
+                                        <?php if ($c['listos'] < $c['bultos']): ?>
+                                            <span class="block text-xs text-zinc-400"><?= $n($c['bultos']) ?> en total</span>
+                                        <?php endif; ?>
                                     <?php else: ?>
                                         <?= $n($c['bultos']) ?>
                                     <?php endif; ?>
@@ -253,10 +264,16 @@ document.addEventListener('DOMContentLoaded', function () {
         var clientes = {};
 
         marcadas.forEach(function (c) {
-            t.bultos += Number(c.dataset.bultos);
-            t.peso += Number(c.dataset.peso);
-            t.m3 += Number(c.dataset.m3);
-            t.valor += Number(c.dataset.valor);
+            // Si trafico sube solo parte de la carga, kilos, m3 y valor van en proporcion.
+            var cantidad = c.closest('tr').querySelector('.armar-cantidad');
+            var listos = Number(c.dataset.bultos);
+            var sube = cantidad ? Math.min(listos, Math.max(0, parseInt(cantidad.value, 10) || 0)) : listos;
+            var proporcion = listos > 0 ? sube / listos : 0;
+
+            t.bultos += sube;
+            t.peso += Number(c.dataset.peso) * proporcion;
+            t.m3 += Number(c.dataset.m3) * proporcion;
+            t.valor += Number(c.dataset.valor) * proporcion;
             clientes[c.dataset.cliente] = true;
         });
 
@@ -270,7 +287,13 @@ document.addEventListener('DOMContentLoaded', function () {
 
         tbody.querySelectorAll('tr').forEach(function (fila) {
             var check = fila.querySelector('.armar-check');
+            var cantidad = fila.querySelector('.armar-cantidad');
             fila.classList.toggle('bg-amber-100', check.checked);
+
+            // "Bultos a subir" solo se edita (y se envia) en las cargas marcadas.
+            if (cantidad) {
+                cantidad.disabled = !check.checked;
+            }
         });
     }
 
@@ -292,6 +315,11 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Clic en cualquier parte de la fila marca la carga (si se puede).
     tbody.addEventListener('click', function (evento) {
+        // Escribir en "Bultos a subir" no marca ni desmarca la carga.
+        if (evento.target.closest('.armar-cantidad')) {
+            return;
+        }
+
         var fila = evento.target.closest('tr');
         var check = fila ? fila.querySelector('.armar-check') : null;
 
@@ -300,6 +328,12 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         totales();
+    });
+
+    tbody.addEventListener('input', function (evento) {
+        if (evento.target.classList.contains('armar-cantidad')) {
+            totales();
+        }
     });
 
     buscar.addEventListener('input', filtrar);

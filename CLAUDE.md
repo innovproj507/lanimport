@@ -114,7 +114,9 @@ The paper delivery form (empresa de transporte, chofer, placa, entregado por, ce
 
 - "Armar salida" (`GET /salidas`, view `salida/armar.php`): Trafico fills the container data and checks **cargas** (not LPNs).
   - The list comes from `Salida\Domain\CargasParaSalidaInterface` (`PdoCargasParaSalida`). It shows every carga en bodega, ready ones first; the rest are disabled with the reason (sin etiquetas / por escanear / en otra salida).
-  - `POST /salidas` takes each checked carga's scanned, free LPNs (`lpnsListos`). A partial carga ships what was scanned, and the rest stays as saldo.
+  - `POST /salidas` takes each checked carga's scanned, free LPNs. A partial carga ships what was scanned, and the rest stays as saldo.
+  - **Dividing a carga between containers:** Trafico types "Bultos a subir" (`cantidad[cargaId]`, default all ready). `SalidaController::lpnsDeCargasMarcadas()` takes the first N ready LPNs by consecutive (`CargasParaSalidaInterface::lpnsListosPorCarga()`); the rest stays available for the next DO. "Agregar cargas" works the same way.
+  - Bodega takes no decisions on salidas. It views, scans, finalizes and adds photos. Armar, agregar, cancelar and editing the embarque use the route filter `$planificaSalida` (operaciones/gerente/admin), and the buttons are hidden for bodega.
   - `CrearOrdenSalidaHandler` validates the container before creating anything, and stores it with the order.
 - More cargas can be added to a **pending** DO (same container): `GET|POST /salidas/{id}/agregar` reuses `salida/armar.php` with `$ordenDestino` (no container form). `AgregarCargasSalidaHandler` reserves the new LPNs, and `SalidaOrden::agregarLineas()` holds the rules: pending only, no repeated LPN, and the DO becomes consolidated (`cliente_id` NULL) if a new client comes in. The repository upserts `salida_lineas`, so scans already done are kept.
 - A DO can mix clients (consolidated): `salida_ordenes.cliente_id` is NULL then (migration 057), and set only when all LPNs belong to one client.

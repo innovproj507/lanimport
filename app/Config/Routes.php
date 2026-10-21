@@ -169,17 +169,19 @@ $routes->post('recepcion/escanear', 'LpnController::escanearRecepcion', ['filter
 // Inventario — requiere sesion + rol operaciones/bodega/gerente/admin
 $routes->get('inventario', 'InventarioController::index', ['filter' => $bodegaFilter]);
 
-// Salidas — requiere sesion + rol operaciones/bodega/gerente/admin (igual que $bodegaRoles en WebRoutes.php)
+// Salidas — bodega ve, escanea, finaliza y toma fotos; armar, agregar cargas, cancelar y el embarque
+// los decide trafico/gerencia/owner (bodega no toma decisiones).
+$planificaSalida = ['auth', 'role:operaciones,gerente,admin'];
 $routes->get('salidas/historial', 'SalidaController::historial', ['filter' => $bodegaFilter]);
-$routes->get('salidas', 'SalidaController::index', ['filter' => $bodegaFilter]);
-$routes->post('salidas', 'SalidaController::store', ['filter' => $bodegaFilter]);
+$routes->get('salidas', 'SalidaController::index', ['filter' => $planificaSalida]);
+$routes->post('salidas', 'SalidaController::store', ['filter' => $planificaSalida]);
 $routes->get('salidas/(:segment)', 'SalidaController::show/$1', ['filter' => $bodegaFilter]);
 $routes->post('salidas/(:segment)/escanear', 'SalidaController::confirmarEscaneo/$1', ['filter' => $bodegaFilter]);
 $routes->post('salidas/(:segment)/finalizar', 'SalidaController::finalizar/$1', ['filter' => $bodegaFilter]);
-$routes->post('salidas/(:segment)/cancelar', 'SalidaController::cancelar/$1', ['filter' => $bodegaFilter]);
-$routes->get('salidas/(:segment)/agregar', 'SalidaController::agregarForm/$1', ['filter' => $bodegaFilter]);
-$routes->post('salidas/(:segment)/agregar', 'SalidaController::agregar/$1', ['filter' => $bodegaFilter]);
-$routes->post('salidas/(:segment)/embarque','SalidaController::guardarEmbarque/$1', ['filter' => $bodegaFilter]);
+$routes->post('salidas/(:segment)/cancelar', 'SalidaController::cancelar/$1', ['filter' => $planificaSalida]);
+$routes->get('salidas/(:segment)/agregar', 'SalidaController::agregarForm/$1', ['filter' => $planificaSalida]);
+$routes->post('salidas/(:segment)/agregar', 'SalidaController::agregar/$1', ['filter' => $planificaSalida]);
+$routes->post('salidas/(:segment)/embarque','SalidaController::guardarEmbarque/$1', ['filter' => $planificaSalida]);
 $routes->get('salidas/(:segment)/manifiesto', 'SalidaController::manifiesto/$1', ['filter' => $bodegaFilter]);
 $routes->get('salidas/(:segment)/reporte', 'SalidaController::reporte/$1', ['filter' => $bodegaFilter]);
 $routes->get('salidas/(:segment)/reporte/excel', 'SalidaController::reporteExcel/$1', ['filter' => $bodegaFilter]);

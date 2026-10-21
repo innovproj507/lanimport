@@ -36,9 +36,11 @@ foreach ($clientes as $c) {
 }
 ?>
 
+<?php if (in_array($_SESSION['usuario_rol'] ?? null, ['operaciones', 'gerente', 'admin'], true)): // armar salidas: trafico/gerencia ?>
 <div class="flex justify-end mb-4">
     <?= header_button('/salidas', 'plus', 'Armar salida', 'amber') ?>
 </div>
+<?php endif; ?>
 
 <div class="bg-white rounded-xl shadow-sm p-6 mb-6">
 <?= card_header('filter', 'Filtros', 'amber') ?>

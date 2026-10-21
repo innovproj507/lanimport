@@ -10,7 +10,9 @@ require_once __DIR__ . '/../partials/view_helpers.php';
 $pageTitle = 'Salida ' . $orden->etiquetaDo();
 $pageSubtitle = (str_contains($clienteNombre, ', ') ? 'Clientes: ' : 'Cliente: ') . $clienteNombre;
 $backHref = '/salidas/historial';
-$headerActions = ($orden->estado()->value === 'pendiente' ? header_button('/salidas/' . $orden->id() . '/agregar', 'plus', 'Agregar cargas', 'emerald') : '')
+// Bodega escanea y finaliza; agregar cargas, cancelar y el embarque los decide trafico/gerencia.
+$planifica = in_array($_SESSION['usuario_rol'] ?? null, ['operaciones', 'gerente', 'admin'], true);
+$headerActions = ($planifica && $orden->estado()->value === 'pendiente' ? header_button('/salidas/' . $orden->id() . '/agregar', 'plus', 'Agregar cargas', 'emerald') : '')
     . header_button('/salidas/' . $orden->id() . '/reporte', 'chart', 'Reporte de salida', 'amber')
     . header_button('/salidas/' . $orden->id() . '/manifiesto', 'printer', 'Imprimir manifiesto', 'blue');
 require __DIR__ . '/../partials/header.php';
@@ -39,7 +41,7 @@ $claseInput = 'w-full rounded-lg border border-zinc-300 bg-white text-black px-3
         <?= card_header('truck', 'Datos del embarque', 'sky') ?>
         <span class="text-sm text-zinc-500">Consecutivo: <strong class="text-black"><?= htmlspecialchars($orden->etiquetaDo()) ?></strong></span>
     </div>
-    <fieldset <?= $cancelada ? 'disabled' : '' ?> class="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <fieldset <?= $cancelada || !$planifica ? 'disabled' : '' ?> class="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div>
             <label class="block text-sm font-medium text-zinc-700 mb-1">Numero de contenedor</label>
             <input type="text" name="numero_contenedor" maxlength="15" placeholder="Ej: TGBU10548-6" value="<?= htmlspecialchars($embarque->contenedorFormateado() ?? '') ?>" class="<?= $claseInput ?> uppercase">
@@ -114,12 +116,14 @@ $claseInput = 'w-full rounded-lg border border-zinc-300 bg-white text-black px-3
                     <?= icon_small('check') ?><span>Confirmar Salida</span>
                 </button>
             </form>
+            <?php if ($planifica): ?>
             <form method="post" action="/salidas/<?= htmlspecialchars($orden->id()) ?>/cancelar">
                 <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
                 <button type="submit" class="inline-flex items-center gap-2 bg-red-500/10 text-red-600 rounded-lg px-4 py-2 text-sm font-medium hover:bg-red-500/20 transition">
                     <?= icon_small('x') ?><span>Cancelar Orden</span>
                 </button>
             </form>
+            <?php endif; ?>
         </div>
     <?php else: ?>
         <p class="mt-4 text-sm font-medium <?= $confirmada ? 'text-emerald-600' : 'text-red-600' ?>">
