@@ -230,7 +230,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     <th class="py-2 pr-4">UoM</th>
                     <th class="py-2 pr-4">Cantidad</th>
                     <th class="py-2 pr-4">Dimensiones (cm)</th>
-                    <th class="py-2 pr-4">p3</th>
+                    <th class="py-2 pr-4">p3 total</th>
                     <th class="py-2 pr-4">Peso (kg)</th>
                     <th class="py-2">Valor</th>
                 </tr>

@@ -29,7 +29,9 @@ final class PdoCargasParaSalida implements CargasParaSalidaInterface
              FROM cargas c
              JOIN clientes cl ON cl.id = c.cliente_id
              LEFT JOIN (SELECT carga_id, MAX(marca) AS marca, SUM(cantidad) AS bultos, SUM(peso) AS peso,
-                               SUM(valor) AS valor, SUM(cubicaje_p3 * cantidad) AS pies3
+                               SUM(valor) AS valor,
+                               -- El p3 de la linea es su total (como peso y valor).
+                               SUM(COALESCE(cubicaje_p3, ancho * alto * largo * cantidad / 28316.846592)) AS pies3
                         FROM carga_lineas GROUP BY carga_id) li ON li.carga_id = c.id
              LEFT JOIN (SELECT carga_id, COUNT(*) AS etiquetas,
                                SUM(estado = 'available') AS listos,
@@ -110,7 +112,7 @@ final class PdoCargasParaSalida implements CargasParaSalidaInterface
              JOIN lpns l ON l.id = x.lpn_id AND l.carga_id IS NOT NULL
              JOIN cargas ca ON ca.id = l.carga_id
              JOIN (SELECT carga_id, SUM(cantidad) AS bultos, SUM(peso) AS peso, SUM(valor) AS valor,
-                          SUM(cubicaje_p3 * cantidad) AS pies3
+                          SUM(COALESCE(cubicaje_p3, ancho * alto * largo * cantidad / 28316.846592)) AS pies3
                    FROM carga_lineas GROUP BY carga_id) t ON t.carga_id = ca.id"
         );
 

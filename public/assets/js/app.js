@@ -731,7 +731,9 @@ document.addEventListener('DOMContentLoaded', function () {
         var ancho = parseFloat(row.querySelector('.carga-linea-ancho').value) || 0;
         var alto = parseFloat(row.querySelector('.carga-linea-alto').value) || 0;
         var largo = parseFloat(row.querySelector('.carga-linea-largo').value) || 0;
-        var cubicaje = (ancho * alto * largo) / 28316.846592;
+        var cantidad = parseFloat(row.querySelector('[name="linea_cantidad[]"]').value) || 0;
+        // p3 TOTAL de la linea (como el peso y el valor): medidas por pieza x cantidad.
+        var cubicaje = (ancho * alto * largo * cantidad) / 28316.846592;
 
         // Sin medidas queda en blanco (no "0.000000").
         row.querySelector('.carga-linea-cubicaje').value = cubicaje > 0 ? cubicaje.toFixed(6) : '';
@@ -748,7 +750,7 @@ document.addEventListener('DOMContentLoaded', function () {
             });
         }
 
-        ['.carga-linea-ancho', '.carga-linea-alto', '.carga-linea-largo'].forEach(function (selector) {
+        ['.carga-linea-ancho', '.carga-linea-alto', '.carga-linea-largo', '[name="linea_cantidad[]"]'].forEach(function (selector) {
             row.querySelector(selector).addEventListener('input', function () {
                 recalcularCubicaje(row);
             });

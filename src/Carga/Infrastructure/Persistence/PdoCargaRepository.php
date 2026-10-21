@@ -298,10 +298,10 @@ final class PdoCargaRepository implements CargaRepositoryInterface
         $countStmt->execute($params);
         $total = (int) $countStmt->fetchColumn();
 
-        // Totales de todas las cargas filtradas (peso y valor son totales de linea; el p3 es por pieza).
+        // Totales de todas las cargas filtradas (peso, valor y p3 son totales de linea).
         $resumenStmt = $this->connection->prepare(
             "SELECT COALESCE(SUM(cl.cantidad), 0) AS bultos, COALESCE(SUM(cl.peso), 0) AS peso, COALESCE(SUM(cl.valor), 0) AS valor,
-                    COALESCE(SUM(COALESCE(cl.cubicaje_p3, cl.ancho * cl.alto * cl.largo / 28316.846592) * cl.cantidad), 0) AS pies3
+                    COALESCE(SUM(COALESCE(cl.cubicaje_p3, cl.ancho * cl.alto * cl.largo * cl.cantidad / 28316.846592)), 0) AS pies3
              FROM carga_lineas cl
              WHERE cl.carga_id IN (SELECT ca.id FROM cargas ca JOIN clientes c ON c.id = ca.cliente_id WHERE {$where})"
         );

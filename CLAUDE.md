@@ -127,7 +127,8 @@ The paper delivery form (empresa de transporte, chofer, placa, entregado por, ce
 - Shipment data (contenedor, sello, naviera from the `navieras` catalog, barco, fecha de cargue, ETD, destino) is the `Salida\Domain\ValueObject\DatosEmbarque` value object. It is editable until the order is cancelled.
 - `GET /salidas/{id}/manifiesto` prints the manifest with one row per carga.
   - Kilos, m3 and valor come from `carga_lineas` and are prorated when only part of a carga's LPNs ship.
-  - Line peso and valor are line totals; `cubicaje_p3` is per piece.
+  - Line peso, valor **and `cubicaje_p3`** are line totals. Trafico types the line's total p3 from its sheet, for example 708.62 p3 for 131 bultos. Never multiply p3 by `cantidad`.
+  - `LineaCarga::cubicajePies()` falls back to W×H×L×cantidad / 28316.85 when no p3 was typed. The form's auto-calc does the same.
 - `GET /salidas/{id}/reporte` is the traffic team's "reporte de salida" sheet (`salida/reporte_imprimir.php`): FECHA (carga ingreso, m/d/Y), COMPAÑÍA, CLIENTE, MARCA, BULTOS, CUBICAJE P3, PESO, VALOR, ADUANERO, DESCRIPCION, with totals. It is built from the same `manifiesto()` rows (prorated), sorted by aduanero and fecha, and can be filtered with `?aduanero=`. `/reporte/excel` downloads the same rows as .xlsx (`EscritorXlsx`).
 
 ### Reempaque: trafico ordena, bodega ejecuta

@@ -65,7 +65,7 @@ foreach ($grupos as $clave => $grupo) {
     foreach ($grupo['carga'] ? $grupo['carga']->lineas() : [] as $linea) {
         $datos['bultos'] += $linea->cantidad();
         $datos['peso'] += $linea->peso();
-        $datos['pies3'] += $linea->cubicajePies() * $linea->cantidad();
+        $datos['pies3'] += $linea->cubicajePies();
         $datos['valor'] += $linea->valor();
     }
     $grupos[$clave]['datos'] = $datos;

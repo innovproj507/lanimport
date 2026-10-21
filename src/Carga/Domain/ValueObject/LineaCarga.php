@@ -37,9 +37,13 @@ final class LineaCarga
         );
     }
 
+    /**
+     * Cubicaje (p3) TOTAL de la linea, como el peso y el valor: es lo que trafico escribe (de su
+     * hoja: 708.62 p3 para 131 bultos). Si no se escribio, sale de las medidas por pieza x cantidad.
+     */
     public function cubicajePies(): float
     {
-        return $this->cubicajePies ?? round(($this->ancho * $this->alto * $this->largo) / 28_316.846592, 6);
+        return $this->cubicajePies ?? round(($this->ancho * $this->alto * $this->largo * $this->cantidad) / 28_316.846592, 6);
     }
 
     public function descripcion(): string

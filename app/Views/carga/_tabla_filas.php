@@ -9,14 +9,14 @@ if (empty($cargas)):
 ?>
     <tr><td colspan="11" class="py-4 text-sm text-zinc-500">No se encontraron cargas.</td></tr>
 <?php else: foreach ($cargas as $carga):
-    // Totales de la carga: suma de sus lineas (el peso es total de linea; el p3 es por pieza).
+    // Totales de la carga: suma de sus lineas (peso y p3 son totales de linea).
     $bultos = 0.0;
     $peso = 0.0;
     $pies3 = 0.0;
     foreach ($carga->lineas() as $linea) {
         $bultos += $linea->cantidad();
         $peso += $linea->peso();
-        $pies3 += $linea->cubicajePies() * $linea->cantidad();
+        $pies3 += $linea->cubicajePies();
     }
     ?>
     <tr class="border-b border-slate-200">

@@ -289,7 +289,7 @@ final class PdoSalidaOrdenRepository implements SalidaOrdenRepositoryInterface
     {
         // Una fila por carga: los bultos son los LPN de esa carga que van en la salida; kilos,
         // m3 y valor salen de las lineas de la carga, prorrateados si solo sale parte de sus bultos.
-        // En las lineas el peso y el valor son totales de la linea y el cubicaje (p3) es por pieza.
+        // En las lineas el peso, el valor y el cubicaje (p3) son totales de la linea.
         // Las cajas reempacadas se abren (genealogia) hasta sus bultos originales, que son los que tienen carga.
         $stmt = $this->connection->prepare(
             "WITH RECURSIVE contenido (lpn_id) AS (
@@ -308,7 +308,7 @@ final class PdoSalidaOrdenRepository implements SalidaOrdenRepositoryInterface
              JOIN clientes c ON c.id = l.cliente_id
              LEFT JOIN (
                  SELECT carga_id, SUM(peso) AS kilos, SUM(valor) AS valor,
-                        SUM(COALESCE(cubicaje_p3, ancho * alto * largo / 28316.846592) * cantidad) AS pies3,
+                        SUM(COALESCE(cubicaje_p3, ancho * alto * largo * cantidad / 28316.846592)) AS pies3,
                         GROUP_CONCAT(DISTINCT NULLIF(descripcion, '') ORDER BY orden SEPARATOR ', ') AS descripciones
                  FROM carga_lineas GROUP BY carga_id
              ) t ON t.carga_id = ca.id
