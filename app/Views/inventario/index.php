@@ -191,9 +191,8 @@ $n = static fn (float $v, int $d = 2): string => number_format($v, $d, '.', ',')
                     <th class="py-2 pr-4 text-right">Bultos</th>
                     <th class="py-2 pr-4 text-right">Peso (kg)</th>
                     <th class="py-2 pr-4 text-right">Valor</th>
-                    <th class="py-2 pr-4">Estado</th>
-                    <th class="py-2 pr-4 text-right">LPNs</th>
-                    <th class="py-2 pr-4">Por estado</th>
+                    <th class="py-2 pr-4" title="Estado de la carga completa">Estado carga</th>
+                    <th class="py-2 pr-4" title="Cuantas etiquetas (LPN) de la carga hay en cada estado">Etiquetas (LPN)</th>
                     <th class="py-2 pr-4">Fecha</th>
                     <th class="py-2 text-right">Acciones</th>
                 </tr>
@@ -217,7 +216,6 @@ $n = static fn (float $v, int $d = 2): string => number_format($v, $d, '.', ',')
                         <td class="py-2 pr-4 text-right text-black font-medium whitespace-nowrap"><?= $n($grupo['datos']['peso']) ?></td>
                         <td class="py-2 pr-4 text-right text-zinc-700 whitespace-nowrap"><?= $n($grupo['datos']['valor']) ?></td>
                         <td class="py-2 pr-4 whitespace-nowrap"><?= $cargaGrupo ? badge_estado_carga($cargaGrupo->estado()) : '—' ?></td>
-                        <td class="py-2 pr-4 text-right font-medium text-black"><?= $grupo['total'] ?></td>
                         <td class="py-2 pr-4 space-x-1 whitespace-nowrap">
                             <?php foreach ($grupo['porEstado'] as $estadoValor => $cantidad): ?>
                                 <?= badge($cantidad . ' ' . ($estados[$estadoValor] ?? $estadoValor), $estadoColores[$estadoValor] ?? 'slate') ?>
