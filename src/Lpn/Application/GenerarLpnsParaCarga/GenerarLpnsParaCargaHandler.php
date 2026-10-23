@@ -49,8 +49,11 @@ final class GenerarLpnsParaCargaHandler implements CommandHandlerInterface
             $carga->lineas(),
         ));
 
+        // Cada linea genera una etiqueta por bulto; las de cantidad 0 (o sin cantidad) no generan.
         if ($cantidadTotal <= 0) {
-            throw new ValidationException('La carga no tiene lineas con cantidad para generar LPNs.');
+            throw new ValidationException($carga->lineas() === []
+                ? 'La carga no tiene lineas en "Descripcion de la Carga". Edite la carga y agregue la cantidad de bultos: se genera una etiqueta por bulto.'
+                : 'Las lineas de la carga tienen cantidad 0: no hay bultos para etiquetar. Edite la carga y ponga la cantidad de bultos de cada linea (una etiqueta por bulto).');
         }
 
         // La serie (12/38) depende solo de la plantilla (Configuracion > Etiqueta LPN), no del pais del cliente.

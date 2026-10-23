@@ -97,21 +97,18 @@ final class Carga extends AggregateRoot
     }
 
     /**
-     * Toda carga lleva al menos una linea con cantidad de bultos: de ahi salen sus etiquetas (LPN),
-     * el peso y el cubicaje. Sin lineas no se pueden generar los LPN.
+     * Las lineas pueden ir sin descripcion (algunos clientes solo dan la cantidad) y con cantidad 0
+     * (esa linea no genera etiquetas LPN; al generarlas se avisa el motivo). Solo se rechaza una
+     * cantidad negativa.
      *
      * @param array<int, LineaCarga> $lineas
      * @return array<int, LineaCarga>
      */
     private static function validarLineas(array $lineas): array
     {
-        if ($lineas === []) {
-            throw new ValidationException('Agregue al menos una linea en "Descripcion de la Carga" (descripcion y cantidad de bultos).');
-        }
-
         foreach (array_values($lineas) as $i => $linea) {
-            if ($linea->cantidad() < 1) {
-                throw new ValidationException('La linea ' . ($i + 1) . ' ("' . $linea->descripcion() . '") debe tener una cantidad de al menos 1 bulto.');
+            if ($linea->cantidad() < 0) {
+                throw new ValidationException('La linea ' . ($i + 1) . ' de "Descripcion de la Carga" tiene una cantidad negativa.');
             }
         }
 

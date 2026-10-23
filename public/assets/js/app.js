@@ -767,12 +767,9 @@ document.addEventListener('DOMContentLoaded', function () {
         var rows = tbody.querySelectorAll('.carga-linea-row');
         var nuevaFila = rows[rows.length - 1].cloneNode(true);
 
+        // Fila nueva vacia (sin cantidad por defecto): una fila olvidada no genera bultos de mas.
         nuevaFila.querySelectorAll('input').forEach(function (input) {
-            if (input.name === 'linea_cantidad[]') {
-                input.value = '1';
-            } else {
-                input.value = '';
-            }
+            input.value = '';
         });
 
         delete nuevaFila.dataset.cubicajeManual;

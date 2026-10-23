@@ -286,6 +286,7 @@ final class CargaController extends BaseController
             'whatsapp' => $this->datosWhatsapp($carga),
             'fotos' => $this->fotosDeCarga($carga->id()),
             'aviso' => $this->tomarAviso(),
+            'modal' => $this->tomarModal(),
             'error' => $error,
         ]);
     }
@@ -449,6 +450,15 @@ final class CargaController extends BaseController
         return $aviso;
     }
 
+    /** @return array{titulo: string, texto: string}|null alerta que se muestra en ventana al abrir la carga */
+    private function tomarModal(): ?array
+    {
+        $modal = $_SESSION['carga_modal'] ?? null;
+        unset($_SESSION['carga_modal']);
+
+        return $modal;
+    }
+
     public function showEditForm(string $id): string
     {
         /** @var CargaRepositoryInterface $cargas */
@@ -566,7 +576,10 @@ final class CargaController extends BaseController
             $this->container()->get(GenerarLpnsParaCargaHandler::class)->handle($command);
 
             return redirect()->to('/cargas/' . $id . '/recepcion');
-        } catch (ValidationException $e) {
+        } catch (ValidationException|NotFoundException $e) {
+            // Antes se volvia a la carga sin decir nada: ahora se explica en una ventana.
+            $_SESSION['carga_modal'] = ['titulo' => 'No se generaron las etiquetas (LPN)', 'texto' => $e->getMessage()];
+
             return redirect()->to('/cargas/' . $id);
         }
     }
@@ -661,16 +674,14 @@ final class CargaController extends BaseController
             $marca = trim((string) ($marcas[$i] ?? ''));
             $cubicaje = trim((string) ($cubicajes[$i] ?? ''));
 
-            if ($descripcion === '') {
-                // Una fila vacia se ignora; una con datos sin descripcion se avisa (antes se perdia sin decir nada).
-                $tieneDatos = $marca !== '' || $cubicaje !== ''
-                    || (float) ($pesos[$i] ?? 0) > 0 || (float) ($valores[$i] ?? 0) > 0
-                    || (float) ($anchos[$i] ?? 0) > 0 || (float) ($altos[$i] ?? 0) > 0 || (float) ($largos[$i] ?? 0) > 0;
+            // La descripcion es opcional (algunos clientes solo dan la cantidad): la linea se guarda
+            // si tiene algun dato; solo una fila totalmente vacia se ignora.
+            $tieneDatos = $descripcion !== '' || $marca !== '' || $cubicaje !== ''
+                || (float) ($cantidades[$i] ?? 0) > 0
+                || (float) ($pesos[$i] ?? 0) > 0 || (float) ($valores[$i] ?? 0) > 0
+                || (float) ($anchos[$i] ?? 0) > 0 || (float) ($altos[$i] ?? 0) > 0 || (float) ($largos[$i] ?? 0) > 0;
 
-                if ($tieneDatos) {
-                    throw new ValidationException('La linea ' . ((int) $i + 1) . ' de "Descripcion de la Carga" tiene datos pero no tiene descripcion. Escriba la descripcion (por ejemplo ROPA, CALZADO).');
-                }
-
+            if (!$tieneDatos) {
                 continue;
             }
 

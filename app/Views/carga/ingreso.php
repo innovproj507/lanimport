@@ -205,7 +205,7 @@ require __DIR__ . '/../partials/header.php';
                     <tbody id="carga-lineas-tbody">
                         <tr class="carga-linea-row border-b border-slate-200">
                             <td class="py-2 pr-3">
-                                <input type="text" name="linea_descripcion[]" class="w-full rounded-lg border border-zinc-300 bg-white text-black px-2 py-1.5 text-sm">
+                                <input type="text" name="linea_descripcion[]" placeholder="Opcional" class="w-full rounded-lg border border-zinc-300 bg-white text-black px-2 py-1.5 text-sm">
                             </td>
                             <td class="py-2 pr-3">
                                 <input type="text" name="linea_marca[]" placeholder="Opcional" class="w-full rounded-lg border border-zinc-300 bg-white text-black px-2 py-1.5 text-sm">
@@ -214,7 +214,7 @@ require __DIR__ . '/../partials/header.php';
                                 <input type="text" name="linea_unidad_medida[]" class="w-full rounded-lg border border-zinc-300 bg-white text-black px-2 py-1.5 text-sm">
                             </td>
                             <td class="py-2 pr-3">
-                                <input type="number" step="0.01" min="0" name="linea_cantidad[]" value="1" class="carga-linea-cantidad w-full rounded-lg border border-zinc-300 bg-white text-black px-2 py-1.5 text-sm">
+                                <input type="number" step="0.01" min="0" name="linea_cantidad[]" value="" placeholder="0" title="Bultos de esta linea: genera una etiqueta (LPN) por bulto. Con 0 o vacio no genera etiquetas." class="carga-linea-cantidad w-full rounded-lg border border-zinc-300 bg-white text-black px-2 py-1.5 text-sm">
                             </td>
                             <td class="py-2 pr-3">
                                 <input type="number" step="0.01" min="0" name="linea_ancho[]" class="carga-linea-ancho w-full rounded-lg border border-zinc-300 bg-white text-black px-2 py-1.5 text-sm">

@@ -9,6 +9,7 @@ use App\Libraries\Csrf;
 /** @var array<int, array{destinatario: string, canal: string, asunto: string, estado: string, error: ?string, fecha: string}> $correos */
 /** @var array{clienteId: string, telefono: ?string, telefonoValido: ?string, despachada: bool} $whatsapp */
 /** @var array{tipo: string, texto: string}|null $aviso */
+/** @var array{titulo: string, texto: string}|null $modal alerta en ventana (p.ej. por que no se generaron los LPN) */
 require_once __DIR__ . '/../partials/view_helpers.php';
 $pageTitle = 'Carga registrada';
 $pageSubtitle = 'Tracking: ' . $view->trackingNumero;
@@ -22,6 +23,36 @@ require __DIR__ . '/../partials/header.php';
     <div class="bg-red-500/10 text-red-600 text-sm rounded-lg px-4 py-3 mb-4 border border-red-500/30">
         <?= htmlspecialchars($error) ?>
     </div>
+<?php endif; ?>
+
+<?php if (!empty($modal)): ?>
+<div id="modal-carga-alerta" class="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" role="alertdialog" aria-modal="true" aria-labelledby="modal-carga-titulo">
+    <div class="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
+        <div class="flex items-start gap-3">
+            <span class="w-10 h-10 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center shrink-0"><?= icon_small('bell', 'w-5 h-5') ?></span>
+            <div>
+                <h2 id="modal-carga-titulo" class="font-semibold text-black text-lg"><?= htmlspecialchars($modal['titulo']) ?></h2>
+                <p class="text-sm text-zinc-700 mt-2"><?= htmlspecialchars($modal['texto']) ?></p>
+            </div>
+        </div>
+        <div class="flex justify-end gap-2 mt-6">
+            <button type="button" data-cerrar-modal class="inline-flex items-center gap-2 bg-slate-200 text-zinc-800 rounded-lg px-4 py-2 text-sm font-medium hover:bg-slate-300 transition">Entendido</button>
+            <a href="/cargas/<?= htmlspecialchars($view->cargaId) ?>/editar" class="inline-flex items-center gap-2 bg-amber-500 text-black rounded-lg px-4 py-2 text-sm font-medium hover:bg-amber-400 transition">
+                <?= icon_small('pencil') ?><span>Editar carga</span>
+            </a>
+        </div>
+    </div>
+</div>
+<script>
+(function () {
+    var modal = document.getElementById('modal-carga-alerta');
+    var cerrar = function () { modal.remove(); };
+    modal.querySelector('[data-cerrar-modal]').addEventListener('click', cerrar);
+    modal.addEventListener('click', function (e) { if (e.target === modal) { cerrar(); } });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && document.body.contains(modal)) { cerrar(); } });
+    modal.querySelector('[data-cerrar-modal]').focus();
+})();
+</script>
 <?php endif; ?>
 
 <?php if ($aviso !== null): ?>
@@ -238,7 +269,7 @@ document.addEventListener('DOMContentLoaded', function () {
             <tbody>
                 <?php foreach ($view->lineas as $linea): ?>
                     <tr class="border-b border-slate-200">
-                        <td class="py-2 pr-4 text-black font-medium"><?= htmlspecialchars($linea['descripcion']) ?></td>
+                        <td class="py-2 pr-4 text-black font-medium"><?= $linea['descripcion'] !== '' ? htmlspecialchars($linea['descripcion']) : '<span class="text-zinc-400 font-normal">(sin descripcion)</span>' ?></td>
                         <td class="py-2 pr-4 text-zinc-700"><?= htmlspecialchars($linea['marca'] ?? '—') ?></td>
                         <td class="py-2 pr-4 text-zinc-700"><?= htmlspecialchars($linea['unidadMedida']) ?></td>
                         <td class="py-2 pr-4 text-zinc-700"><?= htmlspecialchars((string) $linea['cantidad']) ?></td>
