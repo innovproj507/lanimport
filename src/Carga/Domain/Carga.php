@@ -91,9 +91,31 @@ final class Carga extends AggregateRoot
         );
 
         $carga->historial[] = HistorialEstado::registrar(CargaStatus::INGRESADO, $registradoPorUsuarioId);
-        $carga->lineas = $lineas;
+        $carga->lineas = self::validarLineas($lineas);
 
         return $carga;
+    }
+
+    /**
+     * Toda carga lleva al menos una linea con cantidad de bultos: de ahi salen sus etiquetas (LPN),
+     * el peso y el cubicaje. Sin lineas no se pueden generar los LPN.
+     *
+     * @param array<int, LineaCarga> $lineas
+     * @return array<int, LineaCarga>
+     */
+    private static function validarLineas(array $lineas): array
+    {
+        if ($lineas === []) {
+            throw new ValidationException('Agregue al menos una linea en "Descripcion de la Carga" (descripcion y cantidad de bultos).');
+        }
+
+        foreach (array_values($lineas) as $i => $linea) {
+            if ($linea->cantidad() < 1) {
+                throw new ValidationException('La linea ' . ($i + 1) . ' ("' . $linea->descripcion() . '") debe tener una cantidad de al menos 1 bulto.');
+            }
+        }
+
+        return $lineas;
     }
 
     /**
@@ -177,7 +199,7 @@ final class Carga extends AggregateRoot
         $this->aduanero = $aduanero;
         $this->numeroContenedor = $numeroContenedor;
         $this->fechaIngreso = $fechaIngreso;
-        $this->lineas = $lineas;
+        $this->lineas = self::validarLineas($lineas);
         $this->notas = $notas;
         $this->facturaProveedorNombre = $facturaProveedorNombre;
         $this->facturaProveedorRuta = $facturaProveedorRuta;

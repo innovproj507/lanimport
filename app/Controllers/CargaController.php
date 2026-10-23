@@ -658,13 +658,21 @@ final class CargaController extends BaseController
 
         foreach ($descripciones as $i => $descripcion) {
             $descripcion = trim((string) $descripcion);
-
-            if ($descripcion === '') {
-                continue;
-            }
-
             $marca = trim((string) ($marcas[$i] ?? ''));
             $cubicaje = trim((string) ($cubicajes[$i] ?? ''));
+
+            if ($descripcion === '') {
+                // Una fila vacia se ignora; una con datos sin descripcion se avisa (antes se perdia sin decir nada).
+                $tieneDatos = $marca !== '' || $cubicaje !== ''
+                    || (float) ($pesos[$i] ?? 0) > 0 || (float) ($valores[$i] ?? 0) > 0
+                    || (float) ($anchos[$i] ?? 0) > 0 || (float) ($altos[$i] ?? 0) > 0 || (float) ($largos[$i] ?? 0) > 0;
+
+                if ($tieneDatos) {
+                    throw new ValidationException('La linea ' . ((int) $i + 1) . ' de "Descripcion de la Carga" tiene datos pero no tiene descripcion. Escriba la descripcion (por ejemplo ROPA, CALZADO).');
+                }
+
+                continue;
+            }
 
             $lineas[] = [
                 'descripcion' => $descripcion,
