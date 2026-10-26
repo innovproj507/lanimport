@@ -5,6 +5,7 @@ use App\Libraries\Csrf;
 /** @var array<int, \Courier\Lpn\Domain\Ubicacion> $ubicaciones */
 $pageTitle = 'Recepcion de LPNs';
 $pageSubtitle = 'Tracking: ' . (string) $carga->trackingNumero();
+$backHref = '/cargas/' . $carga->id();
 $mapaUbicaciones = [];
 foreach ($ubicaciones as $ubicacion) {
     $mapaUbicaciones[$ubicacion->id()] = $ubicacion->codigo();

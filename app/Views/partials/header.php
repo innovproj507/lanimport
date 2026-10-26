@@ -224,6 +224,13 @@ require_once __DIR__ . '/view_helpers.php';
                            class="w-9 h-9 rounded-lg flex items-center justify-center text-zinc-600 bg-white shadow-sm hover:bg-slate-100 transition shrink-0">
                             <?= icon_small('arrow-left', 'w-5 h-5') ?>
                         </a>
+                    <?php elseif ($currentPath !== $inicio): ?>
+                        <?php // Sin destino fijo: vuelve a la pantalla anterior del sistema; si no hay (entro por un enlace), al inicio. ?>
+                        <a href="<?= htmlspecialchars($inicio) ?>" title="Volver"
+                           onclick="if (window.history.length > 1 && document.referrer.indexOf(window.location.origin + '/') === 0) { window.history.back(); return false; }"
+                           class="w-9 h-9 rounded-lg flex items-center justify-center text-zinc-600 bg-white shadow-sm hover:bg-slate-100 transition shrink-0">
+                            <?= icon_small('arrow-left', 'w-5 h-5') ?>
+                        </a>
                     <?php endif; ?>
                     <div>
                         <h1 class="text-2xl font-bold text-[#0b1b4d]"><?= htmlspecialchars($pageTitle) ?></h1>
