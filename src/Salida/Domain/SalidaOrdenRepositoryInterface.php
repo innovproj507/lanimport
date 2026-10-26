@@ -36,8 +36,11 @@ interface SalidaOrdenRepositoryInterface
      * Para la "Orden de carga" que trafico imprime y entrega a bodega: cada bulto de la salida
      * con su carga, n/total de la etiqueta y ubicacion, agrupados por carga (cajas reempacadas aparte).
      *
+     * "quedan": los bultos de la carga que NO van en esta salida (carga que sale en parte).
+     *
      * @return array<int, array{tracking: string, cliente: string, marca: ?string, totalCarga: int,
-     *     bultos: array<int, array{codigo: string, numero: ?int, ubicacion: ?string, escaneado: bool}>}>
+     *     bultos: array<int, array{codigo: string, numero: ?int, ubicacion: ?string, escaneado: bool}>,
+     *     quedan: array<int, array{codigo: string, numero: ?int, ubicacion: ?string, estado: string, otraSalida: ?string}>}>
      */
     public function detalleCargue(string $ordenId): array;
 

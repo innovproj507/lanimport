@@ -277,6 +277,12 @@ final class SalidaController extends BaseController
             'navieras' => $navieras,
             'fotos' => $this->container()->get(FotoEvidenciaRepositoryInterface::class)->listar(TipoEvidencia::Salida, $orden->id()),
             'otrasSalidas' => $orden->estado()->value === 'pendiente' ? $this->otrasSalidas($orden) : [],
+            // Cargas que salen en parte: que bultos se quedan (por carga), para que trafico lo vea.
+            'quedanPorCarga' => array_column(
+                $this->container()->get(SalidaOrdenRepositoryInterface::class)->detalleCargue($orden->id()),
+                'quedan',
+                'cargaId',
+            ),
             'mensaje' => $mensaje,
             'error' => $error,
         ]);

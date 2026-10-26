@@ -7,7 +7,7 @@ declare(strict_types=1);
  * por carga, las etiquetas exactas (LPN) que suben, con su ubicacion, para buscarlas y escanearlas.
  */
 /** @var \Courier\Salida\Domain\SalidaOrden $orden */
-/** @var array<int, array{tracking: string, cliente: string, marca: ?string, totalCarga: int, bultos: array<int, array{codigo: string, numero: ?int, ubicacion: ?string, escaneado: bool}>}> $grupos */
+/** @var array<int, array{tracking: string, cliente: string, marca: ?string, totalCarga: int, bultos: array<int, array{codigo: string, numero: ?int, ubicacion: ?string, escaneado: bool}>, quedan: array<int, array{codigo: string, numero: ?int, ubicacion: ?string, estado: string, otraSalida: ?string}>}> $grupos */
 /** @var \Courier\Configuracion\Domain\DatosEmpresa $empresa */
 /** @var string|null $usuario quien armo la salida */
 
@@ -44,6 +44,11 @@ $totalBultos = array_sum(array_map(static fn (array $g) => count($g['bultos']), 
         .bulto .codigo { font-family: 'Courier New', monospace; font-weight: 700; }
         .bulto .n { color: #444; }
         .bulto .ubic { margin-left: auto; color: #555; font-size: 10px; }
+        .quedan { border-top: 2px dashed #999; background: #fafafa; }
+        .quedan-titulo { padding: 4px 10px; font-weight: 700; font-size: 11px; color: #b91c1c; }
+        .quedan .bulto { color: #666; }
+        .quedan .codigo { text-decoration: line-through; font-weight: 400; }
+        .no { width: 13px; text-align: center; color: #b91c1c; font-weight: 700; flex-shrink: 0; }
         .firmas { display: grid; grid-template-columns: repeat(2, 1fr); gap: 40px; margin-top: 40px; }
         .firma { border-top: 1px solid #111; padding-top: 4px; text-align: center; font-size: 11px; }
         .meta { font-size: 10px; color: #555; margin-top: 16px; text-align: right; }
@@ -90,7 +95,7 @@ $totalBultos = array_sum(array_map(static fn (array $g) => count($g['bultos']), 
         <div class="carga">
             <div class="carga-titulo">
                 <span><span class="tracking"><?= $e($g['tracking']) ?></span> · <?= $e(mb_strtoupper($g['cliente'])) ?><?= $g['marca'] ? ' · ' . $e(mb_strtoupper($g['marca'])) : '' ?></span>
-                <span><?= count($g['bultos']) ?><?= $g['totalCarga'] > count($g['bultos']) ? ' de ' . $g['totalCarga'] : '' ?> bultos</span>
+                <span><?= count($g['bultos']) ?><?= $g['totalCarga'] > count($g['bultos']) ? ' de ' . $g['totalCarga'] : '' ?> bultos suben<?= !empty($g['quedan']) ? ' · ' . count($g['quedan']) . ' se quedan' : '' ?></span>
             </div>
             <div class="bultos">
                 <?php foreach ($g['bultos'] as $b): ?>
@@ -102,6 +107,22 @@ $totalBultos = array_sum(array_map(static fn (array $g) => count($g['bultos']), 
                     </div>
                 <?php endforeach; ?>
             </div>
+            <?php if (!empty($g['quedan'])): ?>
+                <?php // Carga que sale en parte: estas etiquetas NO se suben a este contenedor. ?>
+                <div class="quedan">
+                    <div class="quedan-titulo">NO SUBIR · se quedan (<?= count($g['quedan']) ?>)</div>
+                    <div class="bultos">
+                        <?php foreach ($g['quedan'] as $q): ?>
+                            <div class="bulto">
+                                <span class="no">✕</span>
+                                <span class="codigo"><?= $e($q['codigo']) ?></span>
+                                <?php if ($q['numero'] !== null && $g['totalCarga'] > 0): ?><span class="n"><?= $q['numero'] ?>/<?= $g['totalCarga'] ?></span><?php endif; ?>
+                                <span class="ubic"><?= $e($q['otraSalida'] ? 'va en ' . $q['otraSalida'] : ($q['estado'] === 'receiving' ? 'sin escanear' : ($q['ubicacion'] ?? ''))) ?></span>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+            <?php endif; ?>
         </div>
     <?php endforeach; ?>
 

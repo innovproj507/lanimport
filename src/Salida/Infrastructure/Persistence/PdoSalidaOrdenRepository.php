@@ -231,6 +231,7 @@ final class PdoSalidaOrdenRepository implements SalidaOrdenRepositoryInterface
             // Una caja reempacada no tiene carga propia: va como grupo propio.
             $clave = $f['carga_id'] !== null ? (string) $f['carga_id'] : 'caja-' . $f['lpn_id'];
             $grupos[$clave] ??= [
+                'cargaId' => $clave,
                 'tracking' => $f['tracking_numero'] !== null ? (string) $f['tracking_numero'] : 'Caja reempacada',
                 'cliente' => (string) ($f['cliente'] ?? ''),
                 'marca' => $f['marca'] !== null ? (string) $f['marca'] : null,
@@ -243,6 +244,36 @@ final class PdoSalidaOrdenRepository implements SalidaOrdenRepositoryInterface
                 'ubicacion' => $f['ubicacion'] !== null ? (string) $f['ubicacion'] : null,
                 'escaneado' => (bool) $f['escaneado'],
             ];
+        }
+
+        // Carga que sale en parte: los bultos que NO van en esta salida (se quedan en bodega o van en
+        // otra), para que trafico y bodega sepan cuales no se suben.
+        $quedan = $this->connection->prepare(
+            "SELECT l.codigo, l.orden_en_carga, l.estado, u.codigo AS ubicacion,
+                    (SELECT CONCAT('DO.', s.do_numero) FROM salida_lineas x JOIN salida_ordenes s ON s.id = x.salida_orden_id
+                     WHERE x.lpn_id = l.id AND s.estado <> 'cancelada' ORDER BY s.created_at DESC LIMIT 1) AS otra_salida
+             FROM lpns l
+             LEFT JOIN ubicaciones u ON u.id = l.ubicacion_id
+             WHERE l.carga_id = :carga AND l.estado <> 'consumed'
+               AND NOT EXISTS (SELECT 1 FROM salida_lineas sl WHERE sl.lpn_id = l.id AND sl.salida_orden_id = :orden)
+             ORDER BY l.orden_en_carga, l.codigo"
+        );
+
+        foreach ($grupos as $clave => $g) {
+            $grupos[$clave]['quedan'] = [];
+
+            if (str_starts_with((string) $clave, 'caja-')) {
+                continue;
+            }
+
+            $quedan->execute([':carga' => $clave, ':orden' => $ordenId]);
+            $grupos[$clave]['quedan'] = array_map(static fn (array $f) => [
+                'codigo' => (string) $f['codigo'],
+                'numero' => $f['orden_en_carga'] !== null ? (int) $f['orden_en_carga'] : null,
+                'ubicacion' => $f['ubicacion'] !== null ? (string) $f['ubicacion'] : null,
+                'estado' => (string) $f['estado'],
+                'otraSalida' => $f['otra_salida'] !== null ? (string) $f['otra_salida'] : null,
+            ], $quedan->fetchAll(PDO::FETCH_ASSOC));
         }
 
         return array_values($grupos);

@@ -203,6 +203,12 @@ $opcionSalida = static fn (array $s): string => $s['etiqueta']
                             <?php else: ?>
                                 <?= htmlspecialchars($grupo['tracking']) ?>
                             <?php endif; ?>
+                            <?php $quedan = $quedanPorCarga[$grupo['cargaId']] ?? []; if ($quedan !== []): ?>
+                                <?php // Carga que sale en parte: cuantos suben aqui y cuantos se quedan (se ven con +). ?>
+                                <span class="block mt-1 font-sans font-normal text-xs text-amber-700">
+                                    Parcial: <?= $grupo['total'] ?> de <?= $grupo['total'] + count($quedan) ?> suben · <?= count($quedan) ?> se quedan
+                                </span>
+                            <?php endif; ?>
                             <?php if ($planifica && !$confirmada && !$cancelada): ?>
                                 <?php // Sacar la carga de este DO: a otro DO (conserva lo escaneado) o de vuelta a bodega. ?>
                                 <details class="mt-1 font-sans font-normal">
@@ -242,6 +248,14 @@ $opcionSalida = static fn (array $s): string => $s['etiqueta']
                             <td class="py-1.5 text-right salida-linea-estado">
                                 <?= $linea->escaneado() ? badge('Escaneado', 'emerald') : badge('Pendiente', 'slate') ?>
                             </td>
+                        </tr>
+                    <?php endforeach; ?>
+                    <?php foreach ($quedanPorCarga[$grupo['cargaId']] ?? [] as $q): ?>
+                        <?php // Bultos de la carga que NO van en esta salida (sin data-codigo: no cuentan para el escaneo). ?>
+                        <tr class="hidden border-b border-slate-100 bg-slate-50 text-zinc-400" data-carga="<?= htmlspecialchars($grupo['cargaId']) ?>" data-queda="1">
+                            <td class="py-1.5 pr-4 pl-6 font-mono line-through"><?= htmlspecialchars($q['codigo']) ?></td>
+                            <td class="py-1.5 pr-4 text-xs" colspan="2"><?= htmlspecialchars($q['otraSalida'] ? 'Va en ' . $q['otraSalida'] : ($q['estado'] === 'receiving' ? 'Sin escanear en recepcion' : ($q['ubicacion'] ?? 'Bodega general'))) ?></td>
+                            <td class="py-1.5 text-right"><?= badge('Se queda', 'amber') ?></td>
                         </tr>
                     <?php endforeach; ?>
                 <?php endforeach; ?>
