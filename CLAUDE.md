@@ -113,7 +113,7 @@ The paper delivery form (empresa de transporte, chofer, placa, entregado por, ce
 ### Salidas: embarque y manifiesto
 
 - "Armar salida" (`GET /salidas`, view `salida/armar.php`): Trafico fills the container data and checks **cargas** (not LPNs).
-  - The list comes from `Salida\Domain\CargasParaSalidaInterface` (`PdoCargasParaSalida`). It shows every carga en bodega, ready ones first; the rest are disabled with the reason (sin etiquetas / por escanear / en otra salida).
+  - The list comes from `Salida\Domain\CargasParaSalidaInterface` (`PdoCargasParaSalida`). It shows every carga en bodega, ready ones first; the rest are disabled with the reason (sin etiquetas / por escanear / en otra salida). It can be filtered client-side by text, "solo listas" and aduanero (`armar-aduanero`).
   - `POST /salidas` takes each checked carga's scanned, free LPNs. A partial carga ships what was scanned, and the rest stays as saldo.
   - **Dividing a carga between containers:** Trafico types "Bultos a subir" (`cantidad[cargaId]`, default all ready). `SalidaController::lpnsDeCargasMarcadas()` takes the first N ready LPNs by consecutive (`CargasParaSalidaInterface::lpnsListosPorCarga()`); the rest stays available for the next DO. "Agregar cargas" works the same way.
   - **Choosing exact bultos:** per carga, "Elegir etiquetas" opens a modal with its ready LPNs (`GET /salidas/lpns-listos/{cargaId}`, `CargasParaSalidaInterface::lpnsListosDetalle()`). The chosen LPNs post as `lpns[cargaId][]` and override the quantity. The server checks they are still available.
