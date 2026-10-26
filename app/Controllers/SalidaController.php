@@ -80,6 +80,8 @@ final class SalidaController extends BaseController
             'seleccionadas' => $seleccionadas,
             // "Bultos a subir" ya escritos (si hubo un error), por carga.
             'cantidades' => is_array($cantidades) ? array_map('intval', $cantidades) : [],
+            // Etiquetas exactas ya elegidas por carga (si hubo un error), para no perderlas.
+            'elegidas' => is_array($this->request->getPost('lpns')) ? $this->request->getPost('lpns') : [],
             'embarque' => $embarque,
             'ordenDestino' => $ordenDestino,
             'error' => $error,
@@ -99,10 +101,28 @@ final class SalidaController extends BaseController
         $listos = $this->container()->get(CargasParaSalidaInterface::class)->lpnsListosPorCarga($cargaIds);
         $cantidades = $this->request->getPost('cantidad');
         $cantidades = is_array($cantidades) ? $cantidades : [];
+        // Etiquetas exactas que eligio trafico ("Elegir etiquetas"): lpns[cargaId][] = lpnId.
+        $elegidas = $this->request->getPost('lpns');
+        $elegidas = is_array($elegidas) ? $elegidas : [];
         $lpnIds = [];
 
         foreach ($cargaIds as $cargaId) {
             $disponibles = $listos[$cargaId] ?? [];
+
+            if (!empty($elegidas[$cargaId]) && is_array($elegidas[$cargaId])) {
+                $pedidas = array_values(array_unique(array_map('strval', $elegidas[$cargaId])));
+                $noListas = array_diff($pedidas, $disponibles);
+
+                if ($noListas !== []) {
+                    $tracking = (string) ($this->container()->get(CargaRepositoryInterface::class)->findById($cargaId)?->trackingNumero() ?? 'la carga');
+
+                    throw new ValidationException("De la carga {$tracking}, " . count($noListas) . ' de las etiquetas elegidas ya no estan disponibles (otra salida las tomo o cambiaron de estado). Vuelva a elegirlas.');
+                }
+
+                array_push($lpnIds, ...$pedidas);
+
+                continue;
+            }
             $pedida = isset($cantidades[$cargaId]) && trim((string) $cantidades[$cargaId]) !== '' ? (int) $cantidades[$cargaId] : count($disponibles);
 
             if ($pedida < 1 || $pedida > count($disponibles)) {
@@ -117,6 +137,14 @@ final class SalidaController extends BaseController
         }
 
         return $lpnIds;
+    }
+
+    /** JSON: bultos listos de una carga, para "Elegir etiquetas" en Armar salida / Agregar cargas. */
+    public function lpnsListos(string $cargaId): ResponseInterface
+    {
+        return $this->response->setJSON([
+            'lpns' => $this->container()->get(CargasParaSalidaInterface::class)->lpnsListosDetalle($cargaId),
+        ]);
     }
 
     /** Agregar cargas a una salida pendiente: la misma lista de "Armar salida", sin el contenedor. */
@@ -211,7 +239,7 @@ final class SalidaController extends BaseController
                 ],
             ));
 
-            $_SESSION['salida_mensaje'] = 'Salida creada con ' . count($lpnIds) . ' bultos (' . count($cargaIds) . ' carga(s)' . ($cajaIds !== [] ? ' y ' . count($cajaIds) . ' caja(s) reempacada(s)' : '') . '). Bodega ya puede escanearlos al cargar el contenedor.';
+            $_SESSION['salida_mensaje'] = 'Salida creada con ' . count($lpnIds) . ' bultos (' . count($cargaIds) . ' carga(s)' . ($cajaIds !== [] ? ' y ' . count($cajaIds) . ' caja(s) reempacada(s)' : '') . '). Imprima la "Orden de carga (bodega)" y entreguela a bodega para que los escanee al cargar el contenedor.';
 
             return redirect()->to('/salidas/' . $ordenId);
         } catch (ValidationException $e) {
@@ -358,6 +386,28 @@ final class SalidaController extends BaseController
         }
 
         return ['orden' => $orden, 'filas' => $filas, 'aduaneros' => $aduaneros, 'aduanero' => $aduanero];
+    }
+
+    /**
+     * "Orden de carga" que trafico imprime y entrega a bodega: el contenedor y, por carga, las
+     * etiquetas exactas que deben subir (con su ubicacion), para que bodega las busque y escanee.
+     */
+    public function ordenCarga(string $id): string
+    {
+        $orden = $this->container()->get(VerOrdenSalidaHandler::class)->handle(new VerOrdenSalidaQuery($id));
+
+        if ($orden === null) {
+            $this->response->setStatusCode(404);
+
+            return 'Orden de salida no encontrada.';
+        }
+
+        return view('salida/orden_carga_imprimir', [
+            'orden' => $orden,
+            'grupos' => $this->container()->get(SalidaOrdenRepositoryInterface::class)->detalleCargue($orden->id()),
+            'empresa' => $this->container()->get(ConfiguracionRepositoryInterface::class)->datosEmpresa(),
+            'usuario' => $this->container()->get(\Courier\Auth\Domain\UsuarioRepositoryInterface::class)->findById($orden->creadoPorUsuarioId())?->nombre(),
+        ]);
     }
 
     public function manifiesto(string $id): string

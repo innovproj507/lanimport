@@ -47,4 +47,12 @@ interface CargasParaSalidaInterface
      * @return array<string, array<int, string>> cargaId => ids de LPN
      */
     public function lpnsListosPorCarga(array $cargaIds): array;
+
+    /**
+     * Bultos listos (escaneados y libres) de una carga, para que trafico elija cuales suben.
+     *
+     * @return array<int, array{id: string, codigo: string, numero: ?int, total: int, ubicacion: ?string}>
+     *         numero/total: el "12/30" de la etiqueta
+     */
+    public function lpnsListosDetalle(string $cargaId): array;
 }

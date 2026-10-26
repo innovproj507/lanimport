@@ -209,6 +209,45 @@ final class PdoSalidaOrdenRepository implements SalidaOrdenRepositoryInterface
         return $porCarga;
     }
 
+    public function detalleCargue(string $ordenId): array
+    {
+        $stmt = $this->connection->prepare(
+            "SELECT l.carga_id, l.id AS lpn_id, l.codigo, l.orden_en_carga, l.marca, sl.escaneado,
+                    ca.tracking_numero, TRIM(CONCAT(c.nombre, ' ', COALESCE(c.apellido, ''))) AS cliente,
+                    u.codigo AS ubicacion,
+                    (SELECT COUNT(*) FROM lpns t WHERE t.carga_id = l.carga_id) AS total_carga
+             FROM salida_lineas sl
+             JOIN lpns l ON l.id = sl.lpn_id
+             LEFT JOIN cargas ca ON ca.id = l.carga_id
+             LEFT JOIN clientes c ON c.id = l.cliente_id
+             LEFT JOIN ubicaciones u ON u.id = l.ubicacion_id
+             WHERE sl.salida_orden_id = :orden
+             ORDER BY ca.tracking_numero, l.orden_en_carga, l.codigo"
+        );
+        $stmt->execute([':orden' => $ordenId]);
+
+        $grupos = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $f) {
+            // Una caja reempacada no tiene carga propia: va como grupo propio.
+            $clave = $f['carga_id'] !== null ? (string) $f['carga_id'] : 'caja-' . $f['lpn_id'];
+            $grupos[$clave] ??= [
+                'tracking' => $f['tracking_numero'] !== null ? (string) $f['tracking_numero'] : 'Caja reempacada',
+                'cliente' => (string) ($f['cliente'] ?? ''),
+                'marca' => $f['marca'] !== null ? (string) $f['marca'] : null,
+                'totalCarga' => (int) $f['total_carga'],
+                'bultos' => [],
+            ];
+            $grupos[$clave]['bultos'][] = [
+                'codigo' => (string) $f['codigo'],
+                'numero' => $f['orden_en_carga'] !== null ? (int) $f['orden_en_carga'] : null,
+                'ubicacion' => $f['ubicacion'] !== null ? (string) $f['ubicacion'] : null,
+                'escaneado' => (bool) $f['escaneado'],
+            ];
+        }
+
+        return array_values($grupos);
+    }
+
     public function ordenesConCarga(string $cargaId): array
     {
         $stmt = $this->connection->prepare(

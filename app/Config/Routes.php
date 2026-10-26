@@ -179,6 +179,8 @@ $routes->get('salidas/(:segment)', 'SalidaController::show/$1', ['filter' => $bo
 $routes->post('salidas/(:segment)/escanear', 'SalidaController::confirmarEscaneo/$1', ['filter' => $bodegaFilter]);
 $routes->post('salidas/(:segment)/finalizar', 'SalidaController::finalizar/$1', ['filter' => $bodegaFilter]);
 $routes->post('salidas/(:segment)/cancelar', 'SalidaController::cancelar/$1', ['filter' => $planificaSalida]);
+// Bultos listos de una carga, para "Elegir etiquetas" al armar el contenedor (va antes de salidas/(:segment)).
+$routes->get('salidas/lpns-listos/(:segment)', 'SalidaController::lpnsListos/$1', ['filter' => $planificaSalida]);
 $routes->get('salidas/(:segment)/agregar', 'SalidaController::agregarForm/$1', ['filter' => $planificaSalida]);
 $routes->post('salidas/(:segment)/agregar', 'SalidaController::agregar/$1', ['filter' => $planificaSalida]);
 // Unir este DO a otro del mismo contenedor, pasar una carga a otro DO o devolverla a bodega.
@@ -187,6 +189,7 @@ $routes->post('salidas/(:segment)/mover-carga', 'SalidaController::moverCarga/$1
 $routes->post('salidas/(:segment)/devolver-carga', 'SalidaController::devolverCarga/$1', ['filter' => $planificaSalida]);
 $routes->post('salidas/(:segment)/embarque','SalidaController::guardarEmbarque/$1', ['filter' => $planificaSalida]);
 $routes->get('salidas/(:segment)/manifiesto', 'SalidaController::manifiesto/$1', ['filter' => $bodegaFilter]);
+$routes->get('salidas/(:segment)/orden-carga', 'SalidaController::ordenCarga/$1', ['filter' => $bodegaFilter]);
 $routes->get('salidas/(:segment)/reporte', 'SalidaController::reporte/$1', ['filter' => $bodegaFilter]);
 $routes->get('salidas/(:segment)/reporte/excel', 'SalidaController::reporteExcel/$1', ['filter' => $bodegaFilter]);
 

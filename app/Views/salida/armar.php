@@ -12,6 +12,8 @@ use App\Libraries\Csrf;
 /** @var array<int, \Courier\Naviera\Domain\Naviera> $navieras */
 /** @var array<int, string> $seleccionadas */
 /** @var array<string, int> $cantidades "Bultos a subir" ya escritos por carga (si hubo un error) */
+/** @var array<string, array<int, string>> $elegidas etiquetas exactas elegidas por carga (si hubo un error) */
+$elegidas ??= [];
 /** @var array<string, string> $embarque */
 /** @var string|null $error */
 /** @var \Courier\Salida\Domain\SalidaOrden|null $ordenDestino si viene, se agregan cargas a esa salida pendiente */
@@ -175,17 +177,26 @@ $listas = count(array_filter($cargas, static fn (array $c) => $c['listos'] > 0))
                                 <td class="py-2 pr-3"><?= htmlspecialchars($c['marca'] ?? '—') ?></td>
                                 <td class="py-2 pr-3"><?= htmlspecialchars($c['proveedor']) ?></td>
                                 <td class="py-2 pr-3 text-right whitespace-nowrap">
-                                    <?php if ($puede): ?>
-                                        <?php // Trafico decide cuantos bultos de la carga suben a este contenedor; el resto queda en bodega. ?>
+                                    <?php if ($puede): $yaElegidas = array_values(array_filter((array) ($elegidas[$c['cargaId']] ?? []))); ?>
+                                        <?php // Trafico decide cuantos bultos (o cuales, con "Elegir etiquetas") suben a este contenedor; el resto queda en bodega. ?>
                                         <input type="number" name="cantidad[<?= htmlspecialchars($c['cargaId']) ?>]" min="1" max="<?= $c['listos'] ?>" step="1"
-                                               value="<?= (int) ($cantidades[$c['cargaId']] ?? $c['listos']) ?>" data-listos="<?= $c['listos'] ?>"
+                                               value="<?= $yaElegidas !== [] ? count($yaElegidas) : (int) ($cantidades[$c['cargaId']] ?? $c['listos']) ?>" data-listos="<?= $c['listos'] ?>"
                                                title="Bultos de esta carga que suben a este contenedor (de <?= $c['listos'] ?> listos)"
-                                               class="armar-cantidad w-20 rounded-lg border border-zinc-300 bg-white text-black text-right px-2 py-1 text-sm focus:ring-2 focus:ring-amber-400 focus:outline-none disabled:bg-slate-100 disabled:text-zinc-400"
-                                               <?= $marcada ? '' : 'disabled' ?>>
+                                               class="armar-cantidad w-20 rounded-lg border border-zinc-300 bg-white text-black text-right px-2 py-1 text-sm focus:ring-2 focus:ring-amber-400 focus:outline-none disabled:bg-slate-100 disabled:text-zinc-400 read-only:bg-amber-50"
+                                               <?= $marcada ? '' : 'disabled' ?> <?= $yaElegidas !== [] ? 'readonly' : '' ?>>
                                         <span class="text-xs text-zinc-500">de <?= $n($c['listos']) ?></span>
                                         <?php if ($c['listos'] < $c['bultos']): ?>
                                             <span class="block text-xs text-zinc-400"><?= $n($c['bultos']) ?> en total</span>
                                         <?php endif; ?>
+                                        <button type="button" class="armar-elegir block ml-auto mt-1 text-xs text-blue-700 hover:underline disabled:text-zinc-300 disabled:no-underline"
+                                                data-carga="<?= htmlspecialchars($c['cargaId']) ?>" data-tracking="<?= htmlspecialchars($c['tracking']) ?>" <?= $marcada ? '' : 'disabled' ?>>
+                                            <?= $yaElegidas !== [] ? count($yaElegidas) . ' elegidas · cambiar' : 'Elegir etiquetas' ?>
+                                        </button>
+                                        <span class="armar-elegidas" data-carga="<?= htmlspecialchars($c['cargaId']) ?>">
+                                            <?php foreach ($yaElegidas as $lpnId): ?>
+                                                <input type="hidden" name="lpns[<?= htmlspecialchars($c['cargaId']) ?>][]" value="<?= htmlspecialchars((string) $lpnId) ?>">
+                                            <?php endforeach; ?>
+                                        </span>
                                     <?php else: ?>
                                         <?= $n($c['bultos']) ?>
                                     <?php endif; ?>
@@ -244,6 +255,30 @@ $listas = count(array_filter($cargas, static fn (array $c) => $c['listos'] > 0))
     </div>
 </form>
 
+<!-- Elegir etiquetas: los bultos exactos de una carga que suben a este contenedor -->
+<div id="modal-elegir" class="hidden fixed inset-0 bg-black/60 z-50 items-center justify-center p-4">
+    <div class="bg-white rounded-xl shadow-xl max-w-lg w-full flex flex-col max-h-[85vh]">
+        <div class="p-5 border-b border-slate-200">
+            <h2 class="font-semibold text-black text-lg">Elegir etiquetas · <span id="elegir-titulo" class="font-mono"></span></h2>
+            <p class="text-xs text-zinc-500 mt-1">Marque los bultos de esta carga que suben a este contenedor. Solo aparecen los escaneados y libres. Los demas quedan en bodega.</p>
+            <div class="flex items-center gap-2 mt-3">
+                <input type="search" id="elegir-buscar" placeholder="Buscar etiqueta o ubicacion..."
+                       class="flex-1 rounded-lg border border-zinc-300 bg-white text-black px-3 py-1.5 text-sm focus:ring-2 focus:ring-amber-400 focus:outline-none">
+                <button type="button" id="elegir-todas" class="text-xs rounded-lg border border-zinc-300 px-2 py-1.5 hover:bg-slate-100">Todas</button>
+                <button type="button" id="elegir-ninguna" class="text-xs rounded-lg border border-zinc-300 px-2 py-1.5 hover:bg-slate-100">Ninguna</button>
+            </div>
+        </div>
+        <div id="elegir-lista" class="overflow-y-auto flex-1"></div>
+        <div class="p-4 border-t border-slate-200 flex items-center justify-between gap-3">
+            <span class="text-sm text-zinc-600"><strong id="elegir-cuenta" class="text-black">0</strong> elegidas</span>
+            <div class="flex gap-2">
+                <button type="button" data-cerrar-eleccion class="bg-slate-200 text-zinc-800 rounded-lg px-4 py-2 text-sm font-medium hover:bg-slate-300">Cancelar</button>
+                <button type="button" id="elegir-aplicar" class="bg-amber-500 text-black rounded-lg px-4 py-2 text-sm font-medium hover:bg-amber-400">Usar estas etiquetas</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
 document.addEventListener('DOMContentLoaded', function () {
     var tbody = document.getElementById('armar-cargas');
@@ -290,9 +325,14 @@ document.addEventListener('DOMContentLoaded', function () {
             var cantidad = fila.querySelector('.armar-cantidad');
             fila.classList.toggle('bg-amber-100', check.checked);
 
-            // "Bultos a subir" solo se edita (y se envia) en las cargas marcadas.
+            // "Bultos a subir" y "Elegir etiquetas" solo en las cargas marcadas.
             if (cantidad) {
                 cantidad.disabled = !check.checked;
+            }
+
+            var elegir = fila.querySelector('.armar-elegir');
+            if (elegir) {
+                elegir.disabled = !check.checked;
             }
         });
     }
@@ -315,8 +355,14 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Clic en cualquier parte de la fila marca la carga (si se puede).
     tbody.addEventListener('click', function (evento) {
-        // Escribir en "Bultos a subir" no marca ni desmarca la carga.
+        // Escribir en "Bultos a subir" no marca ni desmarca la carga; "Elegir etiquetas" abre la ventana.
         if (evento.target.closest('.armar-cantidad')) {
+            return;
+        }
+
+        var elegir = evento.target.closest('.armar-elegir');
+        if (elegir) {
+            abrirEleccion(elegir);
             return;
         }
 
@@ -327,6 +373,99 @@ document.addEventListener('DOMContentLoaded', function () {
             check.checked = !check.checked;
         }
 
+        totales();
+    });
+
+    // ---- Elegir etiquetas: trafico marca los bultos exactos de la carga que suben a este contenedor ----
+    var modal = document.getElementById('modal-elegir');
+    var listaLpns = document.getElementById('elegir-lista');
+    var botonActual = null;
+
+    function marcadosEnModal() {
+        return Array.prototype.map.call(listaLpns.querySelectorAll('input[type=checkbox]:checked'), function (c) { return c.value; });
+    }
+
+    function contarModal() {
+        document.getElementById('elegir-cuenta').textContent = marcadosEnModal().length;
+    }
+
+    function abrirEleccion(boton) {
+        botonActual = boton;
+        var carga = boton.getAttribute('data-carga');
+        var yaElegidas = Array.prototype.map.call(
+            document.querySelectorAll('.armar-elegidas[data-carga="' + carga + '"] input'),
+            function (i) { return i.value; }
+        );
+        document.getElementById('elegir-titulo').textContent = boton.getAttribute('data-tracking');
+        document.getElementById('elegir-buscar').value = '';
+        listaLpns.innerHTML = '<p class="text-sm text-zinc-500 p-3">Cargando...</p>';
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+
+        fetch('/salidas/lpns-listos/' + encodeURIComponent(carga), { headers: { 'Accept': 'application/json' } })
+            .then(function (r) { return r.json(); })
+            .then(function (datos) {
+                listaLpns.innerHTML = datos.lpns.length === 0
+                    ? '<p class="text-sm text-zinc-500 p-3">Esta carga no tiene bultos listos (escaneados y libres).</p>'
+                    : datos.lpns.map(function (l) {
+                        var marcado = yaElegidas.indexOf(l.id) !== -1 ? 'checked' : '';
+                        return '<label class="flex items-center gap-3 px-3 py-2 border-b border-slate-100 hover:bg-amber-50 cursor-pointer" data-buscar="' + (l.codigo + ' ' + (l.ubicacion || '')).toLowerCase() + '">'
+                            + '<input type="checkbox" value="' + l.id + '" ' + marcado + ' class="rounded border-zinc-300 text-amber-500 focus:ring-amber-400">'
+                            + '<span class="font-mono text-sm text-black flex-1">' + l.codigo + '</span>'
+                            + '<span class="text-xs text-zinc-500 w-16 text-right">' + (l.numero ? l.numero + '/' + l.total : '') + '</span>'
+                            + '<span class="text-xs text-zinc-500 w-24 text-right">' + (l.ubicacion || 'Bodega general') + '</span>'
+                            + '</label>';
+                    }).join('');
+                contarModal();
+            }, function () {
+                listaLpns.innerHTML = '<p class="text-sm text-red-600 p-3">No se pudo cargar la lista. Intente de nuevo.</p>';
+            });
+    }
+
+    function cerrarEleccion() {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+    }
+
+    listaLpns.addEventListener('change', contarModal);
+    document.getElementById('elegir-buscar').addEventListener('input', function () {
+        var texto = this.value.trim().toLowerCase();
+        listaLpns.querySelectorAll('label').forEach(function (l) {
+            l.classList.toggle('hidden', texto !== '' && l.getAttribute('data-buscar').indexOf(texto) === -1);
+        });
+    });
+    document.getElementById('elegir-todas').addEventListener('click', function () {
+        listaLpns.querySelectorAll('label:not(.hidden) input').forEach(function (c) { c.checked = true; });
+        contarModal();
+    });
+    document.getElementById('elegir-ninguna').addEventListener('click', function () {
+        listaLpns.querySelectorAll('label:not(.hidden) input').forEach(function (c) { c.checked = false; });
+        contarModal();
+    });
+    modal.querySelectorAll('[data-cerrar-eleccion]').forEach(function (b) { b.addEventListener('click', cerrarEleccion); });
+
+    // Aplicar: las etiquetas elegidas van en lpns[carga][] y "Bultos a subir" muestra cuantas (sin poder editarlo).
+    document.getElementById('elegir-aplicar').addEventListener('click', function () {
+        var carga = botonActual.getAttribute('data-carga');
+        var elegidas = marcadosEnModal();
+        var destino = document.querySelector('.armar-elegidas[data-carga="' + carga + '"]');
+        var cantidad = botonActual.closest('tr').querySelector('.armar-cantidad');
+
+        destino.innerHTML = elegidas.map(function (id) {
+            return '<input type="hidden" name="lpns[' + carga + '][]" value="' + id + '">';
+        }).join('');
+
+        if (elegidas.length > 0) {
+            cantidad.value = elegidas.length;
+            cantidad.readOnly = true;
+            botonActual.textContent = elegidas.length + ' elegidas · cambiar';
+        } else {
+            cantidad.value = cantidad.getAttribute('data-listos');
+            cantidad.readOnly = false;
+            botonActual.textContent = 'Elegir etiquetas';
+        }
+
+        cerrarEleccion();
         totales();
     });
 
