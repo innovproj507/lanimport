@@ -18,7 +18,7 @@ final class PdoCargasParaSalida implements CargasParaSalidaInterface
     public function listar(): array
     {
         $filas = $this->connection->query(
-            "SELECT c.id, c.tracking_numero, c.cliente_id, c.proveedor, c.fecha_ingreso,
+            "SELECT c.id, c.tracking_numero, c.cliente_id, c.proveedor, c.fecha_ingreso, c.aduanero_nombre,
                     TRIM(CONCAT(cl.nombre, ' ', COALESCE(cl.apellido, ''))) AS cliente,
                     DATEDIFF(CURDATE(), c.fecha_ingreso) AS dias,
                     li.marca, COALESCE(li.bultos, 0) AS bultos, COALESCE(li.peso, 0) AS peso,
@@ -57,6 +57,7 @@ final class PdoCargasParaSalida implements CargasParaSalidaInterface
                 'cliente' => (string) $f['cliente'],
                 'marca' => $f['marca'] !== null ? (string) $f['marca'] : null,
                 'proveedor' => (string) $f['proveedor'],
+                'aduanero' => (string) ($f['aduanero_nombre'] ?? ''),
                 'fechaIngreso' => (string) $f['fecha_ingreso'],
                 'dias' => max(0, (int) $f['dias']),
                 'bultos' => $bultos,

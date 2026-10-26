@@ -100,6 +100,13 @@ $listas = count(array_filter($cargas, static fn (array $c) => $c['listos'] > 0))
             <div class="flex flex-wrap items-center gap-3">
                 <input type="search" id="armar-buscar" placeholder="Buscar cliente, marca, tracking o compania..."
                        class="w-72 rounded-lg border border-zinc-300 bg-white text-black px-3 py-2 text-sm focus:ring-2 focus:ring-amber-400 focus:outline-none">
+                <?php $aduanerosLista = array_values(array_unique(array_filter(array_column($cargas, 'aduanero')))); sort($aduanerosLista); ?>
+                <select id="armar-aduanero" class="rounded-lg border border-zinc-300 bg-white text-black px-3 py-2 text-sm focus:ring-2 focus:ring-amber-400 focus:outline-none">
+                    <option value="">Todos los aduaneros</option>
+                    <?php foreach ($aduanerosLista as $aduaneroNombre): ?>
+                        <option value="<?= htmlspecialchars(mb_strtolower($aduaneroNombre)) ?>"><?= htmlspecialchars($aduaneroNombre) ?></option>
+                    <?php endforeach; ?>
+                </select>
                 <label class="inline-flex items-center gap-2 text-sm text-zinc-700">
                     <input type="checkbox" id="armar-solo-listas" class="rounded border-zinc-300 text-amber-500 focus:ring-amber-400">
                     Solo listas para salir (<?= $listas ?>)
@@ -124,6 +131,7 @@ $listas = count(array_filter($cargas, static fn (array $c) => $c['listos'] > 0))
                             <th class="py-2 pr-3">Cliente</th>
                             <th class="py-2 pr-3">Marca</th>
                             <th class="py-2 pr-3">Compania</th>
+                            <th class="py-2 pr-3">Aduanero</th>
                             <th class="py-2 pr-3 text-right" title="Al marcar una carga se puede indicar cuantos de sus bultos suben a este contenedor">Bultos a subir</th>
                             <th class="py-2 pr-3 text-right">Kilos</th>
                             <th class="py-2 pr-3 text-right">Valor</th>
@@ -151,6 +159,7 @@ $listas = count(array_filter($cargas, static fn (array $c) => $c['listos'] > 0))
                                 <td class="py-2 pr-3 text-black font-medium"><?= htmlspecialchars($caja['cliente']) ?></td>
                                 <td class="py-2 pr-3"><?= htmlspecialchars($caja['marca'] ?? '—') ?></td>
                                 <td class="py-2 pr-3 text-zinc-500">Reempaque</td>
+                                <td class="py-2 pr-3 text-zinc-400">—</td>
                                 <td class="py-2 pr-3 text-right"><?= $n($caja['bultos']) ?></td>
                                 <td class="py-2 pr-3 text-right"><?= $n($caja['peso'], 2) ?></td>
                                 <td class="py-2 pr-3 text-right"><?= $n($caja['valor'], 2) ?></td>
@@ -164,7 +173,7 @@ $listas = count(array_filter($cargas, static fn (array $c) => $c['listos'] > 0))
                             $busqueda = mb_strtolower($c['tracking'] . ' ' . $c['cliente'] . ' ' . ($c['marca'] ?? '') . ' ' . $c['proveedor']);
                             ?>
                             <tr class="border-b border-slate-100 <?= $puede ? 'hover:bg-amber-50 cursor-pointer' : 'text-zinc-400 bg-slate-50' ?>"
-                                data-buscar="<?= htmlspecialchars($busqueda) ?>" data-lista="<?= $puede ? '1' : '0' ?>">
+                                data-buscar="<?= htmlspecialchars($busqueda) ?>" data-lista="<?= $puede ? '1' : '0' ?>" data-aduanero="<?= htmlspecialchars(mb_strtolower($c['aduanero'])) ?>">
                                 <td class="py-2 pr-3">
                                     <input type="checkbox" name="carga_ids[]" value="<?= htmlspecialchars($c['cargaId']) ?>"
                                            class="armar-check rounded border-zinc-300 text-amber-500 focus:ring-amber-400 disabled:opacity-30"
@@ -176,6 +185,7 @@ $listas = count(array_filter($cargas, static fn (array $c) => $c['listos'] > 0))
                                 <td class="py-2 pr-3 <?= $puede ? 'text-black font-medium' : '' ?>"><?= htmlspecialchars($c['cliente']) ?></td>
                                 <td class="py-2 pr-3"><?= htmlspecialchars($c['marca'] ?? '—') ?></td>
                                 <td class="py-2 pr-3"><?= htmlspecialchars($c['proveedor']) ?></td>
+                                <td class="py-2 pr-3"><?= htmlspecialchars($c['aduanero'] !== '' ? $c['aduanero'] : '—') ?></td>
                                 <td class="py-2 pr-3 text-right whitespace-nowrap">
                                     <?php if ($puede): $yaElegidas = array_values(array_filter((array) ($elegidas[$c['cargaId']] ?? []))); ?>
                                         <?php // Trafico decide cuantos bultos (o cuales, con "Elegir etiquetas") suben a este contenedor; el resto queda en bodega. ?>
@@ -337,13 +347,17 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
+    var filtroAduanero = document.getElementById('armar-aduanero');
+
     function filtrar() {
         var texto = buscar.value.trim().toLowerCase();
+        var aduanero = filtroAduanero.value;
         var visibles = 0;
 
         tbody.querySelectorAll('tr').forEach(function (fila) {
             var coincide = (texto === '' || fila.dataset.buscar.indexOf(texto) !== -1)
-                && (!soloListas.checked || fila.dataset.lista === '1');
+                && (!soloListas.checked || fila.dataset.lista === '1')
+                && (aduanero === '' || (fila.dataset.aduanero || '') === aduanero);
             // Lo ya marcado siempre se ve, para no perderlo al filtrar.
             var mostrar = coincide || fila.querySelector('.armar-check').checked;
             fila.classList.toggle('hidden', !mostrar);
@@ -477,6 +491,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     buscar.addEventListener('input', filtrar);
     soloListas.addEventListener('change', filtrar);
+    filtroAduanero.addEventListener('change', filtrar);
     document.getElementById('form-armar-salida').addEventListener('submit', function () {
         crear.disabled = true;
         crear.querySelector('span').textContent = <?= $ordenDestino !== null ? "'Agregando...'" : "'Creando...'" ?>;

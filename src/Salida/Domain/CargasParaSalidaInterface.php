@@ -16,7 +16,7 @@ interface CargasParaSalidaInterface
      *
      * @return array<int, array{
      *     cargaId: string, tracking: string, clienteId: string, cliente: string, marca: ?string,
-     *     proveedor: string, fechaIngreso: string, dias: int, bultos: int, etiquetas: int,
+     *     proveedor: string, aduanero: string, fechaIngreso: string, dias: int, bultos: int, etiquetas: int,
      *     listos: int, porEscanear: int, enOtraSalida: int, enReempaque: int, enCaja: int, peso: float, valor: float, m3: float,
      *     pesoTotal: float, valorTotal: float
      * }>
