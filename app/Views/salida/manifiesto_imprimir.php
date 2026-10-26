@@ -44,7 +44,6 @@ $filasVacias = max(0, 8 - count($filas));
         th, td { border: 1px solid #333; padding: 4px 6px; }
         th { background: #e5e7eb; font-size: 11px; }
         td.n, th.n { text-align: right; }
-        .parcial { font-size: 10px; color: #b45309; font-weight: 700; white-space: nowrap; }
         tfoot td { font-weight: 700; }
         .vacia td { height: 20px; }
         .meta { font-size: 10px; color: #555; margin-top: 10px; text-align: right; }
@@ -100,7 +99,7 @@ $filasVacias = max(0, 8 - count($filas));
                     <td><?= $e(mb_strtoupper($f['cliente'])) ?></td>
                     <td><?= $e(mb_strtoupper($f['marca'])) ?></td>
                     <td><?= $e(mb_strtoupper($f['compania'])) ?></td>
-                    <td class="n"><?= $f['bultos'] ?><?php if (($f['bultosCarga'] ?? 0) > $f['bultos']): // carga que sale en parte ?><span class="parcial"> de <?= $f['bultosCarga'] ?></span><?php endif; ?></td>
+                    <td class="n"><?= $f['bultos'] ?></td>
                     <td class="n"><?= $n($f['kilos']) ?></td>
                     <td class="n"><?= $f['m3'] > 0 ? $n($f['m3'], 3) : '-' ?></td>
                     <td class="n"><?= $n($f['valor']) ?></td>

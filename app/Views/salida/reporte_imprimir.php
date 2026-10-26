@@ -43,7 +43,6 @@ $excel = '/salidas/' . $orden->id() . '/reporte/excel' . ($aduanero !== '' ? '?a
         td.texto { white-space: normal; }
         th { background: #fde047; font-size: 11px; text-align: left; }
         td.n, th.n { text-align: right; }
-        .parcial { font-size: 10px; color: #b45309; font-weight: 700; white-space: nowrap; }
         tfoot td { font-weight: 700; background: #fef08a; }
         .vacio { text-align: center; color: #555; padding: 14px; }
         .meta { font-size: 10px; color: #555; margin-top: 10px; text-align: right; }
@@ -111,7 +110,7 @@ $excel = '/salidas/' . $orden->id() . '/reporte/excel' . ($aduanero !== '' ? '?a
                     <td class="texto"><?= $e(mb_strtoupper($f['compania'])) ?></td>
                     <td class="texto"><?= $e(mb_strtoupper($f['cliente'])) ?></td>
                     <td class="texto"><?= $e(mb_strtoupper($f['marca'])) ?></td>
-                    <td class="n"><?= $f['bultos'] ?><?php if (($f['bultosCarga'] ?? 0) > $f['bultos']): // carga que sale en parte ?><span class="parcial"> de <?= $f['bultosCarga'] ?></span><?php endif; ?></td>
+                    <td class="n"><?= $f['bultos'] ?></td>
                     <td class="n"><?= $f['pies3'] > 0 ? $n($f['pies3']) : '' ?></td>
                     <td class="n"><?= $f['kilos'] > 0 ? $n($f['kilos']) : '' ?></td>
                     <td class="n"><?= $f['valor'] > 0 ? $n($f['valor']) : '' ?></td>
