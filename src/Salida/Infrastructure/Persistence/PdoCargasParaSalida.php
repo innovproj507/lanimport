@@ -151,6 +151,49 @@ final class PdoCargasParaSalida implements CargasParaSalidaInterface
         return array_map('strval', $stmt->fetchAll(PDO::FETCH_COLUMN));
     }
 
+    public function bultosParaAjuste(string $ordenId, string $cargaId): array
+    {
+        $stmt = $this->connection->prepare(
+            "SELECT l.id, l.codigo, l.orden_en_carga, l.estado, u.codigo AS ubicacion,
+                    (SELECT COUNT(*) FROM lpns t WHERE t.carga_id = l.carga_id) AS total,
+                    aqui.escaneado AS escaneado_aqui, aqui.id AS linea_aqui,
+                    (SELECT CONCAT('DO.', s.do_numero) FROM salida_lineas x JOIN salida_ordenes s ON s.id = x.salida_orden_id
+                     WHERE x.lpn_id = l.id AND x.salida_orden_id <> :orden1 AND s.estado = 'pendiente' LIMIT 1) AS otra_salida
+             FROM lpns l
+             LEFT JOIN ubicaciones u ON u.id = l.ubicacion_id
+             LEFT JOIN salida_lineas aqui ON aqui.lpn_id = l.id AND aqui.salida_orden_id = :orden2
+             WHERE l.carga_id = :carga AND l.estado <> 'consumed'
+             ORDER BY l.orden_en_carga, l.codigo"
+        );
+        $stmt->execute([':orden1' => $ordenId, ':orden2' => $ordenId, ':carga' => $cargaId]);
+
+        return array_map(static function (array $f): array {
+            $enEsteDo = $f['linea_aqui'] !== null;
+            $motivo = null;
+
+            if (!$enEsteDo && $f['estado'] !== 'available') {
+                $motivo = match (true) {
+                    $f['otra_salida'] !== null => 'En ' . $f['otra_salida'],
+                    $f['estado'] === 'receiving' => 'Sin escanear en recepcion',
+                    $f['estado'] === 'in_repack' => 'En reempaque',
+                    default => 'No disponible',
+                };
+            }
+
+            return [
+                'id' => (string) $f['id'],
+                'codigo' => (string) $f['codigo'],
+                'numero' => $f['orden_en_carga'] !== null ? (int) $f['orden_en_carga'] : null,
+                'total' => (int) $f['total'],
+                'ubicacion' => $f['ubicacion'] !== null ? (string) $f['ubicacion'] : null,
+                'enEsteDo' => $enEsteDo,
+                'escaneado' => (bool) $f['escaneado_aqui'],
+                'disponible' => $enEsteDo || $f['estado'] === 'available',
+                'motivo' => $motivo,
+            ];
+        }, $stmt->fetchAll(PDO::FETCH_ASSOC));
+    }
+
     public function lpnsListosDetalle(string $cargaId): array
     {
         $stmt = $this->connection->prepare(

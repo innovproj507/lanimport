@@ -209,6 +209,13 @@ $opcionSalida = static fn (array $s): string => $s['etiqueta']
                                     Parcial: <?= $grupo['total'] ?> de <?= $grupo['total'] + count($quedan) ?> suben · <?= count($quedan) ?> se quedan
                                 </span>
                             <?php endif; ?>
+                            <?php if ($planifica && !$confirmada && !$cancelada && !str_starts_with($grupo['cargaId'], 'caja-')): ?>
+                                <?php // Elegir que bultos de esta carga suben a este contenedor (p.ej. 20 de 143); el resto vuelve a bodega. ?>
+                                <button type="button" class="salida-ajustar mt-1 inline-flex items-center gap-1 rounded-lg border border-amber-400 bg-amber-50 px-2 py-0.5 font-sans font-medium text-xs text-amber-800 hover:bg-amber-100"
+                                        data-carga="<?= htmlspecialchars($grupo['cargaId']) ?>" data-tracking="<?= htmlspecialchars($grupo['tracking']) ?>">
+                                    <?= icon_small('pencil', 'w-3 h-3') ?> Ajustar bultos
+                                </button>
+                            <?php endif; ?>
                             <?php if ($planifica && !$confirmada && !$cancelada): ?>
                                 <?php // Sacar la carga de este DO: a otro DO (conserva lo escaneado) o de vuelta a bodega. ?>
                                 <details class="mt-1 font-sans font-normal">
@@ -263,6 +270,101 @@ $opcionSalida = static fn (array $s): string => $s['etiqueta']
         </table>
     </div>
 </div>
+
+<?php if ($planifica && !$confirmada && !$cancelada): ?>
+<!-- Ajustar bultos: trafico deja marcados solo los bultos de la carga que suben a este contenedor -->
+<div id="modal-ajustar" class="hidden fixed inset-0 bg-black/60 z-50 items-center justify-center p-4">
+    <form method="post" action="/salidas/<?= htmlspecialchars($orden->id()) ?>/ajustar-carga" class="bg-white rounded-xl shadow-xl max-w-xl w-full flex flex-col max-h-[88vh]">
+        <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
+        <input type="hidden" name="carga_id" id="ajustar-carga-id">
+        <div class="p-5 border-b border-slate-200">
+            <h2 class="font-semibold text-black text-lg">Ajustar bultos · <span id="ajustar-titulo" class="font-mono"></span></h2>
+            <p class="text-xs text-zinc-500 mt-1">Deje marcados <strong>solo los bultos que suben a este contenedor</strong>. Los que desmarque vuelven a bodega (disponibles para otro contenedor). Lo ya escaneado se conserva.</p>
+            <div class="flex flex-wrap items-center gap-2 mt-3 text-xs">
+                <span>Marcar los primeros</span>
+                <input type="number" id="ajustar-primeros" min="1" class="w-20 rounded-lg border border-zinc-300 px-2 py-1 text-sm">
+                <button type="button" id="ajustar-aplicar-primeros" class="rounded-lg border border-zinc-300 px-2 py-1 hover:bg-slate-100">Aplicar</button>
+                <span class="text-zinc-300">|</span>
+                <button type="button" id="ajustar-todos" class="rounded-lg border border-zinc-300 px-2 py-1 hover:bg-slate-100">Todos</button>
+                <button type="button" id="ajustar-ninguno" class="rounded-lg border border-zinc-300 px-2 py-1 hover:bg-slate-100">Ninguno</button>
+                <input type="search" id="ajustar-buscar" placeholder="Buscar..." class="flex-1 min-w-[8rem] rounded-lg border border-zinc-300 px-2 py-1 text-sm">
+            </div>
+        </div>
+        <div id="ajustar-lista" class="overflow-y-auto flex-1"></div>
+        <div class="p-4 border-t border-slate-200 flex flex-wrap items-center justify-between gap-3">
+            <span class="text-sm text-zinc-700">Suben <strong id="ajustar-suben" class="text-black">0</strong> de <span id="ajustar-total">0</span> · <span id="ajustar-quedan" class="text-amber-700"></span></span>
+            <div class="flex gap-2">
+                <button type="button" data-cerrar-ajuste class="bg-slate-200 text-zinc-800 rounded-lg px-4 py-2 text-sm font-medium hover:bg-slate-300">Cancelar</button>
+                <button type="submit" class="bg-amber-500 text-black rounded-lg px-4 py-2 text-sm font-medium hover:bg-amber-400">Guardar</button>
+            </div>
+        </div>
+    </form>
+</div>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    var modal = document.getElementById('modal-ajustar');
+    var lista = document.getElementById('ajustar-lista');
+
+    function checks() { return Array.prototype.slice.call(lista.querySelectorAll('input[type=checkbox]:not(:disabled)')); }
+
+    function contar() {
+        var marcados = checks().filter(function (c) { return c.checked; }).length;
+        var total = lista.querySelectorAll('input[type=checkbox]').length;
+        document.getElementById('ajustar-suben').textContent = marcados;
+        document.getElementById('ajustar-total').textContent = total;
+        document.getElementById('ajustar-quedan').textContent = (total - marcados) + ' se quedan';
+    }
+
+    document.querySelectorAll('.salida-ajustar').forEach(function (boton) {
+        boton.addEventListener('click', function () {
+            var carga = boton.getAttribute('data-carga');
+            document.getElementById('ajustar-carga-id').value = carga;
+            document.getElementById('ajustar-titulo').textContent = boton.getAttribute('data-tracking');
+            document.getElementById('ajustar-buscar').value = '';
+            lista.innerHTML = '<p class="text-sm text-zinc-500 p-3">Cargando...</p>';
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+
+            fetch('/salidas/<?= htmlspecialchars($orden->id()) ?>/carga-bultos/' + encodeURIComponent(carga), { headers: { 'Accept': 'application/json' } })
+                .then(function (r) { return r.json(); })
+                .then(function (datos) {
+                    lista.innerHTML = datos.bultos.map(function (b) {
+                        var estado = b.enEsteDo ? (b.escaneado ? 'Ya cargado' : 'En este DO') : (b.disponible ? 'En bodega' : b.motivo);
+                        return '<label class="flex items-center gap-3 px-3 py-2 border-b border-slate-100 ' + (b.disponible ? 'hover:bg-amber-50 cursor-pointer' : 'opacity-50') + '" data-buscar="' + b.codigo.toLowerCase() + '">'
+                            + '<input type="checkbox" name="lpns[]" value="' + b.id + '" ' + (b.enEsteDo ? 'checked' : '') + ' ' + (b.disponible ? '' : 'disabled') + ' class="rounded border-zinc-300 text-amber-500 focus:ring-amber-400">'
+                            + '<span class="font-mono text-sm text-black flex-1">' + b.codigo + '</span>'
+                            + '<span class="text-xs text-zinc-500 w-16 text-right">' + (b.numero ? b.numero + '/' + b.total : '') + '</span>'
+                            + '<span class="text-xs w-32 text-right ' + (b.escaneado ? 'text-emerald-700' : 'text-zinc-500') + '">' + estado + '</span>'
+                            + '</label>';
+                    }).join('');
+                    contar();
+                }, function () {
+                    lista.innerHTML = '<p class="text-sm text-red-600 p-3">No se pudo cargar la lista. Intente de nuevo.</p>';
+                });
+        });
+    });
+
+    lista.addEventListener('change', contar);
+    document.getElementById('ajustar-todos').addEventListener('click', function () { checks().forEach(function (c) { c.checked = true; }); contar(); });
+    document.getElementById('ajustar-ninguno').addEventListener('click', function () { checks().forEach(function (c) { c.checked = false; }); contar(); });
+    document.getElementById('ajustar-aplicar-primeros').addEventListener('click', function () {
+        var n = parseInt(document.getElementById('ajustar-primeros').value, 10) || 0;
+        checks().forEach(function (c, i) { c.checked = i < n; });
+        contar();
+    });
+    document.getElementById('ajustar-buscar').addEventListener('input', function () {
+        var texto = this.value.trim().toLowerCase();
+        lista.querySelectorAll('label').forEach(function (l) { l.classList.toggle('hidden', texto !== '' && l.getAttribute('data-buscar').indexOf(texto) === -1); });
+    });
+    modal.querySelector('[data-cerrar-ajuste]').addEventListener('click', function () { modal.classList.add('hidden'); modal.classList.remove('flex'); });
+    modal.querySelector('form').addEventListener('submit', function (e) {
+        var marcados = checks().filter(function (c) { return c.checked; }).length;
+        if (marcados === 0) { e.preventDefault(); alert('Deje marcado al menos un bulto. Para sacar toda la carga use "Sacar > Devolver a bodega".'); return; }
+        if (!confirm('¿Guardar? Suben ' + marcados + ' bultos de esta carga en este contenedor; los demas quedan en bodega.')) { e.preventDefault(); }
+    });
+});
+</script>
+<?php endif; ?>
 
 <script>
 // LPN de cada carga plegados: + los muestra, - los oculta (las filas siguen en la pagina para el escaneo).

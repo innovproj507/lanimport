@@ -32,6 +32,8 @@ use Courier\Salida\Application\CancelarOrdenSalida\CancelarOrdenSalidaHandler;
 use Courier\Salida\Application\ConfirmarSalida\ConfirmarSalidaCommand;
 use Courier\Salida\Application\ConfirmarSalida\ConfirmarSalidaHandler;
 use Courier\Salida\Application\CrearOrdenSalida\CrearOrdenSalidaCommand;
+use Courier\Salida\Application\AjustarBultosCargaSalida\AjustarBultosCargaSalidaCommand;
+use Courier\Salida\Application\AjustarBultosCargaSalida\AjustarBultosCargaSalidaHandler;
 use Courier\Salida\Application\DevolverCargaSalida\DevolverCargaSalidaCommand;
 use Courier\Salida\Application\DevolverCargaSalida\DevolverCargaSalidaHandler;
 use Courier\Salida\Application\MoverCargasSalida\MoverCargasSalidaCommand;
@@ -552,6 +554,39 @@ final class SalidaController extends BaseController
         }
 
         $_SESSION['salida_mensaje'] = "Carga movida a {$destino->etiquetaDo()}. Lo ya escaneado se conserva.";
+
+        return redirect()->to('/salidas/' . $id);
+    }
+
+    /** JSON: los bultos de una carga para "Ajustar bultos" dentro de este DO. */
+    public function bultosCarga(string $id, string $cargaId): ResponseInterface
+    {
+        return $this->response->setJSON([
+            'bultos' => $this->container()->get(CargasParaSalidaInterface::class)->bultosParaAjuste($id, $cargaId),
+        ]);
+    }
+
+    /** Trafico deja en el DO solo los bultos marcados de una carga (p.ej. 20 de 143); el resto vuelve a bodega. */
+    public function ajustarCarga(string $id): RedirectResponse
+    {
+        if (!Csrf::verify($this->request->getPost('_csrf'))) {
+            return redirect()->to('/salidas/' . $id);
+        }
+
+        $lpns = $this->request->getPost('lpns');
+
+        try {
+            $r = $this->container()->get(AjustarBultosCargaSalidaHandler::class)->handle(new AjustarBultosCargaSalidaCommand(
+                $id,
+                trim((string) $this->request->getPost('carga_id')),
+                is_array($lpns) ? $lpns : [],
+            ));
+            $_SESSION['salida_mensaje'] = "Bultos ajustados: quedan {$r['quedan']} en este DO"
+                . ($r['quitados'] > 0 ? ", {$r['quitados']} volvieron a bodega" : '')
+                . ($r['agregados'] > 0 ? ", se agregaron {$r['agregados']}" : '') . '.';
+        } catch (NotFoundException|ValidationException|\Courier\Shared\Domain\Exception\DomainException $e) {
+            $_SESSION['salida_error'] = $e->getMessage();
+        }
 
         return redirect()->to('/salidas/' . $id);
     }

@@ -157,6 +157,7 @@ use Courier\Salida\Application\CancelarOrdenSalida\CancelarOrdenSalidaHandler;
 use Courier\Salida\Application\ConfirmarSalida\ConfirmarSalidaHandler;
 use Courier\Salida\Application\CrearOrdenSalida\CrearOrdenSalidaHandler;
 use Courier\Salida\Application\AgregarCargasSalida\AgregarCargasSalidaHandler;
+use Courier\Salida\Application\AjustarBultosCargaSalida\AjustarBultosCargaSalidaHandler;
 use Courier\Salida\Application\DevolverCargaSalida\DevolverCargaSalidaHandler;
 use Courier\Salida\Application\MoverCargasSalida\MoverCargasSalidaHandler;
 use Courier\Salida\Application\ListarOrdenesSalida\ListarOrdenesSalidaHandler;
@@ -308,6 +309,11 @@ $container->set(MoverCargasSalidaHandler::class, fn (Container $c) => new MoverC
     $c->get(LpnRepositoryInterface::class),
     $c->get(UnitOfWork::class),
     $c->get(SincronizarEstadoCargaHandler::class),
+));
+$container->set(AjustarBultosCargaSalidaHandler::class, fn (Container $c) => new AjustarBultosCargaSalidaHandler(
+    $c->get(SalidaOrdenRepositoryInterface::class),
+    $c->get(LpnRepositoryInterface::class),
+    $c->get(UnitOfWork::class),
 ));
 $container->set(DevolverCargaSalidaHandler::class, fn (Container $c) => new DevolverCargaSalidaHandler(
     $c->get(SalidaOrdenRepositoryInterface::class),

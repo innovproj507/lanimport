@@ -405,6 +405,8 @@ final class PdoSalidaOrdenRepository implements SalidaOrdenRepositoryInterface
                 'compania' => $r['proveedor'] !== null ? (string) $r['proveedor'] : 'Reempaque',
                 'tracking' => $r['tracking_numero'] !== null ? (string) $r['tracking_numero'] : null,
                 'bultos' => (int) $r['bultos_salida'],
+                // Total de bultos de la carga: si es mayor que "bultos", la carga sale en parte.
+                'bultosCarga' => (int) $r['bultos_carga'],
                 'kilos' => round((float) $r['kilos'] * $factor, 2),
                 'm3' => round((float) $r['pies3'] * 0.028316846592 * $factor, 3),
                 'pies3' => round((float) $r['pies3'] * $factor, 2),

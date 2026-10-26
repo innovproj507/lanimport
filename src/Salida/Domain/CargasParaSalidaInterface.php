@@ -55,4 +55,14 @@ interface CargasParaSalidaInterface
      *         numero/total: el "12/30" de la etiqueta
      */
     public function lpnsListosDetalle(string $cargaId): array;
+
+    /**
+     * Para "Ajustar bultos" de una carga dentro de un DO: todos sus bultos (menos los ya despachados)
+     * con si estan en este DO, si ya se escanearon al cargar, y si se pueden agregar (escaneados y
+     * libres) o por que no (sin escanear en recepcion, en otro DO, en reempaque).
+     *
+     * @return array<int, array{id: string, codigo: string, numero: ?int, total: int, ubicacion: ?string,
+     *     enEsteDo: bool, escaneado: bool, disponible: bool, motivo: ?string}>
+     */
+    public function bultosParaAjuste(string $ordenId, string $cargaId): array;
 }

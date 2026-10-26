@@ -186,6 +186,9 @@ $routes->post('salidas/(:segment)/agregar', 'SalidaController::agregar/$1', ['fi
 // Unir este DO a otro del mismo contenedor, pasar una carga a otro DO o devolverla a bodega.
 $routes->post('salidas/(:segment)/unir', 'SalidaController::unir/$1', ['filter' => $planificaSalida]);
 $routes->post('salidas/(:segment)/mover-carga', 'SalidaController::moverCarga/$1', ['filter' => $planificaSalida]);
+// Ajustar que bultos de una carga van en el DO (p.ej. 20 de 143): lista y guardar.
+$routes->get('salidas/(:segment)/carga-bultos/(:segment)', 'SalidaController::bultosCarga/$1/$2', ['filter' => $planificaSalida]);
+$routes->post('salidas/(:segment)/ajustar-carga', 'SalidaController::ajustarCarga/$1', ['filter' => $planificaSalida]);
 $routes->post('salidas/(:segment)/devolver-carga', 'SalidaController::devolverCarga/$1', ['filter' => $planificaSalida]);
 $routes->post('salidas/(:segment)/embarque','SalidaController::guardarEmbarque/$1', ['filter' => $planificaSalida]);
 $routes->get('salidas/(:segment)/manifiesto', 'SalidaController::manifiesto/$1', ['filter' => $bodegaFilter]);
