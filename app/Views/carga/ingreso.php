@@ -20,6 +20,10 @@ $headerActions = '<button type="button" id="btn-nuevo-ingreso" class="inline-fle
 if (in_array($_SESSION['usuario_rol'] ?? null, ['gerente', 'admin'], true)) {
     $headerActions = header_button('/cargas/masiva', 'receipt', 'Carga masiva', 'indigo') . $headerActions;
 }
+// Descarga en Excel lo que se ve filtrado (todas las paginas): el script de abajo le pone los filtros.
+$headerActions = '<a href="/cargas/excel" id="btn-excel-cargas" title="Descargar en Excel las cargas con los filtros actuales"'
+    . ' class="inline-flex items-center gap-2 bg-emerald-600 text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-emerald-500 transition">'
+    . icon_small('download') . '<span>Excel</span></a>' . $headerActions;
 require __DIR__ . '/../partials/header.php';
 ?>
 
@@ -540,6 +544,18 @@ document.addEventListener('DOMContentLoaded', function () {
                 });
         });
     }
+});
+</script>
+
+<script>
+// Excel: al hacer clic se arma la URL con la busqueda y los filtros que esten puestos.
+document.getElementById('btn-excel-cargas').addEventListener('click', function () {
+    var params = new URLSearchParams();
+    [['buscar-cargas', 'q'], ['cargas-estado-filtro', 'estado'], ['cargas-aduanero-filtro', 'aduanero']].forEach(function (f) {
+        var el = document.getElementById(f[0]);
+        if (el && el.value.trim() !== '') { params.set(f[1], el.value.trim()); }
+    });
+    this.href = '/cargas/excel' + (params.toString() ? '?' + params.toString() : '');
 });
 </script>
 

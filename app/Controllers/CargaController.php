@@ -38,6 +38,8 @@ use Courier\Lpn\Application\EliminarLpnsDeCarga\EliminarLpnsDeCargaHandler;
 use Courier\Lpn\Application\GenerarLpnsParaCarga\GenerarLpnsParaCargaCommand;
 use Courier\Lpn\Application\GenerarLpnsParaCarga\GenerarLpnsParaCargaHandler;
 use Courier\Lpn\Domain\EtiquetaLpnConfigRepositoryInterface;
+use Courier\Carga\Infrastructure\Importacion\EscritorXlsx;
+use Courier\Lpn\Domain\EstadoLpn;
 use Courier\Lpn\Domain\LpnRepositoryInterface;
 use Courier\Pais\Application\ListarPaises\ListarPaisesHandler;
 use Courier\Pais\Application\ListarPaises\ListarPaisesQuery;
@@ -220,6 +222,73 @@ final class CargaController extends BaseController
         $resumen = view('carga/_resumen', ['total' => $resultado->total, 'resumen' => $resultado->resumen], ['debug' => false]);
 
         return $this->response->setJSON(['html' => $html, 'paginacion' => $paginacion, 'resumen' => $resumen]);
+    }
+
+    /**
+     * Excel de Ingreso de Carga: todas las cargas que cumplen la busqueda y los filtros de la
+     * pantalla (no solo la pagina visible), con las mismas columnas y una fila de totales.
+     */
+    public function excel(): ResponseInterface
+    {
+        $termino = (string) ($this->request->getGet('q') ?? '');
+        $estado = (string) ($this->request->getGet('estado') ?? '');
+        $aduanero = trim((string) ($this->request->getGet('aduanero') ?? ''));
+
+        $cargas = $this->container()->get(BuscarCargasHandler::class)->handle(
+            new BuscarCargasQuery($termino, $estado !== '' ? $estado : null, 1, 100000, $aduanero !== '' ? $aduanero : null)
+        )->items;
+        $nombresClientes = $this->nombresClientes($this->container()->get(ListarClientesHandler::class)->handle(new ListarClientesQuery()));
+        $lpnsPorEstado = $this->lpnsPorEstado($cargas);
+
+        $filas = [['TRACKING', 'FECHA INGRESO', 'CLIENTE', 'PROVEEDOR', 'ADUANERO', 'MARCA', 'BULTOS', 'PESO (KG)', 'CUBICAJE (P3)', 'VALOR', 'ESTADO CARGA', 'ETIQUETAS (LPN)', 'FACTURA']];
+        $totales = ['bultos' => 0.0, 'peso' => 0.0, 'pies3' => 0.0, 'valor' => 0.0];
+
+        foreach ($cargas as $carga) {
+            // Totales de la carga: suma de sus lineas (peso, p3 y valor son totales de linea), como en la tabla.
+            $suma = ['bultos' => 0.0, 'peso' => 0.0, 'pies3' => 0.0, 'valor' => 0.0];
+            $marcas = [];
+            foreach ($carga->lineas() as $linea) {
+                $suma['bultos'] += $linea->cantidad();
+                $suma['peso'] += $linea->peso();
+                $suma['pies3'] += $linea->cubicajePies();
+                $suma['valor'] += $linea->valor();
+                if ($linea->marca() !== null && $linea->marca() !== '') {
+                    $marcas[$linea->marca()] = true;
+                }
+            }
+            foreach ($suma as $k => $v) {
+                $totales[$k] += $v;
+            }
+
+            $etiquetas = [];
+            foreach ($lpnsPorEstado[$carga->id()] ?? [] as $estadoLpn => $cantidad) {
+                $etiquetas[] = $cantidad . ' ' . (EstadoLpn::tryFrom($estadoLpn)?->label() ?? $estadoLpn);
+            }
+
+            $filas[] = [
+                (string) $carga->trackingNumero(),
+                $carga->fechaIngreso()->format('d/m/Y'),
+                $nombresClientes[$carga->clienteId()] ?? '',
+                $carga->proveedor(),
+                $carga->aduanero()?->nombre() ?? '',
+                implode(', ', array_keys($marcas)),
+                $suma['bultos'], round($suma['peso'], 2), round($suma['pies3'], 2), round($suma['valor'], 2),
+                $carga->estado()->label(),
+                $etiquetas === [] ? 'Sin etiquetas' : implode(', ', $etiquetas),
+                $carga->facturaProveedorRuta() ? 'Si' : 'No',
+            ];
+        }
+
+        $filas[] = ['TOTALES (' . count($cargas) . ' cargas)', '', '', '', '', '', $totales['bultos'], round($totales['peso'], 2), round($totales['pies3'], 2), round($totales['valor'], 2), '', '', ''];
+
+        $contenido = $this->container()->get(EscritorXlsx::class)->generar([
+            'Cargas' => ['filas' => $filas, 'anchos' => [20, 13, 30, 24, 20, 14, 9, 12, 13, 14, 14, 30, 9]],
+        ]);
+
+        return $this->response
+            ->setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+            ->setHeader('Content-Disposition', 'attachment; filename="cargas-' . date('Y-m-d') . '.xlsx"')
+            ->setBody($contenido);
     }
 
     /**
