@@ -36,17 +36,19 @@ final class LpnController extends BaseController
         }
 
         $lpns = $this->container()->get(ListarLpnsPorCargaHandler::class)->handle(new ListarLpnsPorCargaQuery($id));
+        // Segundos = 0: solo cuenta las imagenes que aun no se dibujan.
+        $imagenes = $this->container()->get(GenerarImagenesEtiquetasLpnHandler::class)
+            ->handle(new GenerarImagenesEtiquetasLpnCommand($id, 0));
 
         if ($this->request->getGet('print') !== null) {
             return view('lpn/etiquetas_imprimir', [
                 'carga' => $carga,
                 'lpns' => $lpns,
+                'imagenesFaltan' => $imagenes->faltan,
             ]);
         }
 
         $ubicaciones = $this->container()->get(ListarUbicacionesHandler::class)->handle(new ListarUbicacionesQuery());
-        $imagenes = $this->container()->get(GenerarImagenesEtiquetasLpnHandler::class)
-            ->handle(new GenerarImagenesEtiquetasLpnCommand($id, 0));
 
         return view('lpn/recepcion', [
             'carga' => $carga,

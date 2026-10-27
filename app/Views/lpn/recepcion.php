@@ -41,9 +41,16 @@ $estadoColores = [
 <div class="bg-white rounded-xl shadow-sm p-6 mb-6">
     <div class="flex items-start justify-between gap-4 flex-wrap">
         <?= card_header('search', 'Escaneo de recepcion', 'amber') ?>
-        <a href="?print=1" target="_blank" class="inline-flex items-center gap-2 bg-white border border-zinc-300 text-zinc-700 rounded-lg px-4 py-2 text-sm font-medium hover:bg-slate-100 transition">
-            <?= icon_small('printer') ?><span>Imprimir todas las etiquetas (<?= count($lpns) ?>)</span>
-        </a>
+        <?php if ($imagenesFaltan > 0): ?>
+            <span title="Espere a que termine de preparar las etiquetas"
+                  class="inline-flex items-center gap-2 bg-slate-100 border border-zinc-200 text-zinc-400 rounded-lg px-4 py-2 text-sm font-medium cursor-not-allowed">
+                <?= icon_small('printer') ?><span>Imprimir todas las etiquetas (preparando...)</span>
+            </span>
+        <?php else: ?>
+            <a href="?print=1" target="_blank" class="inline-flex items-center gap-2 bg-white border border-zinc-300 text-zinc-700 rounded-lg px-4 py-2 text-sm font-medium hover:bg-slate-100 transition">
+                <?= icon_small('printer') ?><span>Imprimir todas las etiquetas (<?= count($lpns) ?>)</span>
+            </a>
+        <?php endif; ?>
     </div>
     <div class="flex items-end gap-4 flex-wrap">
         <div>
