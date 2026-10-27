@@ -225,6 +225,7 @@ $n = static fn (float $v, int $d = 2): string => number_format($v, $d, '.', ',')
                         <td class="py-2 text-right whitespace-nowrap space-x-2">
                             <?php if ($grupo['carga'] && $grupo['carga']->facturaProveedorRuta()): ?>
                                 <a href="/<?= htmlspecialchars($grupo['carga']->facturaProveedorRuta()) ?>" target="_blank" title="Ver factura del proveedor"
+                                   data-doc-ver data-doc-titulo="Factura · <?= htmlspecialchars((string) $grupo['carga']->trackingNumero()) ?>"
                                    class="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-red-500 text-white hover:bg-red-600 transition align-middle">
                                     <?= icon_small('receipt') ?>
                                 </a>

@@ -43,6 +43,7 @@ if (empty($cargas)):
         <td class="py-2 text-right space-x-2 whitespace-nowrap">
             <?php if ($carga->facturaProveedorRuta()): ?>
                 <a href="/<?= htmlspecialchars($carga->facturaProveedorRuta()) ?>" target="_blank" title="Ver factura del proveedor"
+                   data-doc-ver data-doc-titulo="Factura · <?= htmlspecialchars((string) $carga->trackingNumero()) ?>"
                    class="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-red-500 text-white hover:bg-red-600 transition">
                     <?= icon_small('receipt') ?>
                 </a>

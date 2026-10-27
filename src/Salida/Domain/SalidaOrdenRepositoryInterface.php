@@ -21,7 +21,7 @@ interface SalidaOrdenRepositoryInterface
     /**
      * Avance de la salida agrupado por carga, para que bodega escanee carga por carga.
      *
-     * @return array<int, array{cargaId: string, tracking: string, cliente: string, marca: ?string, total: int, escaneadas: int, pendientes: array<int, string>, codigos: array<int, string>}>
+     * @return array<int, array{cargaId: string, tracking: string, cliente: string, marca: ?string, factura: ?array{ruta: string, nombre: string}, total: int, escaneadas: int, pendientes: array<int, string>, codigos: array<int, string>}>
      */
     public function avancePorCarga(string $ordenId): array;
 

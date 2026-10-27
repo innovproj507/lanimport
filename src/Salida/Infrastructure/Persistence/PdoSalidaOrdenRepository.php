@@ -169,7 +169,8 @@ final class PdoSalidaOrdenRepository implements SalidaOrdenRepositoryInterface
     {
         $stmt = $this->connection->prepare(
             "SELECT ca.id AS carga_id, ca.tracking_numero, TRIM(CONCAT(c.nombre, ' ', COALESCE(c.apellido, ''))) AS cliente,
-                    l.id AS lpn_id, l.marca, l.codigo, sl.escaneado
+                    l.id AS lpn_id, l.marca, l.codigo, sl.escaneado,
+                    ca.factura_proveedor_ruta, ca.factura_proveedor_nombre
              FROM salida_lineas sl
              JOIN lpns l ON l.id = sl.lpn_id
              LEFT JOIN cargas ca ON ca.id = l.carga_id
@@ -188,6 +189,10 @@ final class PdoSalidaOrdenRepository implements SalidaOrdenRepositoryInterface
                 'tracking' => $fila['tracking_numero'] !== null ? (string) $fila['tracking_numero'] : 'Caja reempacada',
                 'cliente' => (string) ($fila['cliente'] ?? ''),
                 'marca' => $fila['marca'] !== null ? (string) $fila['marca'] : null,
+                // Factura del proveedor que se subio con la carga (PDF o imagen).
+                'factura' => $fila['factura_proveedor_ruta'] !== null
+                    ? ['ruta' => (string) $fila['factura_proveedor_ruta'], 'nombre' => (string) ($fila['factura_proveedor_nombre'] ?? 'Factura')]
+                    : null,
                 'total' => 0,
                 'escaneadas' => 0,
                 'pendientes' => [],

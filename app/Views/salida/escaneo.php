@@ -208,6 +208,17 @@ $opcionSalida = static fn (array $s): string => $s['etiqueta']
                             <?php else: ?>
                                 <?= htmlspecialchars($grupo['tracking']) ?>
                             <?php endif; ?>
+                            <?php if (!empty($grupo['factura'])): ?>
+                                <?php // Factura del proveedor de la carga: se ve en el visor (modal). ?>
+                                <a href="/<?= htmlspecialchars($grupo['factura']['ruta']) ?>" target="_blank" rel="noopener" data-doc-ver
+                                   data-doc-titulo="Factura · <?= htmlspecialchars($grupo['tracking'] . ' · ' . $grupo['cliente']) ?>"
+                                   title="Ver factura del proveedor"
+                                   class="ml-1 inline-flex items-center gap-1 rounded-lg border border-red-300 bg-red-50 px-2 py-0.5 font-sans font-medium text-xs text-red-700 hover:bg-red-100 align-middle">
+                                    <?= icon_small('receipt', 'w-3 h-3') ?> Factura
+                                </a>
+                            <?php elseif (!str_starts_with($grupo['cargaId'], 'caja-')): ?>
+                                <span class="ml-1 font-sans font-normal text-xs text-zinc-400 align-middle">Sin factura</span>
+                            <?php endif; ?>
                             <?php $quedan = $quedanPorCarga[$grupo['cargaId']] ?? []; if ($quedan !== []): ?>
                                 <?php // Carga que sale en parte: cuantos suben aqui y cuantos se quedan (se ven con +). ?>
                                 <span class="block mt-1 font-sans font-normal text-xs text-amber-700">

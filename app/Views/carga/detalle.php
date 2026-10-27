@@ -145,7 +145,8 @@ require __DIR__ . '/../partials/header.php';
         <?php if ($view->facturaProveedorRuta): ?>
             <p class="text-sm text-zinc-700">
                 <strong>Factura del proveedor:</strong>
-                <a href="/<?= htmlspecialchars($view->facturaProveedorRuta) ?>" target="_blank" class="text-amber-600 hover:underline">
+                <a href="/<?= htmlspecialchars($view->facturaProveedorRuta) ?>" target="_blank" class="text-amber-600 hover:underline"
+                   data-doc-ver data-doc-titulo="Factura del proveedor<?= isset($view->trackingNumero) ? ' · ' . htmlspecialchars($view->trackingNumero) : '' ?>">
                     <?= htmlspecialchars($view->facturaProveedorNombre ?? 'Ver archivo') ?>
                 </a>
             </p>
