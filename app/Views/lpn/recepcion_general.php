@@ -4,6 +4,8 @@ use App\Libraries\Csrf;
 /** @var array<int, \Courier\Lpn\Domain\Ubicacion> $ubicaciones */
 $pageTitle = 'Recepcion';
 $pageSubtitle = 'Escanee las etiquetas pegadas a los bultos para dejarlos disponibles';
+// Varias PDA escanean a la vez: la lista se actualiza sola cada 10 s si hubo cambios (vivo.js).
+$vivoSegundos = 10;
 require __DIR__ . '/../partials/header.php';
 $porRecibir = array_sum(array_map(static fn (array $p) => $p['total'] - $p['recibidos'], $pendientes));
 ?>
@@ -33,7 +35,7 @@ $porRecibir = array_sum(array_map(static fn (array $p) => $p['total'] - $p['reci
     <input type="hidden" id="lpn-csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
 </div>
 
-<div class="bg-white rounded-xl shadow-sm p-4 sm:p-6">
+<div class="bg-white rounded-xl shadow-sm p-4 sm:p-6" id="recepcion-pendientes" data-vivo-region="global">
     <div class="flex items-center justify-between gap-4 flex-wrap mb-4">
         <h2 class="font-semibold text-black">Cargas por recibir</h2>
         <span class="text-sm text-zinc-600"><span id="lpn-por-recibir"><?= $porRecibir ?></span> bultos por escanear</span>

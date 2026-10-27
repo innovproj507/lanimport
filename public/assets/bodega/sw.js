@@ -4,7 +4,7 @@
  * La pagina /bodega (lleva la sesion y el token CSRF) y la API siempre van a la red.
  * Al cambiar archivos de la app, subir VERSION para renovar la cache.
  */
-var VERSION = 'lan-bodega-v8';
+var VERSION = 'lan-bodega-v10';
 var ARCHIVOS = [
     '/assets/bodega/css/app.css',
     '/assets/bodega/js/api.js',
@@ -22,7 +22,8 @@ self.addEventListener('install', function (evento) {
 
 self.addEventListener('activate', function (evento) {
     evento.waitUntil(caches.keys().then(function (claves) {
-        return Promise.all(claves.filter(function (c) { return c !== VERSION; }).map(function (c) { return caches.delete(c); }));
+        // Solo las de bodega: las lan-web-* son del service worker del sistema (/sw.js).
+        return Promise.all(claves.filter(function (c) { return c.indexOf('lan-bodega-') === 0 && c !== VERSION; }).map(function (c) { return caches.delete(c); }));
     }));
     self.clients.claim();
 });

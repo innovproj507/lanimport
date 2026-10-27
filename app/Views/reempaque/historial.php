@@ -56,7 +56,7 @@ $estadoColores = ['pendiente' => 'amber', 'completado' => 'emerald', 'cancelado'
 </form>
 </div>
 
-<div class="bg-white rounded-xl shadow-sm p-6">
+<div class="bg-white rounded-xl shadow-sm p-6" id="reempaques-resultados" data-vivo-region="global">
     <?php if (empty($ordenes)): ?>
         <p class="text-sm text-zinc-500">No se encontraron ordenes de reempaque con estos filtros.</p>
     <?php else: ?>

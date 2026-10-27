@@ -210,6 +210,68 @@
         var historial = document.getElementById('rec-historial');
         var selectUbicacion = document.getElementById('ubicacion');
         var cargas = [];
+        // Carga desplegada (la ultima escaneada o la que se toco) y sus bultos sin escanear.
+        var abierta = null;
+        var faltanPorCarga = {};
+
+        function etiquetaBulto(b) {
+            return b.numero ? b.numero + '/' + b.total : '';
+        }
+
+        function pintarFaltan(c) {
+            var faltan = faltanPorCarga[c.cargaId];
+            var cuantos = c.total - c.recibidos;
+
+            if (cuantos <= 0) {
+                return '';
+            }
+
+            var html = '<button type="button" class="btn-faltan' + (abierta === c.cargaId ? ' abierto' : '') + '" data-faltan="' + esc(c.cargaId) + '">'
+                + (abierta === c.cargaId ? '▾' : '▸') + ' Faltan ' + cuantos + ' bulto' + (cuantos === 1 ? '' : 's') + ' por escanear</button>';
+
+            if (abierta !== c.cargaId) {
+                return html;
+            }
+
+            if (!faltan) {
+                return html + '<div class="faltan"><span class="vacio">Cargando...</span></div>';
+            }
+
+            return html + '<div class="faltan">' + faltan.map(function (b) {
+                return '<span class="faltan-bulto"><b>' + esc(etiquetaBulto(b)) + '</b>' + esc(b.codigo)
+                    + (b.descripcion ? '<small>' + esc(b.descripcion) + '</small>' : '') + '</span>';
+            }).join('') + '</div>';
+        }
+
+        function abrir(cargaId) {
+            abierta = cargaId;
+            pintarCargas();
+
+            return window.Api.get('/recepcion/' + encodeURIComponent(cargaId) + '/bultos').then(function (bultos) {
+                faltanPorCarga[cargaId] = bultos.filter(function (b) { return !b.recibido; });
+                pintarCargas();
+            }).catch(function () {});
+        }
+
+        document.getElementById('rec-cargas').addEventListener('click', function (evento) {
+            var boton = evento.target.closest('[data-faltan]');
+
+            if (!boton) {
+                return;
+            }
+
+            var id = boton.getAttribute('data-faltan');
+
+            if (abierta === id) {
+                abierta = null;
+                pintarCargas();
+            } else {
+                abrir(id);
+            }
+
+            // El lector escribe donde este el foco: vuelve al campo de escaneo.
+            input.focus();
+        });
 
         function pintarCargas() {
             var cont = document.getElementById('rec-cargas');
@@ -231,6 +293,7 @@
                         + '<small>Ingreso ' + esc(fecha(c.fechaIngreso)) + (completa ? ' · Completa' : '') + '</small></div>'
                         + '<div class="fila-progreso">' + barraProgreso(c.recibidos, c.total)
                         + '<a class="btn-foto" href="#' + rutaFotos('cargas', c.cargaId, c.tracking) + '">📷 ' + (c.fotos || 0) + '</a></div>'
+                        + (completa ? '<div class="faltan-completa">✔ Todos los bultos escaneados</div>' : pintarFaltan(c))
                         + '</div>';
                 }).join('');
         }
@@ -252,8 +315,20 @@
                     var texto = r.lpn.codigo + ' → ' + r.lpn.estadoLabel;
 
                     if (r.progreso) {
-                        texto += ' · ' + r.progreso.recibidos + ' de ' + r.progreso.total
-                            + (r.progreso.recibidos >= r.progreso.total ? ' · Carga completa' : '');
+                        var faltan = r.faltan || [];
+                        texto += ' · ' + r.progreso.recibidos + ' de ' + r.progreso.total;
+
+                        // Que bultos faltan de esa carga (los numeros de la etiqueta: 3/9, 5/9...).
+                        if (faltan.length === 0) {
+                            texto += ' · Carga completa';
+                        } else {
+                            var numeros = faltan.slice(0, 8).map(function (b) { return etiquetaBulto(b) || b.codigo; });
+                            texto += ' · Faltan ' + faltan.length + ': ' + numeros.join(', ') + (faltan.length > 8 ? '…' : '');
+                        }
+
+                        // La carga escaneada queda desplegada con la lista de lo que falta.
+                        faltanPorCarga[r.progreso.cargaId] = faltan;
+                        abierta = r.progreso.cargaId;
 
                         var i = cargas.findIndex(function (c) { return c.cargaId === r.progreso.cargaId; });
 

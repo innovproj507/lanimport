@@ -65,6 +65,7 @@
     }
 })();
 </script>
+<script src="/assets/js/vivo.js?v=<?= filemtime(FCPATH . 'assets/js/vivo.js') ?>"></script>
 <script src="/assets/js/lector-codigos.js?v=<?= filemtime(FCPATH . 'assets/js/lector-codigos.js') ?>"></script>
 <script src="/assets/js/app.js?v=<?= filemtime(FCPATH . 'assets/js/app.js') ?>"></script>
 </body>

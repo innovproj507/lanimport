@@ -81,7 +81,7 @@ foreach ($clientes as $c) {
 </form>
 </div>
 
-<div class="bg-white rounded-xl shadow-sm p-6">
+<div class="bg-white rounded-xl shadow-sm p-6" id="salidas-resultados" data-vivo-region="global">
     <?php if (empty($ordenes)): ?>
         <p class="text-sm text-zinc-500">No se encontraron ordenes de salida con estos filtros.</p>
     <?php else: ?>

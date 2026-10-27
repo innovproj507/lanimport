@@ -100,7 +100,7 @@ $formatoFecha = static fn (string $fecha): string => (new DateTimeImmutable($fec
 ?>
 
 <!-- Tarjetas de indicadores -->
-<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6 gap-4 mb-6">
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6 gap-4 mb-6" id="dashboard-tarjetas" data-vivo-region="global">
     <?php foreach ($tarjetas as $t): ?>
         <div class="relative overflow-hidden rounded-2xl p-4 text-white shadow-lg bg-gradient-to-br <?= $t['gradiente'] ?>">
             <div class="absolute -right-6 -bottom-8 w-28 h-28 rounded-full bg-white/10"></div>
@@ -179,7 +179,7 @@ $formatoFecha = static fn (string $fecha): string => (new DateTimeImmutable($fec
 </div>
 
 <!-- Fila 3: top clientes, inventario, cargas con mas tiempo en bodega -->
-<div class="grid grid-cols-1 xl:grid-cols-3 gap-6 mb-6">
+<div class="grid grid-cols-1 xl:grid-cols-3 gap-6 mb-6" id="dashboard-fila3" data-vivo-region="global">
     <div class="bg-white rounded-2xl shadow-sm p-5 flex flex-col">
         <h2 class="font-semibold text-[#0b1b4d] mb-3">Top 5 clientes</h2>
         <?php if (empty($resumen->topClientes)): ?>

@@ -13,6 +13,7 @@ use Courier\Lpn\Application\ConfirmarRecepcionLpn\ConfirmarRecepcionLpnCommand;
 use Courier\Lpn\Application\ConfirmarRecepcionLpn\ConfirmarRecepcionLpnHandler;
 use Courier\Lpn\Application\ListarUbicaciones\ListarUbicacionesHandler;
 use Courier\Lpn\Application\ListarUbicaciones\ListarUbicacionesQuery;
+use Courier\Lpn\Domain\EstadoLpn;
 use Courier\Lpn\Domain\LpnRepositoryInterface;
 use Courier\Lpn\Domain\UbicacionRepositoryInterface;
 use Courier\Reempaque\Application\AbrirCajaReempaque\AbrirCajaReempaqueCommand;
@@ -95,10 +96,40 @@ final class BodegaApiController extends BaseApiController
             return $this->success([
                 'lpn' => ['codigo' => $lpn->codigo(), 'estado' => $lpn->estado()->value, 'estadoLabel' => $lpn->estado()->label()],
                 'progreso' => $progreso,
+                // Lo que aun falta de esa carga, para que bodega sepa que bultos buscar.
+                'faltan' => $lpn->cargaId() !== null
+                    ? array_values(array_filter($this->bultosDeCarga($lpn->cargaId()), static fn (array $b) => !$b['recibido']))
+                    : [],
             ]);
         } catch (Throwable $e) {
             return $this->fromException($e);
         }
+    }
+
+    /** Bultos de una carga con si ya se escanearon en recepcion (en orden 1/N, 2/N...). */
+    public function recepcionBultos(string $cargaId): ResponseInterface
+    {
+        try {
+            return $this->success($this->bultosDeCarga($cargaId));
+        } catch (Throwable $e) {
+            return $this->fromException($e);
+        }
+    }
+
+    /** @return array<int, array{codigo: string, numero: ?int, total: int, descripcion: ?string, recibido: bool}> */
+    private function bultosDeCarga(string $cargaId): array
+    {
+        $lpns = $this->container()->get(LpnRepositoryInterface::class)->findByCargaId($cargaId);
+        usort($lpns, static fn ($a, $b) => [$a->ordenEnCarga() ?? PHP_INT_MAX, $a->codigo()] <=> [$b->ordenEnCarga() ?? PHP_INT_MAX, $b->codigo()]);
+        $total = count($lpns);
+
+        return array_map(static fn ($l) => [
+            'codigo' => (string) $l->codigo(),
+            'numero' => $l->ordenEnCarga(),
+            'total' => $total,
+            'descripcion' => $l->descripcion(),
+            'recibido' => $l->estado() !== EstadoLpn::RECEIVING,
+        ], $lpns);
     }
 
     /** Ficha de un LPN escaneado: estado, ubicacion, carga y cliente. */

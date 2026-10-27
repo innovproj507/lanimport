@@ -1,5 +1,4 @@
 <?php
-use App\Libraries\AlertasMenu;
 use App\Libraries\Csrf;
 
 if (session_status() !== PHP_SESSION_ACTIVE) {
@@ -25,8 +24,9 @@ $headerActions = $headerActions ?? '';
 $backHref = $backHref ?? null;
 $currentPath = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
 
-$alertasMenu = AlertasMenu::paraRol($rolActual);
-$totalAlertas = array_sum(array_column($alertasMenu, 'total'));
+require __DIR__ . '/_campana.php';
+// Cada cuantos segundos la pantalla revisa si hubo cambios (vivo.js); las de escaneo lo bajan.
+$vivoSegundos = (int) ($vivoSegundos ?? 30);
 $fechaHoy = class_exists(IntlDateFormatter::class)
     ? (new IntlDateFormatter('es', IntlDateFormatter::NONE, IntlDateFormatter::NONE, null, null, "d MMM yyyy"))->format(new DateTimeImmutable())
     : date('d/m/Y');
@@ -40,9 +40,14 @@ require_once __DIR__ . '/view_helpers.php';
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="icon" type="image/svg+xml" href="/assets/images/logo.svg">
     <title><?= htmlspecialchars($pageTitle) ?> - LAN Import</title>
+<?php require __DIR__ . '/pwa_head.php'; ?>
     <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        #vivo-indicador[data-estado="actualizado"] .vivo-punto { background: #f59e0b; }
+        #vivo-indicador[data-estado="sinred"] .vivo-punto, #vivo-indicador[data-estado="sinsesion"] .vivo-punto { background: #a1a1aa; animation: none; }
+    </style>
 </head>
-<body class="bg-[#eef2f9] text-black">
+<body class="bg-[#eef2f9] text-black" data-vivo-segundos="<?= $vivoSegundos ?>">
 <div class="flex h-screen overflow-hidden">
 
     <div id="sidebar-backdrop" class="hidden fixed inset-0 bg-black/40 z-30 lg:hidden"></div>
@@ -147,26 +152,21 @@ require_once __DIR__ . '/view_helpers.php';
                     <?= icon_small('clock', 'w-4 h-4 text-zinc-500') ?><?= htmlspecialchars($fechaHoy) ?>
                 </span>
 
+                <?php // Las pantallas se actualizan solas (vivo.js): verde = al dia, ambar = acaba de actualizarse. ?>
+                <span id="vivo-indicador" data-estado="ok" title="La pantalla se actualiza sola cuando hay cambios"
+                      class="hidden md:inline-flex items-center gap-1.5 text-xs text-white/80 px-2">
+                    <span class="vivo-punto w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span><span data-vivo-texto>En vivo</span>
+                </span>
+
                 <div class="relative" data-dropdown>
                     <button type="button" data-dropdown-toggle title="Notificaciones"
                             class="relative w-10 h-10 rounded-lg flex items-center justify-center text-white/80 hover:text-white hover:bg-white/10 transition">
                         <?= icon_small('bell', 'w-6 h-6') ?>
-                        <?php if ($totalAlertas > 0): ?>
-                            <span class="absolute top-1 right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center"><?= $totalAlertas > 99 ? '99+' : $totalAlertas ?></span>
-                        <?php endif; ?>
+                        <span id="campana-total" data-vivo-region="global" data-vivo-url="/vivo/campana"><?= $campanaTotalHtml ?></span>
                     </button>
                     <div data-dropdown-menu class="hidden absolute right-0 mt-2 w-72 bg-white rounded-xl shadow-xl border border-slate-200 z-50 overflow-hidden">
                         <p class="px-4 py-3 text-sm font-semibold text-black border-b border-slate-100">Pendientes</p>
-                        <?php if ($alertasMenu === []): ?>
-                            <p class="px-4 py-4 text-sm text-zinc-500">No hay pendientes.</p>
-                        <?php else: ?>
-                            <?php foreach ($alertasMenu as $alerta): ?>
-                                <a href="<?= htmlspecialchars($alerta['href']) ?>" class="flex items-center justify-between px-4 py-3 text-sm text-zinc-700 hover:bg-slate-50">
-                                    <span><?= htmlspecialchars($alerta['texto']) ?></span>
-                                    <span class="px-2 py-0.5 rounded-full bg-red-100 text-red-600 text-xs font-semibold"><?= $alerta['total'] ?></span>
-                                </a>
-                            <?php endforeach; ?>
-                        <?php endif; ?>
+                        <div id="campana-menu" data-vivo-region="global" data-vivo-url="/vivo/campana"><?= $campanaMenuHtml ?></div>
                     </div>
                 </div>
 
@@ -204,6 +204,10 @@ require_once __DIR__ . '/view_helpers.php';
                                     <?= icon_small('cog', 'w-4 h-4 text-zinc-500') ?> Configuracion
                                 </a>
                             <?php endif; ?>
+                            <?php // Visible solo cuando el navegador deja instalar (pwa.js). ?>
+                            <button type="button" data-instalar-app class="hidden w-full flex items-center gap-2 px-4 py-2.5 text-sm text-zinc-700 hover:bg-slate-50">
+                                <?= icon_small('download', 'w-4 h-4 text-zinc-500') ?> Instalar app
+                            </button>
                             <form method="post" action="/logout" class="border-t border-slate-100">
                                 <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
                                 <button type="submit" class="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50">

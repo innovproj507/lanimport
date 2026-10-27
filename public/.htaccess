@@ -1,6 +1,11 @@
 # Disable directory browsing
 Options -Indexes
 
+# Manifest de la app instalable (PWA)
+<IfModule mod_mime.c>
+	AddType application/manifest+json .webmanifest
+</IfModule>
+
 # ----------------------------------------------------------------------
 # Rewrite engine
 # ----------------------------------------------------------------------

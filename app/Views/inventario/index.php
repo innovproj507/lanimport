@@ -136,7 +136,7 @@ $n = static fn (float $v, int $d = 2): string => number_format($v, $d, '.', ',')
 </form>
 </div>
 
-<div class="bg-white rounded-xl shadow-sm p-6">
+<div class="bg-white rounded-xl shadow-sm p-6" id="inventario-resultados" data-vivo-region="global">
     <?php if (empty($lpns)): ?>
         <p class="text-sm text-zinc-500">No se encontraron LPNs con estos filtros.</p>
     <?php elseif ($mostrarDetalle): ?>

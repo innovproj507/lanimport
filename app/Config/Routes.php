@@ -4,10 +4,8 @@ use CodeIgniter\Router\RouteCollection;
 
 /** @var RouteCollection $routes */
 
-// Redirige la raiz al login (mismo comportamiento que /lan)
-$routes->get('/', static function () {
-    return redirect()->to('/login');
-});
+// Raiz (y inicio de la app instalada): a la pantalla del rol si hay sesion, si no al login.
+$routes->get('/', 'AuthController::inicio');
 
 // Auth (sin filtro — son las rutas para autenticarse)
 $routes->get('/login', 'AuthController::showLogin');
@@ -20,6 +18,10 @@ $routes->post('/reset-password/(:segment)', 'AuthController::resetPassword/$1');
 
 // Requieren sesion activa (DashboardController manda al rol bodega a /cargas/ingreso)
 $routes->get('/dashboard', 'DashboardController::index', ['filter' => 'auth']);
+
+// Actualizacion automatica de pantallas (vivo.js): huella de los datos, para refrescar solo si cambiaron.
+$routes->get('/vivo/huella', 'VivoController::huella', ['filter' => 'auth']);
+$routes->get('/vivo/campana', 'VivoController::campana', ['filter' => 'auth']);
 
 // Portal de cliente — requiere sesion + rol cliente
 $routes->get('/portal', 'PortalController::index', ['filter' => ['auth', 'role:cliente']]);
@@ -149,6 +151,8 @@ $routes->group('bodega/api', ['filter' => array_merge($bodegaFilter, ['csrfheade
     $routes->get('ubicaciones', 'Api\BodegaApiController::ubicaciones');
     $routes->get('recepcion', 'Api\BodegaApiController::recepcionPendientes');
     $routes->post('recepcion/escanear', 'Api\BodegaApiController::recepcionEscanear');
+    // Bultos de una carga y cuales faltan por escanear.
+    $routes->get('recepcion/(:segment)/bultos', 'Api\BodegaApiController::recepcionBultos/$1');
     $routes->get('lpns/(:segment)', 'Api\BodegaApiController::lpn/$1');
     $routes->get('salidas', 'Api\BodegaApiController::salidas');
     $routes->get('salidas/(:segment)', 'Api\BodegaApiController::salida/$1');

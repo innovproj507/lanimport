@@ -17,6 +17,7 @@ $pageSubtitle = $pageSubtitle ?? '';
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="icon" type="image/svg+xml" href="/assets/images/logo.svg">
     <title><?= htmlspecialchars($pageTitle) ?> - LAN Import - Export S.A.</title>
+<?php require __DIR__ . '/pwa_head.php'; ?>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-slate-100 text-black">

@@ -459,8 +459,6 @@ document.addEventListener('DOMContentLoaded', function () {
     var mensaje = document.getElementById('salida-scan-mensaje');
     var csrfInput = document.getElementById('salida-csrf');
     var ordenIdInput = document.getElementById('salida-orden-id');
-    var progresoEl = document.getElementById('salida-progreso');
-    var confirmarBtn = document.getElementById('salida-confirmar-btn');
 
     if (!scanInput || !csrfInput || !ordenIdInput) {
         return;
@@ -510,6 +508,10 @@ document.addEventListener('DOMContentLoaded', function () {
                     }
                 }
 
+                // Se buscan aqui: la actualizacion automatica (vivo.js) puede haber reemplazado la zona.
+                var progresoEl = document.getElementById('salida-progreso');
+                var confirmarBtn = document.getElementById('salida-confirmar-btn');
+
                 if (progresoEl) {
                     progresoEl.textContent = data.progreso.escaneadas + ' de ' + data.progreso.total + ' escaneados';
                     progresoEl.setAttribute('data-escaneadas', data.progreso.escaneadas);
@@ -547,7 +549,10 @@ function initBusquedaPaginada(opciones) {
         return;
     }
 
+    var paginaActual = 1;
+
     function cargar(page) {
+        paginaActual = page;
         var params = new URLSearchParams();
         params.set('q', input.value);
         params.set('page', String(page));
@@ -557,7 +562,7 @@ function initBusquedaPaginada(opciones) {
             params.set(f.param, f.select.value);
         });
 
-        fetch(opciones.url + '?' + params.toString())
+        return fetch(opciones.url + '?' + params.toString())
             .then(function (response) { return response.json(); })
             .then(function (data) {
                 tbody.innerHTML = data.html;
@@ -597,6 +602,11 @@ function initBusquedaPaginada(opciones) {
             cargar(1);
         }, 300);
     });
+
+    // Se actualiza sola (misma pagina y filtros) cuando otro usuario cambia los datos (vivo.js).
+    if (opciones.vivo && typeof Vivo !== 'undefined') {
+        Vivo.alCambiar(opciones.vivo, function () { return cargar(paginaActual); });
+    }
 }
 
 document.addEventListener('DOMContentLoaded', function () {
@@ -606,7 +616,8 @@ document.addEventListener('DOMContentLoaded', function () {
         tbodyId: 'clientes-tbody',
         paginacionId: 'clientes-paginacion',
         botonClase: '.clientes-pagina-btn',
-        url: '/clientes/buscar'
+        url: '/clientes/buscar',
+        vivo: 'global'
     });
 
     initBusquedaPaginada({
@@ -629,7 +640,8 @@ document.addEventListener('DOMContentLoaded', function () {
             { id: 'cargas-aduanero-filtro', param: 'aduanero' }
         ],
         resumenId: 'cargas-resumen',
-        url: '/cargas/buscar'
+        url: '/cargas/buscar',
+        vivo: 'global'
     });
 
     initBusquedaPaginada({

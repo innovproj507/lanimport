@@ -10,6 +10,8 @@ require_once __DIR__ . '/../partials/view_helpers.php';
 $pageTitle = 'Salida ' . $orden->etiquetaDo();
 $pageSubtitle = (str_contains($clienteNombre, ', ') ? 'Clientes: ' : 'Cliente: ') . $clienteNombre;
 $backHref = '/salidas/historial';
+// Bodega escanea desde la PDA mientras trafico mira: la pantalla revisa cambios cada 8 s (vivo.js).
+$vivoSegundos = 8;
 // Bodega escanea y finaliza; agregar cargas, cancelar y el embarque los decide trafico/gerencia.
 $planifica = in_array($_SESSION['usuario_rol'] ?? null, ['operaciones', 'gerente', 'admin'], true);
 $headerActions = ($planifica && $orden->estado()->value === 'pendiente' ? header_button('/salidas/' . $orden->id() . '/agregar', 'plus', 'Agregar cargas', 'emerald') : '')
@@ -27,6 +29,7 @@ foreach ($orden->lineas() as $l) {
 $confirmada = $orden->estado()->value === 'confirmada';
 $cancelada = $orden->estado()->value === 'cancelada';
 $embarque = $orden->embarque();
+$vivoDo = 'salida:' . $orden->id();
 $claseInput = 'w-full rounded-lg border border-zinc-300 bg-white text-black px-3 py-2 focus:ring-2 focus:ring-amber-400 focus:outline-none disabled:bg-slate-100 disabled:text-zinc-500';
 ?>
 
@@ -37,7 +40,7 @@ $claseInput = 'w-full rounded-lg border border-zinc-300 bg-white text-black px-3
     <div class="bg-red-500/10 text-red-600 text-sm rounded-lg px-4 py-3 mb-4 border border-red-500/30"><?= htmlspecialchars($error) ?></div>
 <?php endif; ?>
 
-<form method="post" action="/salidas/<?= htmlspecialchars($orden->id()) ?>/embarque" class="bg-white rounded-xl shadow-sm p-6 mb-6">
+<form method="post" action="/salidas/<?= htmlspecialchars($orden->id()) ?>/embarque" id="salida-embarque" data-vivo-region="<?= htmlspecialchars($vivoDo) ?>" class="bg-white rounded-xl shadow-sm p-6 mb-6">
     <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
     <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
         <?= card_header('truck', 'Datos del embarque', 'sky') ?>
@@ -98,7 +101,7 @@ $claseInput = 'w-full rounded-lg border border-zinc-300 bg-white text-black px-3
             </div>
             <p id="salida-scan-mensaje" class="text-sm"></p>
         </div>
-        <div class="text-right">
+        <div class="text-right" id="salida-progreso-zona" data-vivo-region="<?= htmlspecialchars($vivoDo) ?>">
             <p class="text-sm text-zinc-500">Progreso</p>
             <p id="salida-progreso" class="text-lg font-bold text-black" data-escaneadas="<?= $progreso['escaneadas'] ?>" data-total="<?= $progreso['total'] ?>">
                 <?= $progreso['escaneadas'] ?> de <?= $progreso['total'] ?> escaneados
@@ -109,6 +112,7 @@ $claseInput = 'w-full rounded-lg border border-zinc-300 bg-white text-black px-3
     <input type="hidden" id="salida-csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
     <input type="hidden" id="salida-orden-id" value="<?= htmlspecialchars($orden->id()) ?>">
 
+    <div id="salida-acciones" data-vivo-region="<?= htmlspecialchars($vivoDo) ?>">
     <?php if (!$confirmada && !$cancelada): ?>
         <div class="mt-4 flex gap-3">
             <form method="post" action="/salidas/<?= htmlspecialchars($orden->id()) ?>/finalizar">
@@ -132,6 +136,7 @@ $claseInput = 'w-full rounded-lg border border-zinc-300 bg-white text-black px-3
             Esta orden esta <?= htmlspecialchars($orden->estado()->label()) ?><?= $orden->nota() ? ' (' . htmlspecialchars($orden->nota()) . ')' : '' ?>.
         </p>
     <?php endif; ?>
+    </div>
 </div>
 
 <?php
@@ -173,7 +178,7 @@ $opcionSalida = static fn (array $s): string => $s['etiqueta']
 <div class="bg-white rounded-xl shadow-sm p-6">
     <div class="flex flex-wrap items-start justify-between gap-3 mb-4">
         <div>
-            <h2 class="font-semibold text-black mb-1">Cargas de esta salida <span class="text-zinc-400 font-normal">· <?= count($avance) ?></span></h2>
+            <h2 class="font-semibold text-black mb-1">Cargas de esta salida <span id="salida-num-cargas" data-vivo-region="<?= htmlspecialchars($vivoDo) ?>" class="text-zinc-400 font-normal">· <?= count($avance) ?></span></h2>
             <p class="text-xs text-zinc-500">Bodega escanea cada bulto al subirlo al contenedor. Las cargas con bultos pendientes aparecen primero. Use <strong>+</strong> para ver los LPN de una carga.</p>
         </div>
         <div class="flex gap-2 text-xs">
@@ -191,7 +196,7 @@ $opcionSalida = static fn (array $s): string => $s['etiqueta']
                     <th class="py-2 text-right">Escaneados</th>
                 </tr>
             </thead>
-            <tbody id="salida-tbody">
+            <tbody id="salida-tbody" data-vivo-region="<?= htmlspecialchars($vivoDo) ?>">
                 <?php foreach ($avance as $grupo): $completa = $grupo['escaneadas'] >= $grupo['total']; ?>
                     <tr class="border-b border-slate-200 <?= $completa ? 'bg-emerald-50' : 'bg-slate-50' ?>" data-grupo-carga="<?= htmlspecialchars($grupo['cargaId']) ?>">
                         <td class="py-2 pr-4 font-mono font-semibold text-black">
@@ -315,8 +320,15 @@ document.addEventListener('DOMContentLoaded', function () {
         document.getElementById('ajustar-quedan').textContent = (total - marcados) + ' se quedan';
     }
 
-    document.querySelectorAll('.salida-ajustar').forEach(function (boton) {
-        boton.addEventListener('click', function () {
+    // Delegado: la tabla se reemplaza cuando hay cambios (vivo.js) y los botones son nuevos.
+    document.addEventListener('click', function (evento) {
+        var boton = evento.target.closest('.salida-ajustar');
+
+        if (!boton) {
+            return;
+        }
+
+        (function () {
             var carga = boton.getAttribute('data-carga');
             document.getElementById('ajustar-carga-id').value = carga;
             document.getElementById('ajustar-titulo').textContent = boton.getAttribute('data-tracking');
@@ -341,7 +353,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 }, function () {
                     lista.innerHTML = '<p class="text-sm text-red-600 p-3">No se pudo cargar la lista. Intente de nuevo.</p>';
                 });
-        });
+        })();
     });
 
     lista.addEventListener('change', contar);
@@ -397,6 +409,29 @@ document.addEventListener('DOMContentLoaded', function () {
     });
     document.getElementById('salida-contraer-todo').addEventListener('click', function () {
         tbody.querySelectorAll('.salida-toggle').forEach(function (b) { mostrar(b, false); });
+    });
+
+    // Actualizacion automatica (vivo.js): las cargas que estaban abiertas siguen abiertas.
+    var abiertas = [];
+    document.addEventListener('vivo:antes', function (e) {
+        if (e.detail.region === tbody) {
+            abiertas = Array.prototype.map.call(tbody.querySelectorAll('.salida-toggle[aria-expanded="true"]'), function (b) {
+                return b.getAttribute('data-toggle-carga');
+            });
+        }
+    });
+    document.addEventListener('vivo:actualizado', function (e) {
+        if (e.detail.region === tbody) {
+            tbody.querySelectorAll('.salida-toggle').forEach(function (b) {
+                if (abiertas.indexOf(b.getAttribute('data-toggle-carga')) !== -1) { mostrar(b, true); }
+            });
+        }
+
+        // Si otro usuario confirmo o cancelo el DO, ya no se escanea aqui.
+        var scan = document.getElementById('salida-scan-input');
+        if (e.detail.region.id === 'salida-acciones' && scan && !document.getElementById('salida-confirmar-btn')) {
+            scan.disabled = true;
+        }
     });
 });
 </script>

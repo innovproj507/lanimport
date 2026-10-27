@@ -75,6 +75,17 @@ This is the single composition root. It builds a lazy-singleton `Courier\Shared\
 - `AuthFilter` answers 401 JSON (instead of redirecting to `/login`) when the request sends `Accept: application/json`.
 - The service worker is served from `/bodega/sw.js` with `Service-Worker-Allowed: /bodega`, and it only caches `/assets/bodega/*`. Bump `VERSION` in `public/assets/bodega/sw.js` when those files change.
 - Scanned codes go through `ConfirmarRecepcionLpnHandler::normalizarCodigo()`, because keyboard-wedge scanners with a Spanish layout type `-` as `'`.
+- Recepcion shows which bultos are still missing: the scan response includes `faltan` (that carga's unscanned LPNs, with n/total), and each carga has a "Faltan N bultos" toggle (`GET bodega/api/recepcion/{cargaId}/bultos`). The carga just scanned stays expanded.
+
+### App instalable (PWA) y pantallas en vivo
+
+- The whole site is an installable PWA: `public/manifest.webmanifest` (start_url `/`, which `AuthController::inicio` redirects to the role's home or `/login`), icons in `public/assets/pwa/`, and the head tags in `partials/pwa_head.php` (included by `header.php`, `header_cliente.php` and `auth/login.php`).
+- `public/sw.js` (scope `/`, cache `lan-web-*`) never caches pages or data: navigations go to the network and fall back to `public/offline.html`; only `/assets/*` (cache-first when it has `?v=`) and the Tailwind CDN are cached. Bump `VERSION` when changing it or `offline.html`. `/bodega` keeps its own SW; each one deletes only its own cache prefix.
+- `public/assets/js/pwa.js` registers the SW (HTTPS only) and shows the `[data-instalar-app]` buttons (user menu, login) when the browser allows installing.
+- Live screens (`public/assets/js/vivo.js`, AJAX polling): every N seconds (`$vivoSegundos` before the header, default 30) it asks `GET /vivo/huella?r=global,salida:{id}` (`App\Libraries\HuellaCambios`, a cheap hash of counts and `updated_at`). Only when a hash changes does it refresh:
+  - zones: elements with an `id` and `data-vivo-region="<recurso>"`. The page (or `data-vivo-url`) is fetched again and the zone's innerHTML replaced, unless the user is typing in it, has a `<details>` open, or changed a field (`data-vivo-sucio`). Bind events by delegation inside zones; `vivo:antes`/`vivo:actualizado` let the page restore state (the DO keeps its expanded cargas).
+  - AJAX lists: `initBusquedaPaginada({vivo: 'global'})` reloads the current page and filters.
+- Used on: DO (`salida:{id}`, 8 s), Recepcion (10 s), Ingreso de carga and Clientes lists, Inventario, Salidas/Reempaques historial, Dashboard cards, and the bell (`/vivo/campana`).
 
 ### Datos de entrega (formerly "actas de recepcion")
 

@@ -17,10 +17,27 @@ use Courier\Auth\Domain\Exception\InvalidCredentialsException;
 use Courier\Auth\Domain\Exception\TokenRecuperacionInvalidoException;
 use Courier\Auth\Domain\Exception\TooManyAttemptsException;
 use Courier\Auth\Domain\Rol;
+use Courier\Auth\Infrastructure\Security\SessionManager;
 use Courier\Shared\Domain\Exception\ValidationException;
 
 final class AuthController extends BaseController
 {
+    /**
+     * Raiz del sitio (y start_url de la app instalada): con sesion va a la pantalla de su rol,
+     * sin sesion al login.
+     */
+    public function inicio(): RedirectResponse
+    {
+        /** @var SessionManager $sessionManager */
+        $sessionManager = $this->container()->get(SessionManager::class);
+
+        if ($sessionManager->currentUsuarioId() === null) {
+            return redirect()->to('/login');
+        }
+
+        return redirect()->to($sessionManager->currentRol() === Rol::CLIENTE->value ? '/portal' : '/dashboard');
+    }
+
     public function showLogin(): string
     {
         return view('auth/login', ['error' => null]);

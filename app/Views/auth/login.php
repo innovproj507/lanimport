@@ -9,6 +9,7 @@ require_once __DIR__ . '/../partials/view_helpers.php';
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="icon" type="image/svg+xml" href="/assets/images/logo.svg">
     <title>Iniciar sesion - LAN Import - Export S.A.</title>
+<?php require __DIR__ . '/../partials/pwa_head.php'; ?>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-slate-900 min-h-screen">
@@ -65,6 +66,12 @@ require_once __DIR__ . '/../partials/view_helpers.php';
                 Entrar
             </button>
         </form>
+
+        <?php // Visible solo cuando el navegador deja instalar el sistema como app (pwa.js). ?>
+        <button type="button" data-instalar-app
+                class="hidden w-full mt-3 inline-flex items-center justify-center gap-2 border border-slate-300 text-zinc-700 rounded-full py-2 text-sm font-medium hover:bg-slate-50 transition">
+            <?= icon_small('download', 'w-4 h-4') ?> Instalar app en este equipo
+        </button>
     </div>
 </div>
 
