@@ -712,7 +712,7 @@
             document.getElementById('fotos-lista').innerHTML = fotos.length === 0
                 ? '<p class="vacio">Todavia no hay fotos.</p>'
                 : fotos.map(function (f) {
-                    return '<a class="foto" href="' + esc(f.url) + '" target="_blank" rel="noopener">'
+                    return '<a class="foto" href="' + esc(f.url) + '" data-foto-ver data-foto-texto="' + esc(f.fecha + (f.usuario ? ' · ' + f.usuario : '')) + '">'
                         + '<img src="' + esc(f.url) + '" alt="Foto de evidencia" loading="lazy">'
                         + '<small>' + esc(f.fecha) + (f.usuario ? ' · ' + esc(f.usuario) : '') + '</small></a>';
                 }).join('');
@@ -743,6 +743,54 @@
                 input.value = '';
             });
         }
+
+        // Visor a pantalla completa (sin salir de la app): flechas o deslizar para pasar de foto.
+        var visor = document.createElement('div');
+        visor.className = 'visor oculto';
+        visor.innerHTML = '<div class="visor-barra"><span data-visor-texto></span><button type="button" data-visor-cerrar aria-label="Cerrar">✕</button></div>'
+            + '<img alt="Foto de evidencia">'
+            + '<button type="button" class="visor-paso visor-ant" data-visor-paso="-1" aria-label="Anterior">‹</button>'
+            + '<button type="button" class="visor-paso visor-sig" data-visor-paso="1" aria-label="Siguiente">›</button>';
+        vista.appendChild(visor);
+        var enlaces = [];
+        var actual = 0;
+        var inicioX = null;
+
+        function verFoto(i) {
+            actual = (i + enlaces.length) % enlaces.length;
+            visor.querySelector('img').src = enlaces[actual].getAttribute('href');
+            visor.querySelector('[data-visor-texto]').textContent = (actual + 1) + ' / ' + enlaces.length + '  ' + enlaces[actual].getAttribute('data-foto-texto');
+            visor.querySelectorAll('.visor-paso').forEach(function (b) { b.classList.toggle('oculto', enlaces.length < 2); });
+        }
+
+        document.getElementById('fotos-lista').addEventListener('click', function (e) {
+            var a = e.target.closest('[data-foto-ver]');
+
+            if (!a) {
+                return;
+            }
+
+            e.preventDefault();
+            enlaces = Array.prototype.slice.call(this.querySelectorAll('[data-foto-ver]'));
+            verFoto(enlaces.indexOf(a));
+            visor.classList.remove('oculto');
+        });
+
+        visor.addEventListener('click', function (e) {
+            var paso = e.target.closest('[data-visor-paso]');
+
+            if (paso) {
+                verFoto(actual + parseInt(paso.getAttribute('data-visor-paso'), 10));
+            } else if (e.target === visor || e.target.closest('[data-visor-cerrar]')) {
+                visor.classList.add('oculto');
+            }
+        });
+        visor.addEventListener('touchstart', function (e) { inicioX = e.touches[0].clientX; }, { passive: true });
+        visor.addEventListener('touchend', function (e) {
+            var dx = inicioX === null ? 0 : e.changedTouches[0].clientX - inicioX;
+            if (Math.abs(dx) > 50 && enlaces.length > 1) { verFoto(actual + (dx < 0 ? 1 : -1)); }
+            inicioX = null;
+        });
 
         document.getElementById('foto-camara').addEventListener('change', function () { subir(this); });
         document.getElementById('foto-galeria').addEventListener('change', function () { subir(this); });

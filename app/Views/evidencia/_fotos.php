@@ -53,10 +53,12 @@ $totalFotos = array_sum(array_map(static fn (array $g) => count($g['fotos']), $f
                 <?php if ($grupo['fotos'] === []): ?>
                     <p class="text-sm text-zinc-400">Sin fotos.</p>
                 <?php else: ?>
-                    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3" data-fotos-galeria>
                         <?php foreach ($grupo['fotos'] as $foto): ?>
                             <figure class="relative group">
-                                <a href="/<?= htmlspecialchars($foto['ruta']) ?>" target="_blank" rel="noopener">
+                                <?php // Se abre en el visor (modal) de abajo; el enlace queda para abrir en otra pestaña con clic central. ?>
+                                <a href="/<?= htmlspecialchars($foto['ruta']) ?>" data-foto-ver
+                                   data-foto-texto="<?= htmlspecialchars(($grupo['titulo'] !== null ? $grupo['titulo'] . ' · ' : '') . (new DateTimeImmutable($foto['fecha']))->format('d/m/Y H:i') . ($foto['usuario'] ? ' · ' . $foto['usuario'] : '')) ?>">
                                     <img src="/<?= htmlspecialchars($foto['ruta']) ?>" alt="Foto de evidencia" loading="lazy"
                                          class="w-full h-32 object-cover rounded-lg border border-slate-200 hover:opacity-90 transition">
                                 </a>
@@ -82,4 +84,89 @@ $totalFotos = array_sum(array_map(static fn (array $g) => count($g['fotos']), $f
         <?php endforeach; ?>
     </div>
 </div>
+
+<!-- Visor de fotos: anterior/siguiente dentro del mismo grupo (carga) -->
+<div id="foto-visor" class="hidden fixed inset-0 z-[60] bg-black/90 flex-col items-center justify-center select-none" role="dialog" aria-modal="true">
+    <div class="absolute top-0 inset-x-0 flex items-center justify-between gap-3 px-4 py-3 text-white">
+        <p class="text-sm truncate"><span id="foto-visor-contador" class="font-semibold mr-2"></span><span id="foto-visor-texto" class="text-white/80"></span></p>
+        <div class="flex items-center gap-2 shrink-0">
+            <a id="foto-visor-original" href="#" target="_blank" rel="noopener" class="text-xs text-white/80 hover:text-white underline">Abrir original</a>
+            <button type="button" data-visor-cerrar title="Cerrar (Esc)" class="w-10 h-10 rounded-full flex items-center justify-center text-2xl hover:bg-white/10">&times;</button>
+        </div>
+    </div>
+    <img id="foto-visor-img" src="" alt="Foto de evidencia" class="max-w-[94vw] max-h-[82vh] object-contain rounded-lg shadow-2xl">
+    <button type="button" data-visor-paso="-1" title="Anterior" class="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 w-12 h-12 rounded-full bg-white/15 text-white text-3xl hover:bg-white/25 flex items-center justify-center">&#8249;</button>
+    <button type="button" data-visor-paso="1" title="Siguiente" class="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 w-12 h-12 rounded-full bg-white/15 text-white text-3xl hover:bg-white/25 flex items-center justify-center">&#8250;</button>
+</div>
+<script>
+(function () {
+    var visor = document.getElementById('foto-visor');
+    var img = document.getElementById('foto-visor-img');
+    var fotos = [];
+    var actual = 0;
+
+    function mostrar(i) {
+        actual = (i + fotos.length) % fotos.length;
+        var a = fotos[actual];
+        img.src = a.getAttribute('href');
+        document.getElementById('foto-visor-texto').textContent = a.getAttribute('data-foto-texto') || '';
+        document.getElementById('foto-visor-contador').textContent = (actual + 1) + ' / ' + fotos.length;
+        document.getElementById('foto-visor-original').href = a.getAttribute('href');
+        visor.querySelectorAll('[data-visor-paso]').forEach(function (b) { b.classList.toggle('hidden', fotos.length < 2); });
+    }
+
+    function cerrar() {
+        visor.classList.add('hidden');
+        visor.classList.remove('flex');
+        img.src = '';
+        document.body.style.overflow = '';
+    }
+
+    document.addEventListener('click', function (e) {
+        var a = e.target.closest('[data-foto-ver]');
+
+        // Ctrl/clic central: abrir en otra pestaña como antes.
+        if (!a || e.ctrlKey || e.metaKey || e.shiftKey || e.button !== 0) {
+            return;
+        }
+
+        e.preventDefault();
+        fotos = Array.prototype.slice.call(a.closest('[data-fotos-galeria]').querySelectorAll('[data-foto-ver]'));
+        mostrar(fotos.indexOf(a));
+        visor.classList.remove('hidden');
+        visor.classList.add('flex');
+        document.body.style.overflow = 'hidden';
+    });
+
+    visor.addEventListener('click', function (e) {
+        var paso = e.target.closest('[data-visor-paso]');
+
+        if (paso) {
+            mostrar(actual + parseInt(paso.getAttribute('data-visor-paso'), 10));
+        } else if (e.target === visor || e.target.closest('[data-visor-cerrar]')) {
+            cerrar();
+        }
+    });
+
+    document.addEventListener('keydown', function (e) {
+        if (visor.classList.contains('hidden')) {
+            return;
+        }
+
+        if (e.key === 'Escape') { cerrar(); }
+        if (e.key === 'ArrowLeft') { mostrar(actual - 1); }
+        if (e.key === 'ArrowRight') { mostrar(actual + 1); }
+    });
+
+    // Celular/tablet: deslizar para pasar de foto.
+    var inicioX = null;
+    visor.addEventListener('touchstart', function (e) { inicioX = e.touches[0].clientX; }, { passive: true });
+    visor.addEventListener('touchend', function (e) {
+        if (inicioX === null || fotos.length < 2) { return; }
+        var dx = e.changedTouches[0].clientX - inicioX;
+        if (Math.abs(dx) > 50) { mostrar(actual + (dx < 0 ? 1 : -1)); }
+        inicioX = null;
+    });
+})();
+</script>
 <script src="/assets/js/fotos-evidencia.js?v=<?= @filemtime(FCPATH . 'assets/js/fotos-evidencia.js') ?>"></script>

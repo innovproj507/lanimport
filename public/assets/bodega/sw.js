@@ -4,7 +4,7 @@
  * La pagina /bodega (lleva la sesion y el token CSRF) y la API siempre van a la red.
  * Al cambiar archivos de la app, subir VERSION para renovar la cache.
  */
-var VERSION = 'lan-bodega-v10';
+var VERSION = 'lan-bodega-v11';
 var ARCHIVOS = [
     '/assets/bodega/css/app.css',
     '/assets/bodega/js/api.js',
