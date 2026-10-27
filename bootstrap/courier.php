@@ -88,6 +88,7 @@ use Courier\Notificacion\Application\NotificarDespachoCarga\NotificarDespachoCar
 use Courier\Notificacion\Application\PrepararAvisoWhatsapp\PrepararAvisoWhatsappHandler;
 use Courier\Lpn\Application\EliminarLpnsDeCarga\EliminarLpnsDeCargaHandler;
 use Courier\Lpn\Application\GenerarLpnsParaCarga\GenerarLpnsParaCargaHandler;
+use Courier\Lpn\Application\GenerarImagenesEtiquetasLpn\GenerarImagenesEtiquetasLpnHandler;
 use Courier\Lpn\Application\ListarLpnsPorCarga\ListarLpnsPorCargaHandler;
 use Courier\Lpn\Application\ListarUbicaciones\ListarUbicacionesHandler;
 use Courier\Lpn\Application\RegistrarUbicacion\RegistrarUbicacionHandler;
@@ -245,8 +246,13 @@ $container->set(GenerarLpnsParaCargaHandler::class, fn (Container $c) => new Gen
     $c->get(LpnRepositoryInterface::class),
     $c->get(LpnBarcodeGeneratorInterface::class),
     $c->get(PdoEtiquetaRepository::class),
-    $c->get(EtiquetaLpnConfigRepositoryInterface::class),
     $c->get(UnitOfWork::class),
+));
+$container->set(GenerarImagenesEtiquetasLpnHandler::class, fn (Container $c) => new GenerarImagenesEtiquetasLpnHandler(
+    $c->get(CargaRepositoryInterface::class),
+    $c->get(LpnRepositoryInterface::class),
+    $c->get(LpnBarcodeGeneratorInterface::class),
+    $c->get(EtiquetaLpnConfigRepositoryInterface::class),
 ));
 $container->set(ActualizarEtiquetaLpnConfigHandler::class, fn (Container $c) => new ActualizarEtiquetaLpnConfigHandler(
     $c->get(EtiquetaLpnConfigRepositoryInterface::class),

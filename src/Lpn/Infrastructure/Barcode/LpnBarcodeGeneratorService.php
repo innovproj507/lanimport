@@ -17,6 +17,8 @@ final class LpnBarcodeGeneratorService implements LpnBarcodeGeneratorInterface
     private const ANCHO_PX = 800;
     private const ALTO_PX = 600;
     private const MARGEN = 30;
+    private const TAMANO_BASE = 160.0;
+    private const SEPARACION = 0.18;
 
     public function __construct(private readonly string $publicPath)
     {
@@ -42,7 +44,8 @@ final class LpnBarcodeGeneratorService implements LpnBarcodeGeneratorInterface
         $fileName = $codigo . '.png';
         $fullPath = $dir . '/' . $fileName;
 
-        if (imagepng($etiqueta, $fullPath) === false) {
+        // Compresion 3 (la de PHP es 6): casi el mismo tamano y bastante mas rapido en cargas de cientos de bultos.
+        if (imagepng($etiqueta, $fullPath, 3) === false) {
             imagedestroy($etiqueta);
 
             throw new RuntimeException("No se pudo escribir la etiqueta: {$fullPath}");
@@ -62,6 +65,16 @@ final class LpnBarcodeGeneratorService implements LpnBarcodeGeneratorInterface
         }
     }
 
+    public function ruta(string $codigo): string
+    {
+        return self::RELATIVE_DIR . '/' . $codigo . '.png';
+    }
+
+    public function existe(string $codigo): bool
+    {
+        return is_file($this->publicPath . '/' . $this->ruta($codigo));
+    }
+
     /** @return \GdImage */
     private function componerEtiqueta(
         string $codigo,
@@ -75,7 +88,8 @@ final class LpnBarcodeGeneratorService implements LpnBarcodeGeneratorInterface
         $lienzo = imagecreatetruecolor(self::ANCHO_PX, self::ALTO_PX);
         $blanco = imagecolorallocate($lienzo, 255, 255, 255);
         $negro = imagecolorallocate($lienzo, 0, 0, 0);
-        imagefill($lienzo, 0, 0, $blanco);
+        // Rectangulo y no imagefill: el relleno por inundacion tardaba ~10 ms por etiqueta.
+        imagefilledrectangle($lienzo, 0, 0, self::ANCHO_PX - 1, self::ALTO_PX - 1, $blanco);
 
         $anchoMax = self::ANCHO_PX - (self::MARGEN * 2);
         $y = 18;
@@ -136,39 +150,34 @@ final class LpnBarcodeGeneratorService implements LpnBarcodeGeneratorInterface
         }
 
         $altoDisponible = $yFin - $yInicio;
-        $separacion = 0.18;
-        $base = 160.0;
-        $medidas = [];
-        $altoTotal = 0;
 
-        for ($escala = 1.0; $escala >= 0.05; $escala -= 0.02) {
-            $medidas = [];
-            $altoTotal = 0;
+        // Escalas 1.00, 0.98, ... 0.06: se usa la mayor con la que el bloque cabe (o la menor si
+        // ninguna cabe). El alto crece con la escala, asi que basta una busqueda binaria (~6
+        // medidas en vez de ~48 por etiqueta: con 800 bultos se pasaba del limite de 30 s).
+        $escala = static fn (int $paso): float => 1.0 - 0.02 * $paso;
+        $ultimoPaso = 47;
+        [$medidas, $altoTotal] = $this->medirBloque($lineas, $fuentes, $escala(0), $anchoMax);
 
-            foreach ($lineas as [$texto, $peso, $negrita, $minimo]) {
-                $fuente = $negrita ? $fuentes[0] : $fuentes[1];
-                $tamano = $base * $peso * $escala;
+        if ($altoTotal > $altoDisponible) {
+            $bajo = 0;
+            $alto = $ultimoPaso;
+            [$medidas, $altoTotal] = $this->medirBloque($lineas, $fuentes, $escala($alto), $anchoMax);
 
-                // El ancho crece en proporcion al tamano: lo limitamos al ancho disponible.
-                $bbox = imagettfbbox($tamano, 0, $fuente, $texto);
-                $ancho = $bbox[2] - $bbox[0];
-                if ($ancho > $anchoMax) {
-                    // Margen de 2%: el ancho del texto no escala exactamente lineal con el tamano.
-                    $tamano *= ($anchoMax / $ancho) * 0.98;
+            // Invariante: $bajo no cabe; $alto cabe (o es el ultimo paso).
+            while ($alto - $bajo > 1) {
+                $medio = intdiv($bajo + $alto, 2);
+                $prueba = $this->medirBloque($lineas, $fuentes, $escala($medio), $anchoMax);
+
+                if ($prueba[1] <= $altoDisponible) {
+                    $alto = $medio;
+                    [$medidas, $altoTotal] = $prueba;
+                } else {
+                    $bajo = $medio;
                 }
-
-                $tamano = max($tamano, $minimo);
-                $bbox = imagettfbbox($tamano, 0, $fuente, $texto);
-                $medidas[] = [$texto, $tamano, $fuente, $bbox];
-                $altoTotal += ($bbox[1] - $bbox[7]) + $this->espacioEntreLineas($tamano, $separacion);
-            }
-
-            $altoTotal -= $this->espacioEntreLineas(end($medidas)[1], $separacion);
-
-            if ($altoTotal <= $altoDisponible) {
-                break;
             }
         }
+
+        $separacion = self::SEPARACION;
 
         $y = $yInicio + max(0, (int) (($altoDisponible - $altoTotal) / 2));
 
@@ -183,6 +192,42 @@ final class LpnBarcodeGeneratorService implements LpnBarcodeGeneratorInterface
             imagettftext($lienzo, $tamano, 0, max($x, 0), (int) ($y - $bbox[7]), $color, $fuente, $texto);
             $y += ($bbox[1] - $bbox[7]) + $this->espacioEntreLineas($tamano, $separacion);
         }
+    }
+
+    /**
+     * Mide las lineas a una escala dada: tamano de cada una (limitado al ancho y al minimo)
+     * y alto total del bloque.
+     *
+     * @param array<int, array{0: string, 1: float, 2: bool, 3: int}> $lineas
+     * @param array{0: string, 1: string} $fuentes [negrita, normal]
+     * @return array{0: array<int, array{0: string, 1: float, 2: string, 3: array<int, int>}>, 1: float}
+     */
+    private function medirBloque(array $lineas, array $fuentes, float $escala, int $anchoMax): array
+    {
+        $medidas = [];
+        $altoTotal = 0.0;
+
+        foreach ($lineas as [$texto, $peso, $negrita, $minimo]) {
+            $fuente = $negrita ? $fuentes[0] : $fuentes[1];
+            $tamano = self::TAMANO_BASE * $peso * $escala;
+
+            // El ancho crece en proporcion al tamano: lo limitamos al ancho disponible.
+            $bbox = imagettfbbox($tamano, 0, $fuente, $texto);
+            $ancho = $bbox[2] - $bbox[0];
+            if ($ancho > $anchoMax) {
+                // Margen de 2%: el ancho del texto no escala exactamente lineal con el tamano.
+                $tamano *= ($anchoMax / $ancho) * 0.98;
+            }
+
+            $tamano = max($tamano, $minimo);
+            $bbox = imagettfbbox($tamano, 0, $fuente, $texto);
+            $medidas[] = [$texto, $tamano, $fuente, $bbox];
+            $altoTotal += ($bbox[1] - $bbox[7]) + $this->espacioEntreLineas($tamano, self::SEPARACION);
+        }
+
+        $altoTotal -= $this->espacioEntreLineas(end($medidas)[1], self::SEPARACION);
+
+        return [$medidas, $altoTotal];
     }
 
     private function espacioEntreLineas(float $tamano, float $proporcion): float

@@ -3,6 +3,8 @@ use App\Libraries\Csrf;
 /** @var \Courier\Carga\Domain\Carga $carga */
 /** @var array<int, \Courier\Lpn\Domain\Lpn> $lpns */
 /** @var array<int, \Courier\Lpn\Domain\Ubicacion> $ubicaciones */
+/** @var int $imagenesFaltan etiquetas cuya imagen aun no se dibuja (cargas grandes: se terminan aqui por tandas) */
+$imagenesFaltan ??= 0;
 $pageTitle = 'Recepcion de LPNs';
 $pageSubtitle = 'Tracking: ' . (string) $carga->trackingNumero();
 $backHref = '/cargas/' . $carga->id();
@@ -21,6 +23,20 @@ $estadoColores = [
     'consumed' => 'slate',
 ];
 ?>
+
+<?php if ($imagenesFaltan > 0): ?>
+<div id="lpn-imagenes-progreso" class="bg-amber-50 border border-amber-300 rounded-xl p-4 mb-6"
+     data-url="/cargas/<?= htmlspecialchars($carga->id()) ?>/lpns/imagenes" data-total="<?= count($lpns) ?>" data-faltan="<?= $imagenesFaltan ?>">
+    <p class="text-sm font-medium text-amber-900">
+        Preparando las etiquetas: <span id="lpn-imagenes-listas"><?= count($lpns) - $imagenesFaltan ?></span> de <?= count($lpns) ?> listas.
+        No cierre esta pantalla; al terminar se actualiza sola y ya se pueden imprimir.
+    </p>
+    <div class="mt-2 h-2 rounded-full bg-amber-100 overflow-hidden">
+        <div id="lpn-imagenes-barra" class="h-full bg-amber-500 transition-all" style="width: <?= (int) round((count($lpns) - $imagenesFaltan) * 100 / max(1, count($lpns))) ?>%"></div>
+    </div>
+    <p id="lpn-imagenes-error" class="hidden mt-2 text-sm text-red-700"></p>
+</div>
+<?php endif; ?>
 
 <div class="bg-white rounded-xl shadow-sm p-6 mb-6">
     <div class="flex items-start justify-between gap-4 flex-wrap">
@@ -114,6 +130,43 @@ $estadoColores = [
 <script>
 document.addEventListener('DOMContentLoaded', function () {
     var tbody = document.getElementById('lpn-tbody');
+
+    // Carga grande: se piden tandas de imagenes hasta que no falte ninguna y se recarga la pagina.
+    var progreso = document.getElementById('lpn-imagenes-progreso');
+    if (progreso) {
+        var total = parseInt(progreso.getAttribute('data-total'), 10);
+        var errores = 0;
+        var tanda = function () {
+            var datos = new FormData();
+            datos.append('_csrf', document.getElementById('lpn-csrf').value);
+            fetch(progreso.getAttribute('data-url'), { method: 'POST', body: datos, headers: { 'Accept': 'application/json' } })
+                .then(function (r) { return r.json(); })
+                .then(function (json) {
+                    if (!json.success) {
+                        throw new Error(json.message || 'No se pudieron preparar las etiquetas.');
+                    }
+                    errores = 0;
+                    document.getElementById('lpn-imagenes-listas').textContent = total - json.faltan;
+                    document.getElementById('lpn-imagenes-barra').style.width = Math.round((total - json.faltan) * 100 / Math.max(1, total)) + '%';
+                    if (json.faltan > 0) {
+                        tanda();
+                    } else {
+                        window.location.reload();
+                    }
+                })
+                .catch(function (err) {
+                    // Un corte de red no detiene el proceso: se reintenta unas veces antes de avisar.
+                    if (++errores <= 3) {
+                        setTimeout(tanda, 3000);
+                        return;
+                    }
+                    var aviso = document.getElementById('lpn-imagenes-error');
+                    aviso.textContent = (err && err.message ? err.message : String(err)) + ' Recargue la pagina para continuar.';
+                    aviso.classList.remove('hidden');
+                });
+        };
+        tanda();
+    }
 
     function imprimirEtiqueta(rutaEtiqueta) {
         var printerName = LocalPrint.getImpresoraEtiquetas();

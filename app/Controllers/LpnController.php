@@ -13,6 +13,8 @@ use Courier\Lpn\Application\ActualizarEtiquetaLpnConfig\ActualizarEtiquetaLpnCon
 use Courier\Lpn\Application\ActualizarEtiquetaLpnConfig\ActualizarEtiquetaLpnConfigHandler;
 use Courier\Lpn\Application\ConfirmarRecepcionLpn\ConfirmarRecepcionLpnCommand;
 use Courier\Lpn\Application\ConfirmarRecepcionLpn\ConfirmarRecepcionLpnHandler;
+use Courier\Lpn\Application\GenerarImagenesEtiquetasLpn\GenerarImagenesEtiquetasLpnCommand;
+use Courier\Lpn\Application\GenerarImagenesEtiquetasLpn\GenerarImagenesEtiquetasLpnHandler;
 use Courier\Lpn\Application\ListarLpnsPorCarga\ListarLpnsPorCargaHandler;
 use Courier\Lpn\Application\ListarLpnsPorCarga\ListarLpnsPorCargaQuery;
 use Courier\Lpn\Application\ListarUbicaciones\ListarUbicacionesHandler;
@@ -43,11 +45,42 @@ final class LpnController extends BaseController
         }
 
         $ubicaciones = $this->container()->get(ListarUbicacionesHandler::class)->handle(new ListarUbicacionesQuery());
+        $imagenes = $this->container()->get(GenerarImagenesEtiquetasLpnHandler::class)
+            ->handle(new GenerarImagenesEtiquetasLpnCommand($id, 0));
 
         return view('lpn/recepcion', [
             'carga' => $carga,
             'lpns' => $lpns,
             'ubicaciones' => $ubicaciones,
+            'imagenesFaltan' => $imagenes->faltan,
+        ]);
+    }
+
+    /** Una tanda de imagenes de etiquetas pendientes (cargas grandes): la pantalla repite hasta faltan = 0. */
+    public function generarImagenes(string $id): ResponseInterface
+    {
+        if (!Csrf::verify($this->request->getPost('_csrf'))) {
+            return $this->response->setStatusCode(419, 'Page Expired')->setJSON([
+                'success' => false,
+                'message' => 'Sesion expirada, por favor recargue la pagina.',
+            ]);
+        }
+
+        // La tanda tarda ~15 s: se suelta la sesion para no bloquear las demas pantallas del usuario.
+        session_write_close();
+
+        try {
+            $resultado = $this->container()->get(GenerarImagenesEtiquetasLpnHandler::class)
+                ->handle(new GenerarImagenesEtiquetasLpnCommand($id, 15));
+        } catch (NotFoundException $e) {
+            return $this->response->setStatusCode(404)->setJSON(['success' => false, 'message' => $e->getMessage()]);
+        }
+
+        return $this->response->setJSON([
+            'success' => true,
+            'total' => $resultado->total,
+            'generadas' => $resultado->generadas,
+            'faltan' => $resultado->faltan,
         ]);
     }
 

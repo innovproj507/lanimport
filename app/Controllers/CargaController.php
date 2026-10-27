@@ -35,6 +35,8 @@ use Courier\Salida\Domain\SalidaOrdenRepositoryInterface;
 use Courier\Cliente\Application\ListarClientes\ListarClientesQuery;
 use Courier\Lpn\Application\EliminarLpnsDeCarga\EliminarLpnsDeCargaCommand;
 use Courier\Lpn\Application\EliminarLpnsDeCarga\EliminarLpnsDeCargaHandler;
+use Courier\Lpn\Application\GenerarImagenesEtiquetasLpn\GenerarImagenesEtiquetasLpnCommand;
+use Courier\Lpn\Application\GenerarImagenesEtiquetasLpn\GenerarImagenesEtiquetasLpnHandler;
 use Courier\Lpn\Application\GenerarLpnsParaCarga\GenerarLpnsParaCargaCommand;
 use Courier\Lpn\Application\GenerarLpnsParaCarga\GenerarLpnsParaCargaHandler;
 use Courier\Lpn\Domain\EtiquetaLpnConfigRepositoryInterface;
@@ -643,6 +645,10 @@ final class CargaController extends BaseController
         try {
             $command = new GenerarLpnsParaCargaCommand($id, (string) $sessionManager->currentUsuarioId());
             $this->container()->get(GenerarLpnsParaCargaHandler::class)->handle($command);
+
+            // Las imagenes que no alcancen en esta peticion las termina la pantalla de recepcion, por tandas.
+            $this->container()->get(GenerarImagenesEtiquetasLpnHandler::class)
+                ->handle(new GenerarImagenesEtiquetasLpnCommand($id, 15));
 
             return redirect()->to('/cargas/' . $id . '/recepcion');
         } catch (ValidationException|NotFoundException $e) {

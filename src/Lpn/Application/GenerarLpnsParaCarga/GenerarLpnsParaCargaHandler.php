@@ -7,7 +7,6 @@ namespace Courier\Lpn\Application\GenerarLpnsParaCarga;
 use Courier\Carga\Domain\CargaRepositoryInterface;
 use Courier\Carga\Domain\Exception\CargaNotFoundException;
 use Courier\Carga\Infrastructure\Persistence\PdoEtiquetaRepository;
-use Courier\Lpn\Domain\EtiquetaLpnConfigRepositoryInterface;
 use Courier\Lpn\Domain\Lpn;
 use Courier\Lpn\Domain\LpnBarcodeGeneratorInterface;
 use Courier\Lpn\Domain\LpnRepositoryInterface;
@@ -24,7 +23,6 @@ final class GenerarLpnsParaCargaHandler implements CommandHandlerInterface
         private readonly LpnRepositoryInterface $lpns,
         private readonly LpnBarcodeGeneratorInterface $barcodeGenerator,
         private readonly PdoEtiquetaRepository $etiquetas,
-        private readonly EtiquetaLpnConfigRepositoryInterface $etiquetaConfig,
         private readonly UnitOfWork $unitOfWork,
     ) {
     }
@@ -56,15 +54,12 @@ final class GenerarLpnsParaCargaHandler implements CommandHandlerInterface
                 : 'Las lineas de la carga tienen cantidad 0: no hay bultos para etiquetar. Edite la carga y ponga la cantidad de bultos de cada linea (una etiqueta por bulto).');
         }
 
-        // La serie (12/38) depende solo de la plantilla (Configuracion > Etiqueta LPN), no del pais del cliente.
-        $etiquetaConfig = $this->etiquetaConfig->obtener();
-        $mostrarSerie = $etiquetaConfig->mostrarSerie();
-        $proveedorNombreEtiqueta = $etiquetaConfig->mostrarProveedor() ? $carga->proveedor() : null;
-
         $sufijoTracking = substr((string) $carga->trackingNumero(), -6);
         $anchoConsecutivo = strlen((string) $cantidadTotal);
 
-        $resultado = $this->unitOfWork->run(function () use ($carga, $cantidadTotal, $proveedorNombreEtiqueta, $mostrarSerie, $etiquetaConfig, $sufijoTracking, $anchoConsecutivo) {
+        // Solo los registros: las imagenes se dibujan despues, por tandas
+        // (GenerarImagenesEtiquetasLpnHandler); 800 bultos no caben en una peticion.
+        $resultado = $this->unitOfWork->run(function () use ($carga, $sufijoTracking, $anchoConsecutivo) {
             $generados = [];
             $ordenEnCarga = 0;
 
@@ -85,15 +80,7 @@ final class GenerarLpnsParaCargaHandler implements CommandHandlerInterface
                     );
                     $this->lpns->save($lpn);
 
-                    $etiquetaUrl = $this->barcodeGenerator->generate(
-                        $codigo,
-                        $etiquetaConfig->mostrarMarca() ? $linea->marca() : null,
-                        $etiquetaConfig->mostrarDescripcion() ? $linea->descripcion() : null,
-                        $proveedorNombreEtiqueta,
-                        $ordenEnCarga,
-                        $cantidadTotal,
-                        $mostrarSerie,
-                    );
+                    $etiquetaUrl = $this->barcodeGenerator->ruta($codigo);
                     $this->etiquetas->saveParaLpn($lpn->id(), $etiquetaUrl);
 
                     $generados[] = ['lpnId' => $lpn->id(), 'codigo' => $codigo, 'etiquetaUrl' => $etiquetaUrl];
