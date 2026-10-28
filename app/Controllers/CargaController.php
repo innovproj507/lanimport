@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Controllers;
 
 use App\Libraries\Csrf;
+use Courier\Shared\Infrastructure\Config;
 use CodeIgniter\HTTP\RedirectResponse;
 use CodeIgniter\HTTP\ResponseInterface;
 use Courier\Aduanero\Application\ListarAduaneros\ListarAduanerosHandler;
@@ -353,7 +354,7 @@ final class CargaController extends BaseController
             'etiquetaConfig' => $etiquetaConfig,
             'entrega' => $carga->datosEntrega(),
             'registradoPor' => $this->container()->get(UsuarioRepositoryInterface::class)->findById($carga->registradoPorUsuarioId())?->nombre(),
-            'correos' => $this->container()->get(NotificacionRepositoryInterface::class)->listarPorCarga($carga->id()),
+            'correos' => $this->correosVisibles($this->container()->get(NotificacionRepositoryInterface::class)->listarPorCarga($carga->id())),
             'whatsapp' => $this->datosWhatsapp($carga),
             'fotos' => $this->fotosDeCarga($carga->id()),
             'aviso' => $this->tomarAviso(),
@@ -500,9 +501,44 @@ final class CargaController extends BaseController
         return rtrim(rtrim(number_format((float) $total, 2, '.', ''), '0'), '.');
     }
 
+    /**
+     * Mientras se termina de configurar el correo, los envios fallidos no se muestran en pantalla
+     * (al cliente le molestaba el aviso rojo). Siguen registrados en `notificaciones`.
+     * Poner MAIL_MOSTRAR_ERRORES=true en .env para volver a verlos.
+     */
+    private function mostrarErroresCorreo(): bool
+    {
+        return Config::bool('MAIL_MOSTRAR_ERRORES', false);
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $correos
+     * @return array<int, array<string, mixed>>
+     */
+    private function correosVisibles(array $correos): array
+    {
+        if ($this->mostrarErroresCorreo()) {
+            return $correos;
+        }
+
+        return array_values(array_filter(
+            $correos,
+            static fn (array $correo) => ($correo['canal'] ?? 'email') === 'whatsapp' || $correo['estado'] !== 'fallido',
+        ));
+    }
+
     /** Guarda en sesion el aviso que se muestra una vez en el detalle de la carga. */
     private function avisoCorreo(string $prefijo, ?string $estado, ?string $destinatario, ?string $error): void
     {
+        if ($estado === 'fallido' && !$this->mostrarErroresCorreo()) {
+            // Solo el aviso de la carga registrada, sin el error del correo.
+            if ($prefijo !== '') {
+                $_SESSION['carga_aviso'] = ['tipo' => 'ok', 'texto' => $prefijo];
+            }
+
+            return;
+        }
+
         $prefijo = $prefijo !== '' ? $prefijo . ' ' : '';
 
         $_SESSION['carga_aviso'] = match ($estado) {
