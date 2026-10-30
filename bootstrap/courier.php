@@ -84,6 +84,8 @@ use Courier\Lpn\Application\ConfirmarRecepcionLpn\ConfirmarRecepcionLpnHandler;
 use Courier\Carga\Application\SincronizarEstadoCarga\SincronizarEstadoCargaHandler;
 use Courier\Carga\Domain\ConteoBultosCargaInterface;
 use Courier\Carga\Infrastructure\Persistence\PdoConteoBultosCarga;
+use Courier\Carga\Domain\ClienteBultosCargaInterface;
+use Courier\Carga\Infrastructure\Persistence\PdoClienteBultosCarga;
 use Courier\Notificacion\Application\NotificarDespachoCarga\NotificarDespachoCargaHandler;
 use Courier\Notificacion\Application\PrepararAvisoWhatsapp\PrepararAvisoWhatsappHandler;
 use Courier\Lpn\Application\EliminarLpnsDeCarga\EliminarLpnsDeCargaHandler;
@@ -531,7 +533,12 @@ $container->set(ListarCargasPorClienteHandler::class, fn (Container $c) => new L
 
 $container->set(ListarCargasHandler::class, fn (Container $c) => new ListarCargasHandler($c->get(CargaRepositoryInterface::class)));
 $container->set(BuscarCargasHandler::class, fn (Container $c) => new BuscarCargasHandler($c->get(CargaRepositoryInterface::class)));
-$container->set(ActualizarDatosCargaHandler::class, fn (Container $c) => new ActualizarDatosCargaHandler($c->get(CargaRepositoryInterface::class)));
+$container->set(ClienteBultosCargaInterface::class, fn (Container $c) => new PdoClienteBultosCarga($c->get(PDO::class)));
+$container->set(ActualizarDatosCargaHandler::class, fn (Container $c) => new ActualizarDatosCargaHandler(
+    $c->get(CargaRepositoryInterface::class),
+    $c->get(ClienteBultosCargaInterface::class),
+    $c->get(UnitOfWork::class),
+));
 
 // Carga masiva (Excel/CSV)
 $container->set(LectorHojaCalculo::class, fn () => new LectorHojaCalculo());

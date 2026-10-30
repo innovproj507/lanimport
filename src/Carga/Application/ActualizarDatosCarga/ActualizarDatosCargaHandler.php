@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Courier\Carga\Application\ActualizarDatosCarga;
 
 use Courier\Carga\Domain\CargaRepositoryInterface;
+use Courier\Carga\Domain\ClienteBultosCargaInterface;
 use Courier\Carga\Domain\ValueObject\Aduanero;
 use Courier\Carga\Domain\ValueObject\Contenedor;
 use Courier\Carga\Domain\ValueObject\DatosEntrega;
@@ -13,13 +14,17 @@ use Courier\Shared\Application\CommandHandlerInterface;
 use Courier\Shared\Application\CommandInterface;
 use Courier\Shared\Domain\Exception\NotFoundException;
 use Courier\Shared\Domain\Exception\ValidationException;
+use Courier\Shared\Infrastructure\Persistence\UnitOfWork;
 use DateTimeImmutable;
 use Exception;
 
 final class ActualizarDatosCargaHandler implements CommandHandlerInterface
 {
-    public function __construct(private readonly CargaRepositoryInterface $cargas)
-    {
+    public function __construct(
+        private readonly CargaRepositoryInterface $cargas,
+        private readonly ClienteBultosCargaInterface $clienteBultos,
+        private readonly UnitOfWork $unitOfWork,
+    ) {
     }
 
     public function handle(CommandInterface $command): mixed
@@ -64,7 +69,10 @@ final class ActualizarDatosCargaHandler implements CommandHandlerInterface
             $carga->asignarDatosEntrega(DatosEntrega::desdeArreglo($command->datosEntrega));
         }
 
-        $this->cargas->save($carga);
+        $this->unitOfWork->run(function () use ($carga): void {
+            $this->cargas->save($carga);
+            $this->clienteBultos->reasignar($carga->id(), $carga->clienteId());
+        });
 
         return null;
     }
