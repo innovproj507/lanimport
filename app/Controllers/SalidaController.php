@@ -529,6 +529,8 @@ final class SalidaController extends BaseController
             return redirect()->to('/salidas/' . $id);
         }
 
+        $etiquetaOrigen = $this->container()->get(SalidaOrdenRepositoryInterface::class)->findById($id)?->etiquetaDo();
+
         try {
             /** @var SalidaOrden $destino */
             $destino = $this->container()->get(MoverCargasSalidaHandler::class)->handle(new MoverCargasSalidaCommand(
@@ -546,9 +548,9 @@ final class SalidaController extends BaseController
         $origen = $this->container()->get(SalidaOrdenRepositoryInterface::class)->findById($id);
 
         if ($unir || $origen === null || $origen->lineas() === []) {
-            // El DO de origen quedo sin cargas (cancelado): se sigue en el destino.
+            // El DO de origen quedo sin cargas (se elimino): se sigue en el destino.
             $_SESSION['salida_mensaje'] = ($unir ? 'DO unido' : 'Carga movida') . " a {$destino->etiquetaDo()}"
-                . ($origen !== null ? " ({$origen->etiquetaDo()} quedo cancelado: {$origen->nota()})" : '') . '. Lo ya escaneado se conserva.';
+                . ($origen === null && $etiquetaOrigen !== null ? " ({$etiquetaOrigen} quedo vacio y se elimino)" : '') . '. Lo ya escaneado y las fotos se conservan.';
 
             return redirect()->to('/salidas/' . $destino->id());
         }
@@ -606,6 +608,12 @@ final class SalidaController extends BaseController
             $_SESSION['salida_mensaje'] = "Se devolvieron {$bultos} bultos a bodega: vuelven a estar disponibles para otra salida.";
         } catch (NotFoundException|ValidationException|\Courier\Shared\Domain\Exception\DomainException $e) {
             $_SESSION['salida_error'] = $e->getMessage();
+        }
+
+        if (isset($_SESSION['salida_mensaje']) && $this->container()->get(SalidaOrdenRepositoryInterface::class)->findById($id) === null) {
+            $_SESSION['salida_mensaje'] .= ' El DO quedo vacio y se elimino.';
+
+            return redirect()->to('/salidas/historial');
         }
 
         return redirect()->to('/salidas/' . $id);

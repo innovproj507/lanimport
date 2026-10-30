@@ -14,7 +14,7 @@ use Courier\Shared\Infrastructure\Persistence\UnitOfWork;
 
 /**
  * Saca una carga de una salida pendiente y la devuelve a bodega: sus bultos vuelven a estar
- * disponibles para otra salida. Si la salida se queda sin cargas, se cancela.
+ * disponibles para otra salida. Si la salida se queda sin cargas, se elimina.
  */
 final class DevolverCargaSalidaHandler implements CommandHandlerInterface
 {
@@ -54,10 +54,6 @@ final class DevolverCargaSalidaHandler implements CommandHandlerInterface
 
         $sacadas = $orden->sacarLineas($lpnIds);
 
-        if ($orden->lineas() === []) {
-            $orden->cerrarSinCargas('Sin cargas: se devolvieron a bodega');
-        }
-
         $this->unitOfWork->run(function () use ($orden, $sacadas): void {
             foreach ($sacadas as $linea) {
                 $lpn = $this->lpns->findById($linea->lpnId());
@@ -68,7 +64,11 @@ final class DevolverCargaSalidaHandler implements CommandHandlerInterface
                 }
             }
 
-            $this->ordenes->save($orden);
+            if ($orden->lineas() === []) {
+                $this->ordenes->eliminar($orden->id());
+            } else {
+                $this->ordenes->save($orden);
+            }
         });
 
         return count($sacadas);

@@ -123,7 +123,8 @@ $claseInput = 'w-full rounded-lg border border-zinc-300 bg-white text-black px-3
                 </button>
             </form>
             <?php if ($planifica): ?>
-            <form method="post" action="/salidas/<?= htmlspecialchars($orden->id()) ?>/cancelar">
+            <form method="post" action="/salidas/<?= htmlspecialchars($orden->id()) ?>/cancelar"
+                  onsubmit="return confirm('¿Cancelar <?= htmlspecialchars($orden->etiquetaDo()) ?>? Se elimina el DO y sus bultos vuelven a quedar disponibles en bodega.');">
                 <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
                 <button type="submit" class="inline-flex items-center gap-2 bg-red-500/10 text-red-600 rounded-lg px-4 py-2 text-sm font-medium hover:bg-red-500/20 transition">
                     <?= icon_small('x') ?><span>Cancelar Orden</span>
@@ -156,7 +157,7 @@ $opcionSalida = static fn (array $s): string => $s['etiqueta']
         Si una carga se unio por error, use <strong>Sacar</strong> en la tabla de abajo.
     </p>
     <form method="post" action="/salidas/<?= htmlspecialchars($orden->id()) ?>/unir" class="flex flex-wrap items-end gap-3"
-          onsubmit="var s=this.destino_id; if(!s.value){return false;} return confirm('¿Unir <?= htmlspecialchars($orden->etiquetaDo()) ?> a ' + s.options[s.selectedIndex].text.split(' · ')[0] + '? Este DO quedara cancelado y sus cargas pasan al otro.');">
+          onsubmit="var s=this.destino_id; if(!s.value){return false;} return confirm('¿Unir <?= htmlspecialchars($orden->etiquetaDo()) ?> a ' + s.options[s.selectedIndex].text.split(' · ')[0] + '? Sus cargas (con fotos) pasan al otro y este DO se elimina.');">
         <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
         <div class="min-w-[22rem]">
             <label class="block text-sm font-medium text-zinc-700 mb-1">Unir <?= htmlspecialchars($orden->etiquetaDo()) ?> a</label>

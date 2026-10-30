@@ -42,7 +42,8 @@ final class CancelarOrdenSalidaHandler implements CommandHandlerInterface
                 }
             }
 
-            $this->ordenes->save($orden);
+            // Cancelada no se guarda: se elimina para que no quede un DO vacio en el historial.
+            $this->ordenes->eliminar($orden->id());
         });
 
         return null;

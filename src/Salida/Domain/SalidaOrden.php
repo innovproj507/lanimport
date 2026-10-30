@@ -105,17 +105,6 @@ final class SalidaOrden extends AggregateRoot
         $this->agregarLineas($lineas, $clienteIds);
     }
 
-    /** Se queda sin cargas al unirla a otra: se cancela con la nota de a donde fueron. */
-    public function cerrarSinCargas(string $nota): void
-    {
-        if ($this->lineas !== []) {
-            throw new ValidationException("La salida {$this->etiquetaDo()} todavia tiene cargas.");
-        }
-
-        $this->cancelar();
-        $this->nota = mb_substr($nota, 0, 255);
-    }
-
     /** Contenedor, sello, naviera, barco, fechas y destino; se puede completar o corregir mientras no este cancelada. */
     public function actualizarEmbarque(DatosEmbarque $embarque): void
     {

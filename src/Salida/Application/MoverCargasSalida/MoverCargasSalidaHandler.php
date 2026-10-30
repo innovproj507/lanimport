@@ -20,7 +20,7 @@ use Courier\Shared\Infrastructure\Persistence\UnitOfWork;
 /**
  * Pasa cargas de una salida pendiente a otra (o a un DO nuevo), conservando lo que bodega ya
  * escaneo: unir DOs que van en el mismo contenedor, o sacar una carga que se unio por error.
- * Si la salida de origen se queda sin cargas, se cancela con la nota de a donde fueron.
+ * Las fotos de las cargas movidas pasan con ellas. Si la salida de origen se queda sin cargas, se elimina.
  * A una salida ya confirmada solo pasan bultos escaneados, y quedan despachados como al finalizar.
  */
 final class MoverCargasSalidaHandler implements CommandHandlerInterface
@@ -76,14 +76,12 @@ final class MoverCargasSalidaHandler implements CommandHandlerInterface
 
         $this->unitOfWork->run(function () use ($origen, $destino, $despachar, $lpnsMovidos, &$cargaIds): void {
             $this->ordenes->save($destino);
-            // Releida para tener su DO (un DO nuevo lo asigna el repositorio al guardarlo).
-            $guardado = $this->ordenes->findById($destino->id());
+            $this->ordenes->save($origen);
+            $this->ordenes->pasarFotosDeCargasMovidas($origen->id(), $destino->id());
 
             if ($origen->lineas() === []) {
-                $origen->cerrarSinCargas('Unida a ' . $guardado?->etiquetaDo());
+                $this->ordenes->eliminar($origen->id());
             }
-
-            $this->ordenes->save($origen);
 
             if ($despachar) {
                 foreach ($lpnsMovidos as $lpn) {

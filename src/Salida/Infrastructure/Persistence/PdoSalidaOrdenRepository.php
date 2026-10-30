@@ -165,6 +165,25 @@ final class PdoSalidaOrdenRepository implements SalidaOrdenRepositoryInterface
         return $resultado;
     }
 
+    public function eliminar(string $ordenId): void
+    {
+        // salida_lineas y fotos_evidencia se borran en cascada.
+        $this->connection->prepare('DELETE FROM salida_ordenes WHERE id = :id')->execute([':id' => $ordenId]);
+    }
+
+    public function pasarFotosDeCargasMovidas(string $origenId, string $destinoId): void
+    {
+        $stmt = $this->connection->prepare(
+            'UPDATE fotos_evidencia f SET f.salida_orden_id = :destino
+             WHERE f.salida_orden_id = :origen
+               AND NOT EXISTS (
+                   SELECT 1 FROM salida_lineas sl JOIN lpns l ON l.id = sl.lpn_id
+                   WHERE sl.salida_orden_id = :origen_lineas AND l.carga_id = f.carga_id
+               )'
+        );
+        $stmt->execute([':destino' => $destinoId, ':origen' => $origenId, ':origen_lineas' => $origenId]);
+    }
+
     public function avancePorCarga(string $ordenId): array
     {
         $stmt = $this->connection->prepare(

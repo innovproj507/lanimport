@@ -61,4 +61,10 @@ interface SalidaOrdenRepositoryInterface
      * @return array<int, array{cliente: string, marca: string, compania: string, tracking: ?string, bultos: int, bultosCarga: int, kilos: float, m3: float, pies3: float, valor: float, fechaIngreso: ?string, aduanero: string, descripcion: string}>
      */
     public function manifiesto(string $ordenId): array;
+
+    /** Borra la salida con sus lineas y fotos (una salida cancelada o que quedo sin cargas no se guarda). */
+    public function eliminar(string $ordenId): void;
+
+    /** Las fotos de las cargas que ya no estan en el origen pasan al destino, junto con sus bultos. */
+    public function pasarFotosDeCargasMovidas(string $origenId, string $destinoId): void;
 }
