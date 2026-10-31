@@ -85,6 +85,7 @@ use Courier\Carga\Application\SincronizarEstadoCarga\SincronizarEstadoCargaHandl
 use Courier\Carga\Domain\ConteoBultosCargaInterface;
 use Courier\Carga\Infrastructure\Persistence\PdoConteoBultosCarga;
 use Courier\Carga\Domain\ClienteBultosCargaInterface;
+use Courier\Carga\Domain\ImagenesEtiquetasCargaInterface;
 use Courier\Carga\Infrastructure\Persistence\PdoClienteBultosCarga;
 use Courier\Notificacion\Application\NotificarDespachoCarga\NotificarDespachoCargaHandler;
 use Courier\Notificacion\Application\PrepararAvisoWhatsapp\PrepararAvisoWhatsappHandler;
@@ -103,6 +104,7 @@ use Courier\Lpn\Domain\LpnBarcodeGeneratorInterface;
 use Courier\Lpn\Domain\LpnRepositoryInterface;
 use Courier\Lpn\Domain\UbicacionRepositoryInterface;
 use Courier\Lpn\Infrastructure\Barcode\LpnBarcodeGeneratorService;
+use Courier\Lpn\Infrastructure\Barcode\LiberarImagenesEtiquetasCarga;
 use Courier\Lpn\Infrastructure\Persistence\PdoEtiquetaLpnConfigRepository;
 use Courier\Lpn\Infrastructure\Persistence\PdoLpnRepository;
 use Courier\Lpn\Infrastructure\Persistence\PdoUbicacionRepository;
@@ -496,6 +498,11 @@ $container->set(SincronizarEstadoCargaHandler::class, fn (Container $c) => new S
     $c->get(ClienteRepositoryInterface::class),
     $c->get(NotificarDespachoCargaHandler::class),
     $c->get(UnitOfWork::class),
+    $c->get(ImagenesEtiquetasCargaInterface::class),
+));
+$container->set(ImagenesEtiquetasCargaInterface::class, fn (Container $c) => new LiberarImagenesEtiquetasCarga(
+    $c->get(LpnRepositoryInterface::class),
+    $c->get(LpnBarcodeGeneratorInterface::class),
 ));
 
 $container->set(RegistrarCargaHandler::class, fn (Container $c) => new RegistrarCargaHandler(

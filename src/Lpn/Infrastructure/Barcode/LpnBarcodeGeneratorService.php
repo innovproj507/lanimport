@@ -44,8 +44,10 @@ final class LpnBarcodeGeneratorService implements LpnBarcodeGeneratorInterface
         $fileName = $codigo . '.png';
         $fullPath = $dir . '/' . $fileName;
 
-        // Compresion 3 (la de PHP es 6): casi el mismo tamano y bastante mas rapido en cargas de cientos de bultos.
-        if (imagepng($etiqueta, $fullPath, 3) === false) {
+        // La etiqueta es blanco y negro: en paleta de 2 colores pesa ~6 KB en vez de ~40 KB.
+        self::aBlancoYNegro($etiqueta);
+
+        if (imagepng($etiqueta, $fullPath, 6) === false) {
             imagedestroy($etiqueta);
 
             throw new RuntimeException("No se pudo escribir la etiqueta: {$fullPath}");
@@ -54,6 +56,23 @@ final class LpnBarcodeGeneratorService implements LpnBarcodeGeneratorInterface
         imagedestroy($etiqueta);
 
         return self::RELATIVE_DIR . '/' . $fileName;
+    }
+
+    /**
+     * Pasa la imagen a paleta de 2 colores y fija esos colores en blanco y negro puros
+     * (la cuantizacion deja un blanco grisaceo). La impresora termica imprime igual.
+     *
+     * @param \GdImage $imagen
+     */
+    public static function aBlancoYNegro($imagen): void
+    {
+        imagetruecolortopalette($imagen, false, 2);
+
+        for ($i = 0, $n = imagecolorstotal($imagen); $i < $n; $i++) {
+            $c = imagecolorsforindex($imagen, $i);
+            $claro = ($c['red'] + $c['green'] + $c['blue']) / 3 >= 128;
+            imagecolorset($imagen, $i, $claro ? 255 : 0, $claro ? 255 : 0, $claro ? 255 : 0);
+        }
     }
 
     public function eliminar(string $codigo): void

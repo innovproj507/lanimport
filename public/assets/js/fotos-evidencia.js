@@ -1,11 +1,11 @@
 /**
  * Fotos de evidencia (recepcion de cargas y salidas). Lo usan la app de bodega y la web.
- * Antes de subir, la foto se reduce en el equipo (lado mayor 1600 px, JPEG): una foto de
- * celular de 4-8 MB queda en unos 300-500 KB y sube rapido con el wifi de la bodega.
+ * Antes de subir, la foto se reduce en el equipo (lado mayor 1600 px, WebP; JPEG si el navegador
+ * no sabe WebP): una foto de celular de 4-8 MB queda en ~100-150 KB y sube rapido con el wifi.
  */
 (function () {
     var LADO_MAXIMO = 1600;
-    var CALIDAD = 0.8;
+    var CALIDAD = 0.75;
 
     function cargarImagen(archivo) {
         if (window.createImageBitmap) {
@@ -25,7 +25,7 @@
         });
     }
 
-    /** Devuelve un Blob JPEG reducido; si no se puede reducir, la foto original. */
+    /** Devuelve un Blob WebP (o JPEG) reducido; si no se puede reducir, la foto original. */
     function comprimir(archivo) {
         if (!archivo || !/^image\//.test(archivo.type)) {
             return Promise.reject(new Error('El archivo no es una foto.'));
@@ -40,10 +40,17 @@
             lienzo.height = Math.round(alto * escala);
             lienzo.getContext('2d').drawImage(img, 0, 0, lienzo.width, lienzo.height);
 
-            return new Promise(function (resolver) {
-                lienzo.toBlob(function (blob) {
-                    resolver(blob && blob.size < archivo.size ? blob : archivo);
-                }, 'image/jpeg', CALIDAD);
+            // Safari viejo no genera WebP (devuelve PNG o nada): entonces JPEG como antes.
+            var aBlob = function (tipo) {
+                return new Promise(function (resolver) {
+                    lienzo.toBlob(function (blob) { resolver(blob && blob.type === tipo ? blob : null); }, tipo, CALIDAD);
+                });
+            };
+
+            return aBlob('image/webp').then(function (blob) {
+                return blob || aBlob('image/jpeg');
+            }).then(function (blob) {
+                return blob && blob.size < archivo.size ? blob : archivo;
             });
         }, function () {
             // Formato que el navegador no sabe dibujar (p.ej. HEIC): se manda tal cual y decide el servidor.
@@ -55,7 +62,7 @@
     function subir(url, archivo, csrf) {
         return comprimir(archivo).then(function (blob) {
             var datos = new FormData();
-            datos.append('foto', blob, blob === archivo && archivo.name ? archivo.name : 'foto.jpg');
+            datos.append('foto', blob, blob === archivo && archivo.name ? archivo.name : (blob.type === 'image/webp' ? 'foto.webp' : 'foto.jpg'));
 
             return fetch(url, {
                 method: 'POST',

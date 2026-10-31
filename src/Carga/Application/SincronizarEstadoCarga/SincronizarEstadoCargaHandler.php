@@ -7,6 +7,7 @@ namespace Courier\Carga\Application\SincronizarEstadoCarga;
 use Courier\Carga\Domain\CargaRepositoryInterface;
 use Courier\Carga\Domain\CargaStatus;
 use Courier\Carga\Domain\ConteoBultosCargaInterface;
+use Courier\Carga\Domain\ImagenesEtiquetasCargaInterface;
 use Courier\Carga\Infrastructure\Persistence\PdoHistorialEstadoRepository;
 use Courier\Cliente\Domain\ClienteRepositoryInterface;
 use Courier\Notificacion\Application\NotificarDespachoCarga\NotificarDespachoCargaHandler;
@@ -28,6 +29,7 @@ final class SincronizarEstadoCargaHandler implements CommandHandlerInterface
         private readonly ClienteRepositoryInterface $clientes,
         private readonly NotificarDespachoCargaHandler $notificarDespacho,
         private readonly UnitOfWork $unitOfWork,
+        private readonly ImagenesEtiquetasCargaInterface $imagenesEtiquetas,
     ) {
     }
 
@@ -59,6 +61,9 @@ final class SincronizarEstadoCargaHandler implements CommandHandlerInterface
         });
 
         if (in_array(CargaStatus::EN_TRANSITO, $alcanzados, true)) {
+            // Ya salio toda: sus imagenes de etiqueta no hacen falta (se regeneran si se piden).
+            $this->imagenesEtiquetas->liberar($carga->id());
+
             $cliente = $this->clientes->findById($carga->clienteId());
 
             if ($cliente !== null) {
