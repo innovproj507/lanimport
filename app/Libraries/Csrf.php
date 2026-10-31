@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace App\Libraries;
 
+use Courier\Auth\Infrastructure\Security\SessionManager;
+
 final class Csrf
 {
     public static function token(): string
     {
-        if (session_status() !== PHP_SESSION_ACTIVE) {
+        if (session_status() !== PHP_SESSION_ACTIVE && !SessionManager::esSoloLectura()) {
             session_start();
         }
 
@@ -21,7 +23,7 @@ final class Csrf
 
     public static function verify(?string $token): bool
     {
-        if (session_status() !== PHP_SESSION_ACTIVE) {
+        if (session_status() !== PHP_SESSION_ACTIVE && !SessionManager::esSoloLectura()) {
             session_start();
         }
 

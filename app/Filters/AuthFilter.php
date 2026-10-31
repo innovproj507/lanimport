@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filters;
 
+use App\Libraries\Csrf;
 use CodeIgniter\Filters\FilterInterface;
 use CodeIgniter\HTTP\RequestInterface;
 use CodeIgniter\HTTP\ResponseInterface;
@@ -31,6 +32,13 @@ final class AuthFilter implements FilterInterface
             }
 
             return redirect()->to('/login');
+        }
+
+        // Consultas JSON (busquedas, app de bodega, pantallas en vivo): no escriben en la sesion,
+        // asi que se libera para no poner en fila las demas peticiones del mismo usuario.
+        if ($request->getMethod() === 'GET' && str_contains($request->getHeaderLine('Accept'), 'application/json')) {
+            Csrf::token();
+            SessionManager::liberarParaLectura();
         }
 
         return null;

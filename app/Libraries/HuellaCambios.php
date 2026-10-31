@@ -39,7 +39,26 @@ final class HuellaCambios
         return $huellas;
     }
 
+    /**
+     * Todas las pantallas abiertas piden la misma huella global cada pocos segundos: se calcula
+     * una vez cada 3 s y las demas peticiones la leen de un archivo (20 pantallas = 1 consulta).
+     */
     private static function global(PDO $pdo): string
+    {
+        $archivo = WRITEPATH . 'cache/huella_global.txt';
+        $guardada = @file_get_contents($archivo);
+
+        if (is_string($guardada) && strlen($guardada) === 32 && @filemtime($archivo) >= time() - 3) {
+            return $guardada;
+        }
+
+        $huella = self::calcularGlobal($pdo);
+        @file_put_contents($archivo, $huella, LOCK_EX);
+
+        return $huella;
+    }
+
+    private static function calcularGlobal(PDO $pdo): string
     {
         $fila = $pdo->query(
             "SELECT

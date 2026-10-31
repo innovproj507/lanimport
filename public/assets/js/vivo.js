@@ -16,6 +16,11 @@ var Vivo = (function () {
     var ultimas = null;
     var ocupado = false;
     var detenido = false;
+    // Pantalla quieta (sin cambios ni uso en 5 min): se consulta cada minuto en vez de cada N s.
+    var ultimaActividad = Date.now();
+    var ultimaConsulta = 0;
+    var QUIETA_MS = 5 * 60 * 1000;
+    var INTERVALO_QUIETA_MS = 60 * 1000;
 
     function alCambiar(recurso, fn) {
         oyentes.push({ recurso: recurso, fn: fn });
@@ -112,6 +117,12 @@ var Vivo = (function () {
             return;
         }
 
+        var ahora = Date.now();
+        if (ahora - ultimaActividad > QUIETA_MS && ahora - ultimaConsulta < INTERVALO_QUIETA_MS) {
+            return;
+        }
+
+        ultimaConsulta = ahora;
         ocupado = true;
 
         fetch('/vivo/huella?r=' + encodeURIComponent(lista.join(',')), {
@@ -141,6 +152,7 @@ var Vivo = (function () {
                     return;
                 }
 
+                ultimaActividad = Date.now();
                 var tareas = [refrescarZonas(cambiados)].concat(oyentes
                     .filter(function (o) { return cambiados.indexOf(o.recurso) !== -1; })
                     .map(function (o) { return Promise.resolve(o.fn()); }));
@@ -171,7 +183,12 @@ var Vivo = (function () {
         // Primera huella enseguida (punto de partida) y luego cada N segundos.
         setTimeout(consultar, 300);
         setInterval(consultar, segundos * 1000);
-        document.addEventListener('visibilitychange', function () { if (!document.hidden) { consultar(); } });
+        ['pointerdown', 'keydown', 'scroll'].forEach(function (evento) {
+            document.addEventListener(evento, function () { ultimaActividad = Date.now(); }, { passive: true, capture: true });
+        });
+        document.addEventListener('visibilitychange', function () {
+            if (!document.hidden) { ultimaActividad = Date.now(); consultar(); }
+        });
         window.addEventListener('online', consultar);
     });
 

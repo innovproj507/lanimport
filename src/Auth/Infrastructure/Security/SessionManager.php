@@ -8,6 +8,35 @@ use Courier\Auth\Domain\Usuario;
 
 final class SessionManager
 {
+    /** La sesion ya se leyo y se libero: $_SESSION sigue disponible, pero no se vuelve a abrir. */
+    private static bool $soloLectura = false;
+
+    /**
+     * PHP bloquea el archivo de sesion mientras dura la peticion, asi que dos peticiones del
+     * mismo usuario (p.ej. la PDA escaneando mientras su pantalla consulta en vivo) van en fila.
+     * Las consultas JSON que no escriben en la sesion la liberan apenas pasan el filtro auth.
+     */
+    public static function liberarParaLectura(): void
+    {
+        if (session_status() === PHP_SESSION_ACTIVE) {
+            session_write_close();
+        }
+
+        self::$soloLectura = true;
+    }
+
+    public static function esSoloLectura(): bool
+    {
+        return self::$soloLectura;
+    }
+
+    private static function abrir(): void
+    {
+        if (session_status() !== PHP_SESSION_ACTIVE && !self::$soloLectura) {
+            session_start();
+        }
+    }
+
     public function start(Usuario $usuario, bool $recordar = false): void
     {
         if (session_status() !== PHP_SESSION_ACTIVE) {
@@ -37,18 +66,14 @@ final class SessionManager
 
     public function currentUsuarioId(): ?string
     {
-        if (session_status() !== PHP_SESSION_ACTIVE) {
-            session_start();
-        }
+        self::abrir();
 
         return $_SESSION['usuario_id'] ?? null;
     }
 
     public function currentRol(): ?string
     {
-        if (session_status() !== PHP_SESSION_ACTIVE) {
-            session_start();
-        }
+        self::abrir();
 
         return $_SESSION['usuario_rol'] ?? null;
     }

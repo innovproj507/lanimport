@@ -562,7 +562,7 @@ function initBusquedaPaginada(opciones) {
             params.set(f.param, f.select.value);
         });
 
-        return fetch(opciones.url + '?' + params.toString())
+        return fetch(opciones.url + '?' + params.toString(), { headers: { 'Accept': 'application/json' } })
             .then(function (response) { return response.json(); })
             .then(function (data) {
                 tbody.innerHTML = data.html;
