@@ -55,11 +55,11 @@ $modo = 'tarea'
 
 try {
     $accion = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument $argumentos
-    # Arranca al iniciar sesion y, ademas, cada 5 minutos: si el agente se cerro, vuelve a levantarlo
+    # Arranca al iniciar sesion y, ademas, cada minuto: si el agente se cerro, vuelve a levantarlo
     # (si ya esta corriendo, IgnoreNew no abre otro). Si el proceso falla, Windows lo reinicia al minuto.
     $disparadores = @(
         (New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME),
-        (New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1) -RepetitionInterval (New-TimeSpan -Minutes 5))
+        (New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1) -RepetitionInterval (New-TimeSpan -Minutes 1))
     )
     $configuracion = New-ScheduledTaskSettingsSet `
         -AllowStartIfOnBatteries `

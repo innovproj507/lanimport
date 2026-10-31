@@ -34,17 +34,47 @@ var LocalPrint = (function () {
         + 'Si ya esta instalado, espere un minuto (se vuelve a abrir solo) o reinicie la sesion de Windows; '
         + 'si no, descarguelo desde Impresoras e instalelo.';
 
+    function esperar(ms) {
+        return new Promise(function (resolve) { setTimeout(resolve, ms); });
+    }
+
+    // La imagen se manda al agente ya descargada (del cache del navegador): asi el agente no
+    // tiene que bajarla otra vez de internet. Si no se puede leer, el agente usa la URL.
+    function imagenBase64(url) {
+        return fetch(url, { credentials: 'same-origin' }).then(function (r) {
+            if (!r.ok) { throw new Error(); }
+            return r.blob();
+        }).then(function (blob) {
+            return new Promise(function (resolve, reject) {
+                var lector = new FileReader();
+                lector.onload = function () { resolve(String(lector.result).split(',')[1] || ''); };
+                lector.onerror = reject;
+                lector.readAsDataURL(blob);
+            });
+        }).catch(function () { return ''; });
+    }
+
+    // Si el agente se esta reiniciando no responde por unos segundos: se reintenta antes de avisar.
+    function enviarAlAgente(cuerpo, intentos) {
+        return fetch(BASE_URL + '/imprimir-imagen', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: cuerpo
+        }).catch(function () {
+            if (intentos > 1) {
+                return esperar(2000).then(function () { return enviarAlAgente(cuerpo, intentos - 1); });
+            }
+            throw new Error(SIN_AGENTE);
+        });
+    }
+
     function imprimirImagen(printerName, imageUrl) {
         if (!printerName) {
             return Promise.reject(new Error('No hay impresora de etiquetas configurada.'));
         }
 
-        return fetch(BASE_URL + '/imprimir-imagen', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ impresora: printerName, url: imageUrl })
-        }).catch(function () {
-            throw new Error(SIN_AGENTE);
+        return imagenBase64(imageUrl).then(function (imagen) {
+            return enviarAlAgente(JSON.stringify({ impresora: printerName, url: imageUrl, imagen: imagen }), 4);
         }).then(function (response) {
             return response.json().then(function (data) {
                 if (!response.ok || data.error) {

@@ -22,18 +22,33 @@ param(
 Add-Type -AssemblyName System.Drawing
 
 $ErrorActionPreference = 'Stop'
-$version = '1.1.0'
+$version = '1.2.0'
+$inicio = Get-Date
+
+# El agente corre oculto: el registro va a un archivo para poder revisar por que fallo.
+$carpetaLog = Join-Path $env:LOCALAPPDATA 'AgenteImpresionLAN'
+New-Item -ItemType Directory -Force -Path $carpetaLog | Out-Null
+$archivoLog = Join-Path $carpetaLog 'agente.log'
 
 function Escribir-Log {
     param([string]$Mensaje)
-    Write-Host "[$(Get-Date -Format 'HH:mm:ss')] $Mensaje"
+    $linea = "[$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')] $Mensaje"
+    Write-Host $linea
+    try {
+        if ((Test-Path $archivoLog) -and (Get-Item $archivoLog).Length -gt 1MB) {
+            Move-Item $archivoLog "$archivoLog.1" -Force
+        }
+        Add-Content -Path $archivoLog -Value $linea -Encoding UTF8
+    } catch {
+        # Sin log no se detiene el agente.
+    }
 }
 
 # Codigo que corre dentro de cada runspace para atender una solicitud.
 # Debe ser autosuficiente: no puede depender de funciones/variables del
 # script principal, solo de lo que se le pase explicitamente.
 $manejarSolicitud = {
-    param($context, $version)
+    param($context, $version, $inicio, $archivoLog)
 
     Add-Type -AssemblyName System.Drawing
 
@@ -62,7 +77,7 @@ $manejarSolicitud = {
     }
 
     function Imprimir-Imagen {
-        param([string]$NombreImpresora, [string]$Url)
+        param([string]$NombreImpresora, [string]$Url, [string]$Base64)
 
         $impresorasDisponibles = Obtener-Impresoras
 
@@ -73,9 +88,14 @@ $manejarSolicitud = {
         $tempFile = [System.IO.Path]::GetTempFileName() + '.png'
 
         try {
-            # Windows viejos usan TLS 1.0 por defecto y el servidor HTTPS lo rechaza.
-            [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
-            Invoke-WebRequest -Uri $Url -OutFile $tempFile -UseBasicParsing -TimeoutSec 15
+            if ($Base64) {
+                # El navegador ya tenia la imagen: no hace falta bajarla otra vez de internet.
+                [System.IO.File]::WriteAllBytes($tempFile, [Convert]::FromBase64String($Base64))
+            } else {
+                # Windows viejos usan TLS 1.0 por defecto y el servidor HTTPS lo rechaza.
+                [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+                Invoke-WebRequest -Uri $Url -OutFile $tempFile -UseBasicParsing -TimeoutSec 15
+            }
 
             $imagen = [System.Drawing.Image]::FromFile($tempFile)
 
@@ -132,7 +152,7 @@ $manejarSolicitud = {
 
         switch ($request.Url.AbsolutePath) {
             '/estado' {
-                Enviar-Json -Response $response -StatusCode 200 -Objeto @{ ok = $true; version = $version }
+                Enviar-Json -Response $response -StatusCode 200 -Objeto @{ ok = $true; version = $version; desde = $inicio.ToString('yyyy-MM-dd HH:mm:ss') }
             }
             '/impresoras' {
                 Enviar-Json -Response $response -StatusCode 200 -Objeto @{ impresoras = @(Obtener-Impresoras) }
@@ -147,7 +167,7 @@ $manejarSolicitud = {
                 $cuerpo = $reader.ReadToEnd() | ConvertFrom-Json
                 $reader.Close()
 
-                Imprimir-Imagen -NombreImpresora $cuerpo.impresora -Url $cuerpo.url
+                Imprimir-Imagen -NombreImpresora $cuerpo.impresora -Url $cuerpo.url -Base64 $cuerpo.imagen
 
                 Enviar-Json -Response $response -StatusCode 200 -Objeto @{ ok = $true }
             }
@@ -157,6 +177,10 @@ $manejarSolicitud = {
         }
     } catch {
         try {
+            Add-Content -Path $archivoLog -Value "[$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')] Error en $($request.Url.AbsolutePath): $($_.Exception.Message)" -Encoding UTF8
+        } catch {
+        }
+        try {
             Enviar-Json -Response $response -StatusCode 500 -Objeto @{ error = $_.Exception.Message }
         } catch {
             # La respuesta ya pudo haberse cerrado; nada mas que hacer.
@@ -164,11 +188,15 @@ $manejarSolicitud = {
     }
 }
 
-$listener = New-Object System.Net.HttpListener
-$listener.Prefixes.Add("http://localhost:$Puerto/")
+function Iniciar-Listener {
+    $nuevo = New-Object System.Net.HttpListener
+    $nuevo.Prefixes.Add("http://localhost:$Puerto/")
+    $nuevo.Start()
+    return $nuevo
+}
 
 try {
-    $listener.Start()
+    $listener = Iniciar-Listener
 } catch {
     Escribir-Log "No se pudo iniciar el servidor en el puerto $Puerto. ¿Ya hay otra instancia corriendo? Error: $($_.Exception.Message)"
     exit 1
@@ -182,30 +210,53 @@ Escribir-Log "Agente de impresion LAN corriendo en http://localhost:$Puerto/  (v
 Escribir-Log "Impresoras detectadas: $([System.Drawing.Printing.PrinterSettings]::InstalledPrinters -join ', ')"
 Escribir-Log 'Presiona Ctrl+C para detener.'
 
+# Antes, cualquier error del listener (p.ej. el navegador cortaba una peticion, o Windows volvia
+# de suspension) salia del bucle y el agente se cerraba: "No se pudo conectar" hasta que la tarea
+# programada lo volvia a abrir. Ahora el error se registra y el listener se vuelve a crear.
 try {
-    while ($listener.IsListening) {
-        $context = $listener.GetContext()
-
-        $ps = [powershell]::Create()
-        $ps.RunspacePool = $runspacePool
-        [void]$ps.AddScript($manejarSolicitud).AddArgument($context).AddArgument($version)
-        $handle = $ps.BeginInvoke()
-        $tareasActivas.Add(@{ Powershell = $ps; Handle = $handle })
-
-        # Limpiar tareas ya terminadas para no acumular memoria.
-        $tareasActivas.RemoveAll([Predicate[object]] {
-            param($tarea)
-            if ($tarea.Handle.IsCompleted) {
-                $tarea.Powershell.EndInvoke($tarea.Handle) | Out-Null
-                $tarea.Powershell.Dispose()
-                return $true
+    while ($true) {
+        try {
+            if ($null -eq $listener -or -not $listener.IsListening) {
+                Escribir-Log 'Reiniciando el servidor...'
+                try { if ($listener) { $listener.Close() } } catch { }
+                $listener = Iniciar-Listener
+                Escribir-Log 'Servidor reiniciado.'
             }
-            return $false
-        })
+
+            # Espera con pausas para notar si el listener murio (GetContext() se quedaria colgado).
+            $espera = $listener.GetContextAsync()
+            while (-not $espera.Wait(5000)) {
+                if (-not $listener.IsListening) {
+                    throw 'El servidor dejo de escuchar.'
+                }
+            }
+            $context = $espera.Result
+
+            $ps = [powershell]::Create()
+            $ps.RunspacePool = $runspacePool
+            [void]$ps.AddScript($manejarSolicitud).AddArgument($context).AddArgument($version).AddArgument($inicio).AddArgument($archivoLog)
+            $handle = $ps.BeginInvoke()
+            $tareasActivas.Add(@{ Powershell = $ps; Handle = $handle })
+
+            # Limpiar tareas ya terminadas para no acumular memoria.
+            $tareasActivas.RemoveAll([Predicate[object]] {
+                param($tarea)
+                if ($tarea.Handle.IsCompleted) {
+                    $tarea.Powershell.EndInvoke($tarea.Handle) | Out-Null
+                    $tarea.Powershell.Dispose()
+                    return $true
+                }
+                return $false
+            }) | Out-Null
+        } catch {
+            Escribir-Log "Error del servidor: $($_.Exception.Message)"
+            try { $listener.Close() } catch { }
+            $listener = $null
+            Start-Sleep -Seconds 2
+        }
     }
 } finally {
-    $listener.Stop()
-    $listener.Close()
+    try { $listener.Close() } catch { }
     $runspacePool.Close()
     $runspacePool.Dispose()
 }
