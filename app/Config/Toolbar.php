@@ -52,7 +52,9 @@ class Toolbar extends BaseConfig
      * If set to false var data from the views will not be collected. Useful to
      * avoid high memory usage when there are lots of data passed to the view.
      */
-    public bool $collectVarData = true;
+    // Las vistas reciben entidades grandes: con esto cada pagina escribia ~11 MB en writable/debugbar
+    // y en desarrollo las pantallas tardaban 1-2 s. Solo afecta al modo desarrollo.
+    public bool $collectVarData = false;
 
     /**
      * --------------------------------------------------------------------------
