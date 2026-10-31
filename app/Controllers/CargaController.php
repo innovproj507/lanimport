@@ -243,13 +243,14 @@ final class CargaController extends BaseController
         $nombresClientes = $this->nombresClientes($this->container()->get(ListarClientesHandler::class)->handle(new ListarClientesQuery()));
         $lpnsPorEstado = $this->lpnsPorEstado($cargas);
 
-        $filas = [['TRACKING', 'FECHA INGRESO', 'CLIENTE', 'PROVEEDOR', 'ADUANERO', 'MARCA', 'BULTOS', 'PESO (KG)', 'CUBICAJE (P3)', 'VALOR', 'ESTADO CARGA', 'ETIQUETAS (LPN)', 'FACTURA']];
+        $filas = [['TRACKING', 'FECHA INGRESO', 'CLIENTE', 'PROVEEDOR', 'ADUANERO', 'MARCA', 'DESCRIPCION', 'BULTOS', 'PESO (KG)', 'CUBICAJE (P3)', 'VALOR', 'ESTADO CARGA', 'ETIQUETAS (LPN)', 'FACTURA']];
         $totales = ['bultos' => 0.0, 'peso' => 0.0, 'pies3' => 0.0, 'valor' => 0.0];
 
         foreach ($cargas as $carga) {
             // Totales de la carga: suma de sus lineas (peso, p3 y valor son totales de linea), como en la tabla.
             $suma = ['bultos' => 0.0, 'peso' => 0.0, 'pies3' => 0.0, 'valor' => 0.0];
             $marcas = [];
+            $descripciones = [];
             foreach ($carga->lineas() as $linea) {
                 $suma['bultos'] += $linea->cantidad();
                 $suma['peso'] += $linea->peso();
@@ -257,6 +258,9 @@ final class CargaController extends BaseController
                 $suma['valor'] += $linea->valor();
                 if ($linea->marca() !== null && $linea->marca() !== '') {
                     $marcas[$linea->marca()] = true;
+                }
+                if (trim($linea->descripcion()) !== '') {
+                    $descripciones[trim($linea->descripcion())] = true;
                 }
             }
             foreach ($suma as $k => $v) {
@@ -275,6 +279,7 @@ final class CargaController extends BaseController
                 $carga->proveedor(),
                 $carga->aduanero()?->nombre() ?? '',
                 implode(', ', array_keys($marcas)),
+                implode(', ', array_keys($descripciones)),
                 $suma['bultos'], round($suma['peso'], 2), round($suma['pies3'], 2), round($suma['valor'], 2),
                 $carga->estado()->label(),
                 $etiquetas === [] ? 'Sin etiquetas' : implode(', ', $etiquetas),
@@ -282,10 +287,10 @@ final class CargaController extends BaseController
             ];
         }
 
-        $filas[] = ['TOTALES (' . count($cargas) . ' cargas)', '', '', '', '', '', $totales['bultos'], round($totales['peso'], 2), round($totales['pies3'], 2), round($totales['valor'], 2), '', '', ''];
+        $filas[] = ['TOTALES (' . count($cargas) . ' cargas)', '', '', '', '', '', '', $totales['bultos'], round($totales['peso'], 2), round($totales['pies3'], 2), round($totales['valor'], 2), '', '', ''];
 
         $contenido = $this->container()->get(EscritorXlsx::class)->generar([
-            'Cargas' => ['filas' => $filas, 'anchos' => [20, 13, 30, 24, 20, 14, 9, 12, 13, 14, 14, 30, 9]],
+            'Cargas' => ['filas' => $filas, 'anchos' => [20, 13, 30, 24, 20, 14, 35, 9, 12, 13, 14, 14, 30, 9]],
         ]);
 
         return $this->response
