@@ -4,14 +4,17 @@ declare(strict_types=1);
 
 /**
  * Datos ficticios para probar en local (solo desarrollo, nunca en produccion):
- *   php bin/datos-prueba.php
+ *   php bin/datos-prueba.php                   todo el juego de datos
+ *   php bin/datos-prueba.php --solo-reempaque  solo ejemplos de reempaque (terminado y a medio hacer)
+ *                                              con bultos libres de cargas de prueba ya creadas
  *
  * Crea, con los mismos casos de uso del sistema (asi todo queda consistente):
  *  - usuarios prueba.<rol>@lan.local (clave Prueba.2026!) para cada rol;
  *  - 6 clientes "PRUEBA ..." con correo @ejemplo.test (no se envia nada real) y 8 ubicaciones;
  *  - 16 cargas en distintos momentos: sin etiquetas, por escanear, parciales, en bodega,
  *    una grande (180 bultos), una dividida entre dos contenedores y una ya despachada;
- *  - un DO pendiente a medio escanear, un DO confirmado (cargas en transito) y un reempaque.
+ *  - un DO pendiente a medio escanear, un DO confirmado (cargas en transito) y tres reempaques:
+ *    uno por hacer, uno a medio hacer en la PDA (una caja cerrada, otra abierta) y uno terminado.
  * Se puede correr varias veces: cada corrida agrega otro juego de cargas.
  */
 
@@ -34,8 +37,16 @@ use Courier\Lpn\Application\GenerarLpnsParaCarga\GenerarLpnsParaCargaHandler;
 use Courier\Lpn\Application\RegistrarUbicacion\RegistrarUbicacionCommand;
 use Courier\Lpn\Application\RegistrarUbicacion\RegistrarUbicacionHandler;
 use Courier\Lpn\Domain\LpnRepositoryInterface;
+use Courier\Reempaque\Application\AbrirCajaReempaque\AbrirCajaReempaqueCommand;
+use Courier\Reempaque\Application\AbrirCajaReempaque\AbrirCajaReempaqueHandler;
+use Courier\Reempaque\Application\CerrarCajaReempaque\CerrarCajaReempaqueCommand;
+use Courier\Reempaque\Application\CerrarCajaReempaque\CerrarCajaReempaqueHandler;
+use Courier\Reempaque\Application\EmpacarBultoReempaque\EmpacarBultoReempaqueCommand;
+use Courier\Reempaque\Application\EmpacarBultoReempaque\EmpacarBultoReempaqueHandler;
 use Courier\Reempaque\Application\IniciarReempaque\IniciarReempaqueCommand;
 use Courier\Reempaque\Application\IniciarReempaque\IniciarReempaqueHandler;
+use Courier\Reempaque\Application\TerminarReempaque\TerminarReempaqueCommand;
+use Courier\Reempaque\Application\TerminarReempaque\TerminarReempaqueHandler;
 use Courier\Salida\Application\ConfirmarSalida\ConfirmarSalidaCommand;
 use Courier\Salida\Application\ConfirmarSalida\ConfirmarSalidaHandler;
 use Courier\Salida\Application\CrearOrdenSalida\CrearOrdenSalidaCommand;
@@ -133,6 +144,76 @@ foreach ($nombresClientes as $i => [$nombre, $apellido, $empresa, $pais]) {
     $clientes[] = (string) $id;
 }
 $paso(count($clientes) . ' clientes PRUEBA (correo @ejemplo.test) y ' . count($ubicaciones) . ' ubicaciones');
+
+// --- Reempaques: lo que bodega hace en la PDA (abrir caja, escanear, cerrar, terminar) ---
+$clienteDe = static function (string $cargaId) use ($pdo): string {
+    $stmt = $pdo->prepare('SELECT cliente_id FROM cargas WHERE id = ?');
+    $stmt->execute([$cargaId]);
+
+    return (string) $stmt->fetchColumn();
+};
+
+/** @param array<int, \Courier\Lpn\Domain\Lpn> $lpns  reparte los bultos en cajas: [[bultos caja 1], [bultos caja 2], ...] */
+$armarCajas = static function (string $ordenId, array $cajas, bool $cerrarUltima) use ($c): void {
+    foreach ($cajas as $i => $bultos) {
+        $c->get(AbrirCajaReempaqueHandler::class)->handle(new AbrirCajaReempaqueCommand($ordenId));
+        foreach ($bultos as $lpn) {
+            $c->get(EmpacarBultoReempaqueHandler::class)->handle(new EmpacarBultoReempaqueCommand($ordenId, (string) $lpn->codigo()));
+        }
+        if ($cerrarUltima || $i < count($cajas) - 1) {
+            $c->get(CerrarCajaReempaqueHandler::class)->handle(new CerrarCajaReempaqueCommand($ordenId));
+        }
+    }
+};
+
+// Terminado: los bultos quedan consumidos y las cajas nuevas (LPN-R...) disponibles para una salida.
+$reempaqueTerminado = static function (array $lpns, string $clienteId) use ($c, $trafico, $armarCajas, $paso): void {
+    $ordenId = $c->get(IniciarReempaqueHandler::class)->handle(new IniciarReempaqueCommand(
+        'consolidation', $clienteId, array_map(static fn ($l) => $l->id(), $lpns), $trafico, 'Consolidar en 2 cajas',
+    ));
+    $mitad = (int) ceil(count($lpns) / 2);
+    $armarCajas($ordenId, [array_slice($lpns, 0, $mitad), array_slice($lpns, $mitad)], true);
+    $c->get(TerminarReempaqueHandler::class)->handle(new TerminarReempaqueCommand($ordenId));
+    $paso('Reempaque TERMINADO (Consolidar): ' . count($lpns) . ' bultos en 2 cajas nuevas, disponibles para salida');
+};
+
+// A medio hacer: una caja cerrada, otra abierta con un bulto y el resto por empacar.
+$reempaqueEnCurso = static function (array $lpns, string $clienteId) use ($c, $trafico, $armarCajas, $paso): void {
+    $ordenId = $c->get(IniciarReempaqueHandler::class)->handle(new IniciarReempaqueCommand(
+        'representation_change', $clienteId, array_map(static fn ($l) => $l->id(), $lpns), $trafico, 'Pasar a cajas reforzadas, 4 por caja',
+    ));
+    $armarCajas($ordenId, [array_slice($lpns, 0, 4), array_slice($lpns, 4, 1)], false);
+    $paso('Reempaque A MEDIO HACER (Cambiar caja): caja 1 cerrada con 4, caja 2 abierta con 1, faltan ' . (count($lpns) - 5));
+};
+
+if (in_array('--solo-reempaque', $argv, true)) {
+    // Bultos escaneados y libres de cargas de prueba, agrupados por carga (un reempaque es de un solo cliente).
+    $libres = [];
+    foreach ($pdo->query(
+        "SELECT l.carga_id FROM lpns l JOIN cargas c ON c.id = l.carga_id
+         WHERE c.notas LIKE '[DATOS DE PRUEBA%' AND l.estado = 'available'
+           AND NOT EXISTS (SELECT 1 FROM salida_lineas sl JOIN salida_ordenes so ON so.id = sl.salida_orden_id
+                           WHERE sl.lpn_id = l.id AND so.estado = 'pendiente')
+         GROUP BY l.carga_id HAVING COUNT(*) >= 6 ORDER BY COUNT(*)"
+    )->fetchAll(PDO::FETCH_COLUMN) as $cargaId) {
+        $lpns = array_values(array_filter(
+            $c->get(LpnRepositoryInterface::class)->findByCargaId((string) $cargaId),
+            static fn ($l) => $l->estado()->value === 'available',
+        ));
+        usort($lpns, static fn ($a, $b) => $a->ordenEnCarga() <=> $b->ordenEnCarga());
+        $libres[(string) $cargaId] = $lpns;
+    }
+
+    if (count($libres) < 2) {
+        fwrite(STDERR, "Hacen falta al menos 2 cargas de prueba con 6+ bultos libres. Corra primero: php bin/datos-prueba.php\n");
+        exit(1);
+    }
+
+    $cargaIds = array_keys($libres);
+    $reempaqueTerminado(array_slice($libres[$cargaIds[0]], 0, 6), $clienteDe($cargaIds[0]));
+    $reempaqueEnCurso(array_slice($libres[$cargaIds[1]], 0, 6), $clienteDe($cargaIds[1]));
+    exit(0);
+}
 
 // --- Cargas ------------------------------------------------------------------
 $mercancia = [
@@ -262,5 +343,11 @@ $c->get(IniciarReempaqueHandler::class)->handle(new IniciarReempaqueCommand(
     'consolidation', $clienteReempaque, $ids($listas[$cargaReempaque]), $trafico, 'Consolidar todo en 2 cajas grandes',
 ));
 $paso('Reempaque pendiente (Consolidar) con ' . count($listas[$cargaReempaque]) . ' bultos, para hacerlo en la PDA');
+
+// Terminado con la otra carga de reempaque; a medio hacer con 6 bultos de una carga en bodega.
+$cargaTerminado = $porCarga['reempaque'][1];
+$reempaqueTerminado($listas[$cargaTerminado], $clienteDe($cargaTerminado));
+$cargaEnCurso = $porCarga['en bodega'][3];
+$reempaqueEnCurso(array_slice($listas[$cargaEnCurso], 0, 6), $clienteDe($cargaEnCurso));
 
 echo "\nListo. Las cargas de prueba llevan en notas \"[DATOS DE PRUEBA {$corrida}]\".\n";
