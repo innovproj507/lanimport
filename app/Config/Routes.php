@@ -118,6 +118,8 @@ $routes->group('clientes', ['filter' => ['auth', 'role:operaciones,gerente,admin
 // Cargas — roles mixtos por ruta, igual que WebRoutes.php (bodegaRoles = operaciones/bodega/gerente/admin,
 // salvo detalle que solo exige sesion, y lpns/eliminar que exige gerente/admin).
 $bodegaFilter = ['auth', 'role:operaciones,bodega,gerente,admin'];
+// Imprimir (etiquetas, comprobante, manifiesto, orden de carga, reporte): bodega no imprime.
+$imprimeFilter = ['auth', 'role:operaciones,gerente,admin'];
 $routes->get('cargas', 'CargaController::redirectToIngreso', ['filter' => $bodegaFilter]);
 $routes->get('cargas/ingreso', 'CargaController::showIngresoForm', ['filter' => $bodegaFilter]);
 $routes->post('cargas', 'CargaController::store', ['filter' => $bodegaFilter]);
@@ -144,7 +146,7 @@ $routes->post('cargas/(:segment)/lpns/eliminar', 'CargaController::eliminarLpns/
 $routes->post('fotos-evidencia/(:segment)/eliminar', 'FotoEvidenciaController::eliminar/$1', ['filter' => ['auth', 'role:gerente,admin']]);
 $routes->post('lpn/plantilla-etiqueta', 'LpnController::guardarPlantillaEtiqueta', ['filter' => ['auth', 'role:admin']]);
 // Comprobante de recepcion imprimible (datos de entrega + espacios para firmas).
-$routes->get('cargas/(:segment)/comprobante', 'CargaController::comprobante/$1', ['filter' => $bodegaFilter]);
+$routes->get('cargas/(:segment)/comprobante', 'CargaController::comprobante/$1', ['filter' => $imprimeFilter]);
 $routes->get('cargas/(:segment)/recepcion','LpnController::showRecepcion/$1', ['filter' => $bodegaFilter]);
 $routes->post('cargas/(:segment)/recepcion/confirmar', 'LpnController::confirmarRecepcion/$1', ['filter' => $bodegaFilter]);
 // App movil de bodega (PDA/tablet): pagina unica + API JSON con la misma sesion.
@@ -199,10 +201,10 @@ $routes->get('salidas/(:segment)/carga-bultos/(:segment)', 'SalidaController::bu
 $routes->post('salidas/(:segment)/ajustar-carga', 'SalidaController::ajustarCarga/$1', ['filter' => $planificaSalida]);
 $routes->post('salidas/(:segment)/devolver-carga', 'SalidaController::devolverCarga/$1', ['filter' => $planificaSalida]);
 $routes->post('salidas/(:segment)/embarque','SalidaController::guardarEmbarque/$1', ['filter' => $planificaSalida]);
-$routes->get('salidas/(:segment)/manifiesto', 'SalidaController::manifiesto/$1', ['filter' => $bodegaFilter]);
-$routes->get('salidas/(:segment)/orden-carga', 'SalidaController::ordenCarga/$1', ['filter' => $bodegaFilter]);
-$routes->get('salidas/(:segment)/reporte', 'SalidaController::reporte/$1', ['filter' => $bodegaFilter]);
-$routes->get('salidas/(:segment)/reporte/excel', 'SalidaController::reporteExcel/$1', ['filter' => $bodegaFilter]);
+$routes->get('salidas/(:segment)/manifiesto', 'SalidaController::manifiesto/$1', ['filter' => $imprimeFilter]);
+$routes->get('salidas/(:segment)/orden-carga', 'SalidaController::ordenCarga/$1', ['filter' => $imprimeFilter]);
+$routes->get('salidas/(:segment)/reporte', 'SalidaController::reporte/$1', ['filter' => $imprimeFilter]);
+$routes->get('salidas/(:segment)/reporte/excel', 'SalidaController::reporteExcel/$1', ['filter' => $imprimeFilter]);
 
 // Reempaques: trafico (y gerencia/owner) ordena y cancela; bodega ve las ordenes y las ejecuta
 // caja por caja en la app de bodega (/bodega/api/reempaques/*).

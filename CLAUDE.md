@@ -48,7 +48,7 @@ This is the single composition root. It builds a lazy-singleton `Courier\Shared\
   - Owner is the only role with Configuracion (usuarios, paises, correo, empresa, notificaciones, etiqueta LPN).
   - Gerencia = everything else, plus Reportes and deleting LPNs.
   - Trafico = all operations, without Reportes or those two actions.
-  - Bodega = only recepcion, ingreso, inventario, salidas and reempaque; it has no dashboard or rastreo, and `DashboardController` redirects it to the mobile app at `/bodega`.
+  - Bodega = only recepcion, ingreso, inventario, salidas and reempaque; it has no dashboard or rastreo, and `DashboardController` redirects it to the mobile app at `/bodega`. Bodega does not print: labels, comprobante, manifiesto, orden de carga and reporte are for Trafico/Gerencia/Owner (`$imprimeFilter` in Routes, `?print=1` checked in `LpnController`, buttons hidden with `puede_imprimir()`).
   - Menu visibility in `partials/header.php` must match the route filters.
 - Auth state uses **native PHP `$_SESSION`** through `Courier\Auth\Infrastructure\Security\SessionManager` (`usuario_id`, `usuario_rol`), not CI's session service. CSRF uses the custom `App\Libraries\Csrf`: forms post a hidden `_csrf` field, and controllers call `Csrf::verify($this->request->getPost('_csrf'))`. CI's global `csrf` filter is off.
 - Views are plain PHP templates. They `require __DIR__ . '/../partials/header.php'` and `footer.php` (or `header_cliente.php` for the client portal), and use helpers from `partials/view_helpers.php` (`nav_item`, `badge`, `icon_button`, ...).

@@ -81,6 +81,12 @@ function badge(string $texto, string $color = 'slate'): string
  * URL de un archivo de public/ con su fecha de modificacion (?v=): si la imagen se regenera con el
  * mismo nombre (p.ej. una etiqueta), el navegador y el agente de impresion bajan la nueva, no la de cache.
  */
+/** Imprimir (etiquetas, comprobantes, manifiestos, reportes) es de trafico, gerencia y owner; bodega no imprime. */
+function puede_imprimir(): bool
+{
+    return in_array($_SESSION['usuario_rol'] ?? null, ['operaciones', 'gerente', 'admin'], true);
+}
+
 function url_archivo_publico(string $ruta): string
 {
     $ruta = ltrim($ruta, '/');

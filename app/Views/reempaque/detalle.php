@@ -84,10 +84,12 @@ foreach ($sinEmpacar as $id) {
                     <?php if ($caja['cerrada']): ?>
                         <div class="flex items-center gap-2">
                             <img src="/uploads/lpns/<?= htmlspecialchars($codigoCaja) ?>.png?v=<?= time() ?>" alt="Etiqueta" class="h-12 border border-slate-200 rounded">
+                            <?php if (puede_imprimir()): ?>
                             <button type="button" class="reempaque-imprimir inline-flex items-center gap-2 bg-white border border-zinc-300 text-zinc-700 rounded-lg px-3 py-2 text-sm font-medium hover:bg-slate-100 transition"
                                     data-etiqueta="/uploads/lpns/<?= htmlspecialchars($codigoCaja) ?>.png">
                                 <?= icon_small('printer') ?><span>Imprimir etiqueta</span>
                             </button>
+                            <?php endif; ?>
                         </div>
                     <?php endif; ?>
                 </div>

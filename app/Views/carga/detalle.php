@@ -14,7 +14,7 @@ require_once __DIR__ . '/../partials/view_helpers.php';
 $pageTitle = 'Carga registrada';
 $pageSubtitle = 'Tracking: ' . $view->trackingNumero;
 $backHref = '/cargas/ingreso';
-$headerActions = header_button('/cargas/' . $view->cargaId . '/comprobante', 'printer', 'Imprimir comprobante', 'blue')
+$headerActions = (puede_imprimir() ? header_button('/cargas/' . $view->cargaId . '/comprobante', 'printer', 'Imprimir comprobante', 'blue') : '')
     . header_button('/cargas/' . $view->cargaId . '/editar', 'pencil', 'Editar', 'amber');
 require __DIR__ . '/../partials/header.php';
 ?>
@@ -210,10 +210,12 @@ require __DIR__ . '/../partials/header.php';
             <img id="etiqueta-carga-img" src="<?= htmlspecialchars(url_archivo_publico('uploads/etiquetas/' . $view->trackingNumero . '.png')) ?>" alt="Codigo de barras de la carga <?= htmlspecialchars($view->trackingNumero) ?>"
                  class="max-w-full">
         </div>
+        <?php if (puede_imprimir()): ?>
         <button type="button" id="btn-imprimir-etiqueta" class="mt-3 inline-flex items-center gap-2 bg-white border border-zinc-300 text-zinc-700 rounded-lg px-4 py-2 text-sm font-medium hover:bg-slate-100 transition">
             <?= icon_small('printer') ?><span>Imprimir etiqueta</span>
         </button>
         <p id="etiqueta-print-msg" class="text-xs mt-2 hidden"></p>
+        <?php endif; ?>
     </div>
 </div>
 
@@ -223,6 +225,11 @@ document.addEventListener('DOMContentLoaded', function () {
     var btn = document.getElementById('btn-imprimir-etiqueta');
     var msg = document.getElementById('etiqueta-print-msg');
     var img = document.getElementById('etiqueta-carga-img');
+
+    // Bodega no imprime: no tiene el boton.
+    if (!btn) {
+        return;
+    }
 
     btn.addEventListener('click', function () {
         var printerName = LocalPrint.getImpresoraEtiquetas();

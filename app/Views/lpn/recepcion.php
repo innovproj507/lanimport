@@ -41,6 +41,7 @@ $estadoColores = [
 <div class="bg-white rounded-xl shadow-sm p-6 mb-6">
     <div class="flex items-start justify-between gap-4 flex-wrap">
         <?= card_header('search', 'Escaneo de recepcion', 'amber') ?>
+        <?php if (puede_imprimir()): ?>
         <a href="/impresoras" id="estado-agente" class="hidden self-center text-xs font-medium rounded-full px-3 py-1"></a>
         <?php if ($imagenesFaltan > 0): ?>
             <span title="Espere a que termine de preparar las etiquetas"
@@ -51,6 +52,7 @@ $estadoColores = [
             <a href="?print=1" target="_blank" class="inline-flex items-center gap-2 bg-white border border-zinc-300 text-zinc-700 rounded-lg px-4 py-2 text-sm font-medium hover:bg-slate-100 transition">
                 <?= icon_small('printer') ?><span>Imprimir todas las etiquetas (<?= count($lpns) ?>)</span>
             </a>
+        <?php endif; ?>
         <?php endif; ?>
     </div>
     <div class="flex items-end gap-4 flex-wrap">
@@ -106,10 +108,12 @@ $estadoColores = [
                         </button>
                     </td>
                     <td class="py-2 text-right">
+                        <?php if (puede_imprimir()): ?>
                         <button type="button" class="lpn-imprimir-btn inline-flex items-center justify-center w-8 h-8 rounded-lg bg-white border border-zinc-300 text-zinc-700 hover:bg-slate-100 transition"
                                 data-etiqueta="<?= htmlspecialchars(url_archivo_publico('uploads/lpns/' . $lpn->codigo() . '.png')) ?>" title="Imprimir etiqueta">
                             <?= icon_small('printer') ?>
                         </button>
+                        <?php endif; ?>
                     </td>
                 </tr>
             <?php endforeach; ?>
@@ -125,12 +129,14 @@ $estadoColores = [
         </button>
         <p id="etiqueta-modal-codigo" class="text-sm font-mono font-medium text-black mb-2 pr-8"></p>
         <img id="etiqueta-modal-img" src="" alt="Etiqueta LPN" class="w-full rounded-lg border border-zinc-200">
+        <?php if (puede_imprimir()): ?>
         <div class="flex justify-end mt-3">
             <button type="button" id="etiqueta-modal-imprimir"
                     class="inline-flex items-center gap-2 bg-white border border-zinc-300 text-zinc-700 rounded-lg px-4 py-2 text-sm font-medium hover:bg-slate-100 transition">
                 <?= icon_small('printer') ?><span>Imprimir</span>
             </button>
         </div>
+        <?php endif; ?>
     </div>
 </div>
 
@@ -180,7 +186,7 @@ document.addEventListener('DOMContentLoaded', function () {
     (function () {
         var chip = document.getElementById('estado-agente');
 
-        if (!LocalPrint.getImpresoraEtiquetas()) {
+        if (!chip || !LocalPrint.getImpresoraEtiquetas()) {
             return;
         }
 
@@ -233,7 +239,9 @@ document.addEventListener('DOMContentLoaded', function () {
     function abrirModal(rutaEtiqueta, codigo) {
         modalImg.setAttribute('src', rutaEtiqueta);
         modalCodigo.textContent = codigo;
-        modalImprimir.setAttribute('data-etiqueta', rutaEtiqueta);
+        if (modalImprimir) {
+            modalImprimir.setAttribute('data-etiqueta', rutaEtiqueta);
+        }
         modal.classList.remove('hidden');
         modal.classList.add('flex');
     }
@@ -268,7 +276,8 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
-    modalImprimir.addEventListener('click', function () {
+    // Bodega no imprime: sin boton (puede_imprimir()).
+    if (modalImprimir) modalImprimir.addEventListener('click', function () {
         imprimirEtiqueta(modalImprimir.getAttribute('data-etiqueta'));
     });
 });

@@ -15,10 +15,12 @@ $vivoSegundos = 8;
 // Bodega escanea y finaliza; agregar cargas, cancelar y el embarque los decide trafico/gerencia.
 $planifica = in_array($_SESSION['usuario_rol'] ?? null, ['operaciones', 'gerente', 'admin'], true);
 $headerActions = ($planifica && $orden->estado()->value === 'pendiente' ? header_button('/salidas/' . $orden->id() . '/agregar', 'plus', 'Agregar cargas', 'emerald') : '')
-    // Lo que trafico imprime y entrega a bodega: las etiquetas exactas que suben al contenedor.
-    . header_button('/salidas/' . $orden->id() . '/orden-carga', 'printer', 'Orden de carga (bodega)', 'emerald')
-    . header_button('/salidas/' . $orden->id() . '/reporte', 'chart', 'Reporte de salida', 'amber')
-    . header_button('/salidas/' . $orden->id() . '/manifiesto', 'printer', 'Imprimir manifiesto', 'blue');
+    // Lo que trafico imprime y entrega a bodega (bodega no imprime): las etiquetas exactas que suben al contenedor.
+    . (puede_imprimir()
+        ? header_button('/salidas/' . $orden->id() . '/orden-carga', 'printer', 'Orden de carga (bodega)', 'emerald')
+            . header_button('/salidas/' . $orden->id() . '/reporte', 'chart', 'Reporte de salida', 'amber')
+            . header_button('/salidas/' . $orden->id() . '/manifiesto', 'printer', 'Imprimir manifiesto', 'blue')
+        : '');
 require __DIR__ . '/../partials/header.php';
 
 $progreso = $orden->progreso();
