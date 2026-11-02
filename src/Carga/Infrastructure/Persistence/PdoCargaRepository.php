@@ -261,6 +261,11 @@ final class PdoCargaRepository implements CargaRepositoryInterface
         return ((int) $stmt->fetchColumn()) > 0;
     }
 
+    public function eliminar(string $id): void
+    {
+        $this->connection->prepare('DELETE FROM cargas WHERE id = :id')->execute([':id' => $id]);
+    }
+
     /** @return array{items: array<int, Carga>, total: int} */
     public function searchPaginado(string $term, ?string $estado, int $page, int $perPage, ?string $aduaneroIdentificador = null, ?bool $enSalida = null): array
     {

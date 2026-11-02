@@ -23,6 +23,15 @@ final class PicqerBarcodeGeneratorService implements BarcodeGeneratorInterface
     {
     }
 
+    public function eliminar(TrackingNumero $numero): void
+    {
+        $archivo = $this->publicPath . '/' . self::RELATIVE_DIR . '/' . $numero . '.png';
+
+        if (is_file($archivo)) {
+            @unlink($archivo);
+        }
+    }
+
     public function generate(TrackingNumero $numero): string
     {
         $etiqueta = $this->componerEtiqueta((string) $numero);

@@ -7,6 +7,14 @@
  */
 $vistaInicial = array_key_first($vistasListado);
 ?>
+<?php if (!empty($avisoBorrado)): ?>
+    <?php // Resultado de "Borrar carga": confirmacion, o por que no se pudo (p.ej. ya tiene etiquetas LPN). ?>
+    <div class="flex items-start gap-3 border rounded-xl px-4 py-3 mb-4 shadow-sm <?= $avisoBorrado['tipo'] === 'ok' ? 'bg-emerald-50 border-emerald-300 text-emerald-800' : 'bg-red-50 border-red-300 text-red-800' ?>">
+        <span class="w-8 h-8 rounded-full text-white flex items-center justify-center shrink-0 <?= $avisoBorrado['tipo'] === 'ok' ? 'bg-emerald-500' : 'bg-red-500' ?>"><?= icon_small($avisoBorrado['tipo'] === 'ok' ? 'check' : 'x') ?></span>
+        <div class="flex-1 text-sm pt-1.5"><?= htmlspecialchars($avisoBorrado['texto']) ?></div>
+        <button type="button" onclick="this.parentElement.remove()" title="Cerrar" class="hover:opacity-70 pt-1"><?= icon_small('x') ?></button>
+    </div>
+<?php endif; ?>
 <div class="bg-white rounded-xl shadow-sm p-6">
     <input type="hidden" id="cargas-vista" value="<?= htmlspecialchars($vistaInicial) ?>">
     <?php if (count($vistasListado) > 1): ?>

@@ -26,6 +26,9 @@ interface CargaRepositoryInterface
 
     public function existsTrackingNumero(TrackingNumero $numero): bool;
 
+    /** Borra la carga; lineas, detalle, historial y etiquetas se borran en cascada. */
+    public function eliminar(string $id): void;
+
     /**
      * Lista de cargas (Ingreso de Carga) con filtros, y los totales de todas las cargas filtradas
      * (no solo de la pagina): bultos, peso (kg), cubicaje (p3) y valor de sus lineas.

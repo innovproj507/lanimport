@@ -16,6 +16,8 @@ use Courier\Carga\Application\ActualizarDatosCarga\ActualizarDatosCargaCommand;
 use Courier\Carga\Application\ActualizarDatosCarga\ActualizarDatosCargaHandler;
 use Courier\Carga\Application\BuscarCargas\BuscarCargasQuery;
 use Courier\Carga\Application\BuscarCargas\BuscarCargasHandler;
+use Courier\Carga\Application\EliminarCarga\EliminarCargaCommand;
+use Courier\Carga\Application\EliminarCarga\EliminarCargaHandler;
 use Courier\Carga\Application\ConsultarTrackingPorNumero\ConsultarTrackingPorNumeroHandler;
 use Courier\Carga\Application\RegistrarCarga\RegistrarCargaCommand;
 use Courier\Carga\Application\RegistrarCarga\RegistrarCargaHandler;
@@ -194,6 +196,7 @@ final class CargaController extends BaseController
             'lpnsPorEstado' => $this->lpnsPorEstado($resultado->items),
             'nombresClientes' => $this->nombresClientes($clientes),
             'mostrarFormulario' => $error !== null,
+            'avisoBorrado' => $this->tomarAvisoBorrado(),
         ]);
     }
 
@@ -215,6 +218,7 @@ final class CargaController extends BaseController
             'resumen' => $resultado->resumen,
             'lpnsPorEstado' => $this->lpnsPorEstado($resultado->items),
             'nombresClientes' => $this->nombresClientes($clientes),
+            'avisoBorrado' => $this->tomarAvisoBorrado(),
         ]);
     }
 
@@ -584,6 +588,39 @@ final class CargaController extends BaseController
             'fallido' => ['tipo' => 'error', 'texto' => $prefijo . "No se pudo enviar el correo al cliente ({$destinatario}): {$error}"],
             default => ['tipo' => 'info', 'texto' => $prefijo . 'El aviso por correo al cliente esta desactivado en Configuracion > Notificaciones.'],
         };
+    }
+
+    /**
+     * Borra una carga ingresada por error (solo si no tiene etiquetas LPN; si las tiene, explica
+     * por que no). Vuelve al listado de donde vino (Ingreso o Historial).
+     */
+    public function eliminar(string $id): RedirectResponse
+    {
+        $volver = (string) $this->request->getPost('volver') === '/cargas/historial' ? '/cargas/historial' : '/cargas/ingreso';
+
+        if (!Csrf::verify($this->request->getPost('_csrf'))) {
+            $_SESSION['carga_borrado'] = ['tipo' => 'error', 'texto' => 'Sesion expirada, por favor intente de nuevo.'];
+
+            return redirect()->to($volver);
+        }
+
+        try {
+            $tracking = $this->container()->get(EliminarCargaHandler::class)->handle(new EliminarCargaCommand($id));
+            $_SESSION['carga_borrado'] = ['tipo' => 'ok', 'texto' => "Se borro la carga {$tracking}."];
+        } catch (ValidationException|NotFoundException $e) {
+            $_SESSION['carga_borrado'] = ['tipo' => 'error', 'texto' => $e->getMessage()];
+        }
+
+        return redirect()->to($volver);
+    }
+
+    /** @return array{tipo: string, texto: string}|null resultado de borrar una carga, para el listado */
+    private function tomarAvisoBorrado(): ?array
+    {
+        $aviso = $_SESSION['carga_borrado'] ?? null;
+        unset($_SESSION['carga_borrado']);
+
+        return $aviso;
     }
 
     /** @return array{tipo: string, texto: string}|null */

@@ -60,6 +60,7 @@ use Courier\Auth\Application\BuscarUsuarios\BuscarUsuariosHandler;
 use Courier\Carga\Application\ActualizarDatosCarga\ActualizarDatosCargaHandler;
 use Courier\Carga\Application\ActualizarEstadoCarga\ActualizarEstadoCargaHandler;
 use Courier\Carga\Application\BuscarCargas\BuscarCargasHandler;
+use Courier\Carga\Application\EliminarCarga\EliminarCargaHandler;
 use Courier\Carga\Application\ConsultarTrackingPorContenedor\ConsultarTrackingPorContenedorHandler;
 use Courier\Carga\Application\ConsultarTrackingPorNumero\ConsultarTrackingPorNumeroHandler;
 use Courier\Carga\Application\ImportarCargas\ImportarCargasHandler;
@@ -238,6 +239,12 @@ $container->set(PdoEtiquetaRepository::class, fn (Container $c) => new PdoEtique
 $container->set(TrackingNumeroGeneratorInterface::class, fn (Container $c) => new UuidTrackingNumeroGenerator($c->get(CargaRepositoryInterface::class)));
 $container->set(BarcodeGeneratorInterface::class, fn () => new PicqerBarcodeGeneratorService(dirname(__DIR__) . '/public'));
 $container->set(CargaDocumentoStorage::class, fn () => new CargaDocumentoStorage(dirname(__DIR__) . '/public'));
+$container->set(EliminarCargaHandler::class, fn (Container $c) => new EliminarCargaHandler(
+    $c->get(CargaRepositoryInterface::class),
+    $c->get(ConteoBultosCargaInterface::class),
+    $c->get(BarcodeGeneratorInterface::class),
+    $c->get(UnitOfWork::class),
+));
 
 // Lpn
 $container->set(LpnRepositoryInterface::class, fn (Container $c) => new PdoLpnRepository($c->get(PDO::class)));
