@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /** @var \Courier\Salida\Domain\SalidaOrden $orden */
-/** @var string $titulo cliente(s) de la salida */
+/** @var string $titulo aduanero(s) de las cargas de la salida */
 /** @var array<int, array{cliente: string, marca: string, compania: string, tracking: ?string, bultos: int, kilos: float, m3: float, valor: float}> $filas */
 /** @var \Courier\Configuracion\Domain\DatosEmpresa $empresa */
 

@@ -430,8 +430,8 @@ final class SalidaController extends BaseController
 
         return view('salida/manifiesto_imprimir', [
             'orden' => $orden,
-            // Titulo: el cliente, o los clientes si la salida es consolidada.
-            'titulo' => implode(' / ', $this->container()->get(SalidaOrdenRepositoryInterface::class)->clientesPorOrden([$orden->id()])[$orden->id()] ?? []),
+            // Titulo: el aduanero, o los aduaneros si la salida lleva cargas de varios.
+            'titulo' => implode(' / ', $this->container()->get(SalidaOrdenRepositoryInterface::class)->aduanerosPorOrden([$orden->id()])[$orden->id()] ?? []),
             'filas' => $this->container()->get(SalidaOrdenRepositoryInterface::class)->manifiesto($orden->id()),
             'empresa' => $this->container()->get(ConfiguracionRepositoryInterface::class)->datosEmpresa(),
         ]);
