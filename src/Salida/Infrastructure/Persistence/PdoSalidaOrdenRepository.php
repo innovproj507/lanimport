@@ -165,6 +165,35 @@ final class PdoSalidaOrdenRepository implements SalidaOrdenRepositoryInterface
         return $resultado;
     }
 
+    public function aduanerosPorOrden(array $ordenIds): array
+    {
+        if ($ordenIds === []) {
+            return [];
+        }
+
+        // La caja de reempaque no tiene carga: se toma la de los bultos que contiene.
+        $marcas = implode(',', array_fill(0, count($ordenIds), '?'));
+        $stmt = $this->connection->prepare(
+            "SELECT DISTINCT sl.salida_orden_id, a.nombre
+             FROM salida_lineas sl
+             JOIN lpns l ON l.id = sl.lpn_id
+             LEFT JOIN lpn_genealogia g ON l.carga_id IS NULL AND g.lpn_destino_id = l.id
+             LEFT JOIN lpns o ON o.id = g.lpn_origen_id
+             JOIN cargas ca ON ca.id = COALESCE(l.carga_id, o.carga_id)
+             JOIN aduaneros a ON a.identificador = ca.aduanero_identificador
+             WHERE sl.salida_orden_id IN ({$marcas})
+             ORDER BY a.nombre"
+        );
+        $stmt->execute(array_values($ordenIds));
+
+        $resultado = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $fila) {
+            $resultado[(string) $fila['salida_orden_id']][] = (string) $fila['nombre'];
+        }
+
+        return $resultado;
+    }
+
     public function eliminar(string $ordenId): void
     {
         // salida_lineas y fotos_evidencia se borran en cascada.

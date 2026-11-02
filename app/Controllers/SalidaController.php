@@ -661,11 +661,15 @@ final class SalidaController extends BaseController
             $mapaClientes[$cliente->id()] = $cliente->nombreCompleto();
         }
 
+        $repositorio = $this->container()->get(SalidaOrdenRepositoryInterface::class);
+        $ids = array_map(static fn ($o) => $o->id(), $ordenes);
+
         return view('salida/historial', [
             'ordenes' => $ordenes,
             'mapaClientes' => $mapaClientes,
-            // Una salida consolidada lleva cargas de varios clientes.
-            'clientesPorOrden' => $this->container()->get(SalidaOrdenRepositoryInterface::class)->clientesPorOrden(array_map(static fn ($o) => $o->id(), $ordenes)),
+            // Una salida consolidada lleva cargas de varios clientes y aduaneros.
+            'clientesPorOrden' => $repositorio->clientesPorOrden($ids),
+            'aduanerosPorOrden' => $repositorio->aduanerosPorOrden($ids),
             'clientes' => $clientes,
             'filtros' => ['estado' => $estado, 'cliente_id' => $clienteId],
         ]);

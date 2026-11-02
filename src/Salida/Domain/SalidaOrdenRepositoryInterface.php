@@ -19,6 +19,15 @@ interface SalidaOrdenRepositoryInterface
     public function clientesPorOrden(array $ordenIds): array;
 
     /**
+     * Nombres de los aduaneros de las cargas que van en cada salida (incluye las cargas de los
+     * bultos que van dentro de cajas de reempaque).
+     *
+     * @param array<int, string> $ordenIds
+     * @return array<string, array<int, string>> ordenId => nombres
+     */
+    public function aduanerosPorOrden(array $ordenIds): array;
+
+    /**
      * Avance de la salida agrupado por carga, para que bodega escanee carga por carga.
      *
      * @return array<int, array{cargaId: string, tracking: string, cliente: string, marca: ?string, factura: ?array{ruta: string, nombre: string}, total: int, escaneadas: int, pendientes: array<int, string>, codigos: array<int, string>}>

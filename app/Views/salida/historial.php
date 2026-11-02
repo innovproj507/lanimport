@@ -2,6 +2,7 @@
 /** @var array<int, \Courier\Salida\Domain\SalidaOrden> $ordenes */
 /** @var array<string, string> $mapaClientes */
 /** @var array<string, array<int, string>> $clientesPorOrden ordenId => clientes de sus cargas */
+/** @var array<string, array<int, string>> $aduanerosPorOrden ordenId => aduaneros de sus cargas */
 /** @var array<int, \Courier\Cliente\Domain\Cliente> $clientes */
 /** @var array{estado: string, cliente_id: string} $filtros */
 $pageTitle = 'Historial de salidas';
@@ -89,7 +90,7 @@ foreach ($clientes as $c) {
             <thead>
                 <tr class="text-left text-xs text-zinc-500 uppercase border-b border-slate-200">
                     <th class="py-2 pr-4">DO</th>
-                    <th class="py-2 pr-4">Cliente</th>
+                    <th class="py-2 pr-4">Aduanero</th>
                     <th class="py-2 pr-4">Contenedor</th>
                     <th class="py-2 pr-4">Naviera</th>
                     <th class="py-2 pr-4">Estado</th>
@@ -106,7 +107,8 @@ foreach ($clientes as $c) {
                                 <?= htmlspecialchars($orden->etiquetaDo()) ?>
                             </a>
                         </td>
-                        <td class="py-2 pr-4 text-zinc-700"><?= htmlspecialchars(implode(', ', $clientesPorOrden[$orden->id()] ?? [$mapaClientes[$orden->clienteId() ?? ''] ?? '—'])) ?></td>
+                        <?php // Se muestra el aduanero; los clientes quedan al pasar el mouse. ?>
+                        <td class="py-2 pr-4 text-zinc-700" title="Clientes: <?= htmlspecialchars(implode(', ', $clientesPorOrden[$orden->id()] ?? [$mapaClientes[$orden->clienteId() ?? ''] ?? '—'])) ?>"><?= htmlspecialchars(implode(', ', $aduanerosPorOrden[$orden->id()] ?? ['—'])) ?></td>
                         <td class="py-2 pr-4 font-mono text-zinc-700"><?= htmlspecialchars($orden->embarque()->contenedorFormateado() ?? '—') ?></td>
                         <td class="py-2 pr-4 text-zinc-700"><?= htmlspecialchars($orden->embarque()->navieraNombre ?? '—') ?></td>
                         <td class="py-2 pr-4"><?= badge($orden->estado()->label(), $estadoColores[$orden->estado()->value] ?? 'slate') ?><?php if ($orden->nota()): ?><span class="block text-xs text-zinc-500 mt-1"><?= htmlspecialchars($orden->nota()) ?></span><?php endif; ?></td>
