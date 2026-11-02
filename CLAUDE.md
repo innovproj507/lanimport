@@ -147,6 +147,7 @@ The paper delivery form (empresa de transporte, chofer, placa, entregado por, ce
 - Each `SalidaOrden` gets a DO consecutive per year (`do_anio` + `do_numero`, shown as "DO.193 / 2026").
   - `PdoSalidaOrdenRepository::insert()` assigns it with `SELECT ... FOR UPDATE` inside the UnitOfWork.
   - The number restarts every year, and a unique key on (`do_anio`, `do_numero`) prevents duplicates.
+  - Trafico can correct the number in "Datos del embarque" (`numero_do`, `SalidaOrden::cambiarNumeroDo()`); `ActualizarEmbarqueSalidaHandler` rejects a number another DO of that year already has (`existeNumeroDo()`). New DOs take MAX+1 of the year, so 2026 continues from the manual count (DO.211 was the first) and 2027 starts at 1.
 - Shipment data (contenedor, sello, naviera from the `navieras` catalog, barco, fecha de cargue, ETD, destino) is the `Salida\Domain\ValueObject\DatosEmbarque` value object. It is editable until the order is cancelled.
 - `GET /salidas/{id}/manifiesto` prints the manifest with one row per carga.
   - Kilos, m3 and valor come from `carga_lineas` and are prorated when only part of a carga's LPNs ship.

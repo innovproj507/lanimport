@@ -17,6 +17,8 @@ final class ActualizarEmbarqueSalidaCommand implements CommandInterface
         public readonly ?string $fechaCargue,
         public readonly ?string $fechaSalidaEtd,
         public readonly ?string $destinoFinal,
+        /** Consecutivo DO corregido a mano ("211", "DO211" o "DO.211"); vacio = no cambia. */
+        public readonly ?string $numeroDo = null,
     ) {
     }
 }

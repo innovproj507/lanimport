@@ -88,7 +88,7 @@ final class PdoSalidaOrdenRepository implements SalidaOrdenRepositoryInterface
     private function update(SalidaOrden $orden): void
     {
         $stmt = $this->connection->prepare(
-            'UPDATE salida_ordenes SET estado = :estado, nota = :nota, confirmed_at = :confirmed_at, cliente_id = :cliente_id,
+            'UPDATE salida_ordenes SET estado = :estado, nota = :nota, confirmed_at = :confirmed_at, cliente_id = :cliente_id, do_numero = :do_numero,
                 numero_contenedor = :numero_contenedor, numero_sello = :numero_sello, naviera_id = :naviera_id,
                 nombre_barco = :nombre_barco, fecha_cargue = :fecha_cargue, fecha_salida_etd = :fecha_salida_etd,
                 destino_final = :destino_final
@@ -101,6 +101,7 @@ final class PdoSalidaOrdenRepository implements SalidaOrdenRepositoryInterface
             ':nota' => $orden->nota(),
             ':confirmed_at' => $orden->confirmedAt()?->format('Y-m-d H:i:s'),
             ':cliente_id' => $orden->clienteId(),
+            ':do_numero' => $orden->doNumero(),
         ] + $this->parametrosEmbarque($orden));
 
         // Lineas que se sacaron (pasaron a otro DO o volvieron a bodega) se borran de esta salida.
@@ -192,6 +193,16 @@ final class PdoSalidaOrdenRepository implements SalidaOrdenRepositoryInterface
         }
 
         return $resultado;
+    }
+
+    public function existeNumeroDo(int $anio, int $numero, string $exceptoOrdenId): bool
+    {
+        $stmt = $this->connection->prepare(
+            'SELECT COUNT(*) FROM salida_ordenes WHERE do_anio = :anio AND do_numero = :numero AND id <> :id'
+        );
+        $stmt->execute([':anio' => $anio, ':numero' => $numero, ':id' => $exceptoOrdenId]);
+
+        return (int) $stmt->fetchColumn() > 0;
     }
 
     public function eliminar(string $ordenId): void

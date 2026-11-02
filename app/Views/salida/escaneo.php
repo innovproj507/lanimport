@@ -49,6 +49,17 @@ $claseInput = 'w-full rounded-lg border border-zinc-300 bg-white text-black px-3
         <span class="text-sm text-zinc-500">Consecutivo: <strong class="text-black"><?= htmlspecialchars($orden->etiquetaDo()) ?></strong></span>
     </div>
     <fieldset <?= $cancelada || !$planifica ? 'disabled' : '' ?> class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <?php if ($orden->doNumero() !== null): ?>
+            <?php // Trafico puede corregir el consecutivo; si ya existe otro DO con ese numero en el ano, avisa. ?>
+            <div>
+                <label class="block text-sm font-medium text-zinc-700 mb-1">Numero de DO</label>
+                <div class="flex items-center gap-2">
+                    <span class="text-sm font-medium text-zinc-500">DO.</span>
+                    <input type="number" name="numero_do" min="1" max="999999" required value="<?= (int) $orden->doNumero() ?>" class="<?= $claseInput ?>">
+                    <span class="text-sm font-medium text-zinc-500 whitespace-nowrap">/ <?= (int) $orden->doAnio() ?></span>
+                </div>
+            </div>
+        <?php endif; ?>
         <div>
             <label class="block text-sm font-medium text-zinc-700 mb-1">Numero de contenedor</label>
             <input type="text" name="numero_contenedor" maxlength="15" placeholder="Ej: TGBU10548-6" value="<?= htmlspecialchars($embarque->contenedorFormateado() ?? '') ?>" class="<?= $claseInput ?> uppercase">
@@ -80,7 +91,7 @@ $claseInput = 'w-full rounded-lg border border-zinc-300 bg-white text-black px-3
             <label class="block text-sm font-medium text-zinc-700 mb-1">Fecha de salida (ETD)</label>
             <input type="date" name="fecha_salida_etd" value="<?= htmlspecialchars($embarque->fechaSalidaEtd?->format('Y-m-d') ?? '') ?>" class="<?= $claseInput ?>">
         </div>
-        <div class="md:col-span-2">
+        <div class="<?= $orden->doNumero() !== null ? '' : 'md:col-span-2' ?>">
             <label class="block text-sm font-medium text-zinc-700 mb-1">Destino final</label>
             <input type="text" name="destino_final" maxlength="190" placeholder="Ej: Caracas, Venezuela" value="<?= htmlspecialchars($embarque->destinoFinal ?? '') ?>" class="<?= $claseInput ?>">
         </div>

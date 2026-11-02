@@ -303,6 +303,7 @@ final class SalidaController extends BaseController
                     (string) $this->request->getPost('fecha_cargue'),
                     (string) $this->request->getPost('fecha_salida_etd'),
                     (string) $this->request->getPost('destino_final'),
+                    (string) $this->request->getPost('numero_do'),
                 ));
                 $_SESSION['salida_mensaje'] = 'Datos del embarque guardados.';
             } catch (ValidationException|NotFoundException $e) {

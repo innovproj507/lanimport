@@ -27,6 +27,9 @@ interface SalidaOrdenRepositoryInterface
      */
     public function aduanerosPorOrden(array $ordenIds): array;
 
+    /** Si otro DO (distinto de $exceptoOrdenId) ya tiene ese numero en ese ano. */
+    public function existeNumeroDo(int $anio, int $numero, string $exceptoOrdenId): bool;
+
     /**
      * Avance de la salida agrupado por carga, para que bodega escanee carga por carga.
      *

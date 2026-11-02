@@ -44,6 +44,16 @@ final class ActualizarEmbarqueSalidaHandler implements CommandHandlerInterface
             $navieraNombre = $naviera->nombre();
         }
 
+        $numeroDo = preg_replace('/\D/', '', (string) $command->numeroDo);
+
+        if ($numeroDo !== '' && (int) $numeroDo !== $orden->doNumero()) {
+            if ($orden->doAnio() !== null && $this->ordenes->existeNumeroDo($orden->doAnio(), (int) $numeroDo, $orden->id())) {
+                throw new ValidationException("Ya existe el DO.{$numeroDo} / {$orden->doAnio()}. Escriba otro numero.");
+            }
+
+            $orden->cambiarNumeroDo((int) $numeroDo);
+        }
+
         $orden->actualizarEmbarque(DatosEmbarque::desdeArreglo([
             'numeroContenedor' => $command->numeroContenedor,
             'numeroSello' => $command->numeroSello,

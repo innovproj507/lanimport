@@ -115,6 +115,27 @@ final class SalidaOrden extends AggregateRoot
         $this->embarque = $embarque;
     }
 
+    /**
+     * Corrige el consecutivo DO (trafico lleva un conteo manual). Que no exista otro DO del mismo
+     * ano con ese numero lo valida el caso de uso contra el repositorio.
+     */
+    public function cambiarNumeroDo(int $numero): void
+    {
+        if ($this->estado === EstadoSalidaOrden::CANCELADA) {
+            throw new ValidationException('No se puede cambiar el numero de una salida cancelada.');
+        }
+
+        if ($this->doAnio === null) {
+            throw new ValidationException('Esta salida no tiene consecutivo DO.');
+        }
+
+        if ($numero < 1 || $numero > 999999) {
+            throw new ValidationException('Escriba un numero de DO valido (por ejemplo 211).');
+        }
+
+        $this->doNumero = $numero;
+    }
+
     public function embarque(): DatosEmbarque
     {
         return $this->embarque ?? DatosEmbarque::vacio();
