@@ -46,6 +46,21 @@ enum CargaStatus: string
         }
     }
 
+    /**
+     * Ya salio de bodega completa (todos sus bultos en salidas confirmadas) o va mas adelante.
+     * Retenido cuenta como en bodega: no se sabe si se retuvo antes o despues de salir.
+     */
+    public function despachada(): bool
+    {
+        return in_array($this, [self::EN_TRANSITO, self::EN_ADUANA, self::LIBERADO, self::LISTO_ENTREGA, self::ENTREGADO], true);
+    }
+
+    /** @return array<int, self> */
+    public static function despachadas(): array
+    {
+        return array_values(array_filter(self::cases(), static fn (self $e) => $e->despachada()));
+    }
+
     public function label(): string
     {
         return match ($this) {

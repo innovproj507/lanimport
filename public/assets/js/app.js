@@ -636,6 +636,7 @@ document.addEventListener('DOMContentLoaded', function () {
         paginacionId: 'cargas-paginacion',
         botonClase: '.cargas-pagina-btn',
         filtros: [
+            { id: 'cargas-vista', param: 'vista' },
             { id: 'cargas-estado-filtro', param: 'estado' },
             { id: 'cargas-aduanero-filtro', param: 'aduanero' }
         ],

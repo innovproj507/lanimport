@@ -32,5 +32,5 @@ interface CargaRepositoryInterface
      *
      * @return array{items: array<int, Carga>, total: int, resumen: array{bultos: float, peso: float, pies3: float, valor: float}}
      */
-    public function searchPaginado(string $term, ?string $estado, int $page, int $perPage, ?string $aduaneroIdentificador = null): array;
+    public function searchPaginado(string $term, ?string $estado, int $page, int $perPage, ?string $aduaneroIdentificador = null, ?bool $despachadas = null): array;
 }

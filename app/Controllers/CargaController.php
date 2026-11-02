@@ -174,7 +174,9 @@ final class CargaController extends BaseController
         $proveedores = $this->container()->get(ListarProveedoresHandler::class)->handle(new ListarProveedoresQuery());
         $paises = $this->container()->get(ListarPaisesHandler::class)->handle(new ListarPaisesQuery());
 
-        $resultado = $this->container()->get(BuscarCargasHandler::class)->handle(new BuscarCargasQuery('', null, 1, 10));
+        $resultado = $this->container()->get(BuscarCargasHandler::class)->handle(
+            new BuscarCargasQuery('', null, 1, 10, null, BuscarCargasQuery::VISTA_BODEGA)
+        );
 
         return view('carga/ingreso', [
             'error' => $error,
@@ -204,7 +206,7 @@ final class CargaController extends BaseController
         $perPage = $this->perPageDesdeRequest();
 
         $resultado = $this->container()->get(BuscarCargasHandler::class)->handle(
-            new BuscarCargasQuery($termino, $estado !== '' ? $estado : null, $page, $perPage, $aduanero !== '' ? $aduanero : null)
+            new BuscarCargasQuery($termino, $estado !== '' ? $estado : null, $page, $perPage, $aduanero !== '' ? $aduanero : null, $this->vistaDesdeRequest())
         );
 
         $clientes = $this->container()->get(ListarClientesHandler::class)->handle(new ListarClientesQuery());
@@ -238,7 +240,7 @@ final class CargaController extends BaseController
         $aduanero = trim((string) ($this->request->getGet('aduanero') ?? ''));
 
         $cargas = $this->container()->get(BuscarCargasHandler::class)->handle(
-            new BuscarCargasQuery($termino, $estado !== '' ? $estado : null, 1, 100000, $aduanero !== '' ? $aduanero : null)
+            new BuscarCargasQuery($termino, $estado !== '' ? $estado : null, 1, 100000, $aduanero !== '' ? $aduanero : null, $this->vistaDesdeRequest())
         )->items;
         $nombresClientes = $this->nombresClientes($this->container()->get(ListarClientesHandler::class)->handle(new ListarClientesQuery()));
         $lpnsPorEstado = $this->lpnsPorEstado($cargas);
@@ -297,6 +299,16 @@ final class CargaController extends BaseController
             ->setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
             ->setHeader('Content-Disposition', 'attachment; filename="cargas-' . date('Y-m-d') . '.xlsx"')
             ->setBody($contenido);
+    }
+
+    /** Pestaña de Ingreso de Carga: En bodega (por defecto), Despachadas o Todas. */
+    private function vistaDesdeRequest(): string
+    {
+        $vista = (string) ($this->request->getGet('vista') ?? '');
+
+        return in_array($vista, [BuscarCargasQuery::VISTA_DESPACHADAS, BuscarCargasQuery::VISTA_TODAS], true)
+            ? $vista
+            : BuscarCargasQuery::VISTA_BODEGA;
     }
 
     /**

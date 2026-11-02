@@ -262,7 +262,7 @@ final class PdoCargaRepository implements CargaRepositoryInterface
     }
 
     /** @return array{items: array<int, Carga>, total: int} */
-    public function searchPaginado(string $term, ?string $estado, int $page, int $perPage, ?string $aduaneroIdentificador = null): array
+    public function searchPaginado(string $term, ?string $estado, int $page, int $perPage, ?string $aduaneroIdentificador = null, ?bool $despachadas = null): array
     {
         $page = max(1, $page);
         $perPage = max(1, $perPage);
@@ -285,6 +285,15 @@ final class PdoCargaRepository implements CargaRepositoryInterface
         if ($estado !== null && $estado !== '') {
             $where .= ' AND ca.estado = :estado';
             $params[':estado'] = $estado;
+        }
+
+        // Pestañas de Ingreso: true = ya despachadas, false = siguen en bodega, null = todas.
+        if ($despachadas !== null) {
+            $lista = implode(', ', array_map(
+                fn (CargaStatus $e) => $this->connection->quote($e->value),
+                CargaStatus::despachadas()
+            ));
+            $where .= ' AND ca.estado ' . ($despachadas ? 'IN' : 'NOT IN') . " ({$lista})";
         }
 
         if ($aduaneroIdentificador !== null && $aduaneroIdentificador !== '') {

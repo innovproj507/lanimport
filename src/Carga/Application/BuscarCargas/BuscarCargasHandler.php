@@ -18,7 +18,13 @@ final class BuscarCargasHandler implements QueryHandlerInterface
     {
         assert($query instanceof BuscarCargasQuery);
 
-        $resultado = $this->cargas->searchPaginado($query->termino, $query->estado, $query->page, $query->perPage, $query->aduaneroIdentificador);
+        $despachadas = match ($query->vista) {
+            BuscarCargasQuery::VISTA_BODEGA => false,
+            BuscarCargasQuery::VISTA_DESPACHADAS => true,
+            default => null,
+        };
+
+        $resultado = $this->cargas->searchPaginado($query->termino, $query->estado, $query->page, $query->perPage, $query->aduaneroIdentificador, $despachadas);
 
         return new BuscarCargasResult($resultado['items'], $resultado['total'], $query->page, $query->perPage, $resultado['resumen']);
     }

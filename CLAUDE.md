@@ -61,7 +61,8 @@ This is the single composition root. It builds a lazy-singleton `Courier\Shared\
     - filters by estado **and** aduanero (`initBusquedaPaginada({filtros: [{id, param}]})`);
     - columns Aduanero, Bultos, Peso and Valor (summed from each carga's lines);
     - "Etiquetas (LPN)": how many of the carga's LPNs are in each state (`LpnRepositoryInterface::conteoPorEstado()`, `badge_conteo_lpn()`), the same badges as Inventario;
-    - a totals block (`carga/_resumen.php`, `resumenId`) for **all** filtered cargas, not just the page, from `searchPaginado()['resumen']`.
+    - a totals block (`carga/_resumen.php`, `resumenId`) for **all** filtered cargas, not just the page, from `searchPaginado()['resumen']`;
+    - tabs "En bodega" (default) / "Despachadas" / "Todas" (`vista` param, hidden `cargas-vista` filter, also used by the Excel). Despachada = fully shipped (`CargaStatus::despachada()`: en_transito or later); a partial carga stays in "En bodega".
 
 ### API layer (`/api/v1`, JWT)
 

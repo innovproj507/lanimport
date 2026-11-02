@@ -29,6 +29,16 @@ require __DIR__ . '/../partials/header.php';
 
 <div id="seccion-historial-cargas" class="<?= $mostrarFormulario ? 'hidden' : '' ?>">
     <div class="bg-white rounded-xl shadow-sm p-6">
+        <?php // Las cargas despachadas completas salen de la vista normal: se ven en su pestaña. ?>
+        <input type="hidden" id="cargas-vista" value="bodega">
+        <div class="mb-4 inline-flex rounded-lg border border-zinc-300 p-1 bg-zinc-50 text-sm" role="tablist">
+            <?php foreach (['bodega' => 'En bodega', 'despachadas' => 'Despachadas', 'todas' => 'Todas'] as $vistaValor => $vistaTexto): ?>
+                <button type="button" data-cargas-vista="<?= $vistaValor ?>" role="tab"
+                        class="cargas-vista-tab px-4 py-1.5 rounded-md font-medium transition <?= $vistaValor === 'bodega' ? 'bg-white shadow text-zinc-900' : 'text-zinc-500 hover:text-zinc-800' ?>">
+                    <?= $vistaTexto ?>
+                </button>
+            <?php endforeach; ?>
+        </div>
         <div class="mb-4 flex items-center justify-between gap-4 flex-wrap">
             <div class="flex items-center gap-2">
                 <?= icon_small('search', 'w-4 h-4 text-zinc-500') ?>
@@ -551,11 +561,31 @@ document.addEventListener('DOMContentLoaded', function () {
 // Excel: al hacer clic se arma la URL con la busqueda y los filtros que esten puestos.
 document.getElementById('btn-excel-cargas').addEventListener('click', function () {
     var params = new URLSearchParams();
-    [['buscar-cargas', 'q'], ['cargas-estado-filtro', 'estado'], ['cargas-aduanero-filtro', 'aduanero']].forEach(function (f) {
+    [['buscar-cargas', 'q'], ['cargas-vista', 'vista'], ['cargas-estado-filtro', 'estado'], ['cargas-aduanero-filtro', 'aduanero']].forEach(function (f) {
         var el = document.getElementById(f[0]);
         if (el && el.value.trim() !== '') { params.set(f[1], el.value.trim()); }
     });
     this.href = '/cargas/excel' + (params.toString() ? '?' + params.toString() : '');
+});
+
+// Pestañas En bodega / Despachadas / Todas: cambian el filtro oculto y el listado se recarga.
+document.querySelectorAll('[data-cargas-vista]').forEach(function (tab) {
+    tab.addEventListener('click', function () {
+        var vista = document.getElementById('cargas-vista');
+        if (vista.value === tab.getAttribute('data-cargas-vista')) { return; }
+
+        document.querySelectorAll('[data-cargas-vista]').forEach(function (t) {
+            var activa = t === tab;
+            t.classList.toggle('bg-white', activa);
+            t.classList.toggle('shadow', activa);
+            t.classList.toggle('text-zinc-900', activa);
+            t.classList.toggle('text-zinc-500', !activa);
+            t.classList.toggle('hover:text-zinc-800', !activa);
+        });
+
+        vista.value = tab.getAttribute('data-cargas-vista');
+        vista.dispatchEvent(new Event('change'));
+    });
 });
 </script>
 
