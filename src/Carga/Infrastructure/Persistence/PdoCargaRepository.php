@@ -262,7 +262,7 @@ final class PdoCargaRepository implements CargaRepositoryInterface
     }
 
     /** @return array{items: array<int, Carga>, total: int} */
-    public function searchPaginado(string $term, ?string $estado, int $page, int $perPage, ?string $aduaneroIdentificador = null, ?bool $despachadas = null): array
+    public function searchPaginado(string $term, ?string $estado, int $page, int $perPage, ?string $aduaneroIdentificador = null, ?bool $enSalida = null): array
     {
         $page = max(1, $page);
         $perPage = max(1, $perPage);
@@ -287,13 +287,25 @@ final class PdoCargaRepository implements CargaRepositoryInterface
             $params[':estado'] = $estado;
         }
 
-        // Pestañas de Ingreso: true = ya despachadas, false = siguen en bodega, null = todas.
-        if ($despachadas !== null) {
-            $lista = implode(', ', array_map(
+        // Pestañas de Ingreso: true = en salida, false = en bodega, null = todas. Una carga esta
+        // "en salida" apenas un bulto suyo (o la caja de reempaque que lo contiene) entra en una
+        // DO no cancelada, o si ya figura despachada.
+        if ($enSalida !== null) {
+            $despachadas = implode(', ', array_map(
                 fn (CargaStatus $e) => $this->connection->quote($e->value),
                 CargaStatus::despachadas()
             ));
-            $where .= ' AND ca.estado ' . ($despachadas ? 'IN' : 'NOT IN') . " ({$lista})";
+            $condicion = "(ca.estado IN ({$despachadas})
+                OR EXISTS (SELECT 1 FROM lpns l
+                    JOIN salida_lineas sl ON sl.lpn_id = l.id
+                    JOIN salida_ordenes so ON so.id = sl.salida_orden_id AND so.estado <> 'cancelada'
+                    WHERE l.carga_id = ca.id)
+                OR EXISTS (SELECT 1 FROM lpns l
+                    JOIN lpn_genealogia g ON g.lpn_origen_id = l.id
+                    JOIN salida_lineas sl ON sl.lpn_id = g.lpn_destino_id
+                    JOIN salida_ordenes so ON so.id = sl.salida_orden_id AND so.estado <> 'cancelada'
+                    WHERE l.carga_id = ca.id))";
+            $where .= $enSalida ? " AND {$condicion}" : " AND NOT {$condicion}";
         }
 
         if ($aduaneroIdentificador !== null && $aduaneroIdentificador !== '') {

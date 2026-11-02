@@ -8,9 +8,9 @@ use Courier\Shared\Application\QueryInterface;
 
 final class BuscarCargasQuery implements QueryInterface
 {
-    /** Pestañas de Ingreso de Carga: las que siguen en bodega, las ya despachadas o todas. */
+    /** Pestañas de Ingreso de Carga: las que siguen en bodega, las que ya estan en una DO (o despachadas) o todas. */
     public const VISTA_BODEGA = 'bodega';
-    public const VISTA_DESPACHADAS = 'despachadas';
+    public const VISTA_EN_SALIDA = 'salida';
     public const VISTA_TODAS = 'todas';
 
     public function __construct(

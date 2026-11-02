@@ -301,12 +301,12 @@ final class CargaController extends BaseController
             ->setBody($contenido);
     }
 
-    /** Pestaña de Ingreso de Carga: En bodega (por defecto), Despachadas o Todas. */
+    /** Pestaña de Ingreso de Carga: En bodega (por defecto), En salida o Todas. */
     private function vistaDesdeRequest(): string
     {
         $vista = (string) ($this->request->getGet('vista') ?? '');
 
-        return in_array($vista, [BuscarCargasQuery::VISTA_DESPACHADAS, BuscarCargasQuery::VISTA_TODAS], true)
+        return in_array($vista, [BuscarCargasQuery::VISTA_EN_SALIDA, BuscarCargasQuery::VISTA_TODAS], true)
             ? $vista
             : BuscarCargasQuery::VISTA_BODEGA;
     }

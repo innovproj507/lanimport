@@ -29,10 +29,10 @@ require __DIR__ . '/../partials/header.php';
 
 <div id="seccion-historial-cargas" class="<?= $mostrarFormulario ? 'hidden' : '' ?>">
     <div class="bg-white rounded-xl shadow-sm p-6">
-        <?php // Las cargas despachadas completas salen de la vista normal: se ven en su pestaña. ?>
+        <?php // Una carga que entra en una DO sale de la vista normal (pestaña En salida); si la devuelven a bodega, vuelve. ?>
         <input type="hidden" id="cargas-vista" value="bodega">
         <div class="mb-4 inline-flex rounded-lg border border-zinc-300 p-1 bg-zinc-50 text-sm" role="tablist">
-            <?php foreach (['bodega' => 'En bodega', 'despachadas' => 'Despachadas', 'todas' => 'Todas'] as $vistaValor => $vistaTexto): ?>
+            <?php foreach (['bodega' => 'En bodega', 'salida' => 'En salida', 'todas' => 'Todas'] as $vistaValor => $vistaTexto): ?>
                 <button type="button" data-cargas-vista="<?= $vistaValor ?>" role="tab"
                         class="cargas-vista-tab px-4 py-1.5 rounded-md font-medium transition <?= $vistaValor === 'bodega' ? 'bg-white shadow text-zinc-900' : 'text-zinc-500 hover:text-zinc-800' ?>">
                     <?= $vistaTexto ?>
@@ -568,7 +568,7 @@ document.getElementById('btn-excel-cargas').addEventListener('click', function (
     this.href = '/cargas/excel' + (params.toString() ? '?' + params.toString() : '');
 });
 
-// Pestañas En bodega / Despachadas / Todas: cambian el filtro oculto y el listado se recarga.
+// Pestañas En bodega / En salida / Todas: cambian el filtro oculto y el listado se recarga.
 document.querySelectorAll('[data-cargas-vista]').forEach(function (tab) {
     tab.addEventListener('click', function () {
         var vista = document.getElementById('cargas-vista');
