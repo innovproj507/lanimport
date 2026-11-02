@@ -75,6 +75,7 @@ require_once __DIR__ . '/view_helpers.php';
                 <div class="space-y-1">
                     <?php if ($puedeIngresar): ?>
                         <?= nav_item('/cargas/ingreso', 'box', 'Ingreso de Carga', $currentPath, false, 'text-amber-400') ?>
+                        <?= nav_item('/cargas/historial', 'receipt', 'Historial de cargas', $currentPath, false, 'text-amber-300') ?>
                         <?= nav_item('/recepcion', 'scan', 'Recepcion', $currentPath, false, 'text-lime-400') ?>
                         <?= nav_item('/bodega', 'scan', 'App movil de bodega', $currentPath, false, 'text-lime-300') ?>
                         <?= nav_item('/inventario', 'box', 'Inventario', $currentPath, false, 'text-emerald-400') ?>

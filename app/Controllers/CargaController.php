@@ -197,6 +197,27 @@ final class CargaController extends BaseController
         ]);
     }
 
+    /** Historial de cargas: las que ya estan en una DO o despachadas (fuera de Ingreso de Carga). */
+    public function historial(): string
+    {
+        $clientes = $this->container()->get(ListarClientesHandler::class)->handle(new ListarClientesQuery());
+        $resultado = $this->container()->get(BuscarCargasHandler::class)->handle(
+            new BuscarCargasQuery('', null, 1, 10, null, BuscarCargasQuery::VISTA_EN_SALIDA)
+        );
+
+        return view('carga/historial', [
+            'aduaneros' => $this->container()->get(ListarAduanerosHandler::class)->handle(new ListarAduanerosQuery()),
+            'cargas' => $resultado->items,
+            'total' => $resultado->total,
+            'page' => $resultado->page,
+            'perPage' => $resultado->perPage,
+            'totalPages' => $resultado->totalPages(),
+            'resumen' => $resultado->resumen,
+            'lpnsPorEstado' => $this->lpnsPorEstado($resultado->items),
+            'nombresClientes' => $this->nombresClientes($clientes),
+        ]);
+    }
+
     public function buscar(): ResponseInterface
     {
         $termino = (string) ($this->request->getGet('q') ?? '');

@@ -62,7 +62,7 @@ This is the single composition root. It builds a lazy-singleton `Courier\Shared\
     - columns Aduanero, Bultos, Peso and Valor (summed from each carga's lines);
     - "Etiquetas (LPN)": how many of the carga's LPNs are in each state (`LpnRepositoryInterface::conteoPorEstado()`, `badge_conteo_lpn()`), the same badges as Inventario;
     - a totals block (`carga/_resumen.php`, `resumenId`) for **all** filtered cargas, not just the page, from `searchPaginado()['resumen']`;
-    - tabs "En bodega" (default) / "En salida" / "Todas" (`vista` param, hidden `cargas-vista` filter, also used by the Excel). A carga is "en salida" as soon as any of its LPNs (or the reempaque box holding it) is in a non-cancelled DO, or its estado is en_transito or later (`CargaStatus::despachadas()`); if it is taken out of the DO and returned to bodega it shows in "En bodega" again.
+    - Ingreso de Carga lists only cargas still "en bodega"; `/cargas/historial` (menu "Historial de cargas", view `carga/historial.php`) has the tabs "En salida" / "Todas". Both share `carga/_listado.php` (`$vistasListado`, hidden `cargas-vista` filter = `vista` param of buscar/excel). A carga is "en salida" as soon as any of its LPNs (or the reempaque box holding it) is in a non-cancelled DO, or its estado is en_transito or later (`CargaStatus::despachadas()`); if it is taken out of the DO and returned to bodega it is back in Ingreso.
 
 ### API layer (`/api/v1`, JWT)
 

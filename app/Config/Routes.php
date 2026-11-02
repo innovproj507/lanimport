@@ -122,6 +122,7 @@ $routes->get('cargas', 'CargaController::redirectToIngreso', ['filter' => $bodeg
 $routes->get('cargas/ingreso', 'CargaController::showIngresoForm', ['filter' => $bodegaFilter]);
 $routes->post('cargas', 'CargaController::store', ['filter' => $bodegaFilter]);
 $routes->get('cargas/buscar', 'CargaController::buscar', ['filter' => $bodegaFilter]);
+$routes->get('cargas/historial', 'CargaController::historial', ['filter' => $bodegaFilter]);
 // Excel de la lista con los mismos filtros (busqueda, estado, aduanero).
 $routes->get('cargas/excel', 'CargaController::excel', ['filter' => $bodegaFilter]);
 // Carga masiva por Excel/CSV — solo gerencia y owner. Va antes de cargas/(:segment).
