@@ -39,6 +39,12 @@ $imagenesFaltan ??= 0;
         .btn-print:disabled { background: #475569; cursor: wait; }
         .aviso { padding: 24px; font-family: Arial, sans-serif; color: #92400e; font-size: 15px; }
         .aviso-impresion { display: none; }
+        .tanda-select {
+            background: #fff; color: #111; border: none; border-radius: 8px; padding: 8px 10px; font-size: 14px;
+        }
+        /* Etiquetas fuera de la tanda elegida: no se ven ni se imprimen. */
+        .label.fuera-tanda { display: none !important; }
+        .label.ultima-tanda { page-break-after: avoid; break-after: avoid; }
         @media print {
             @page { size: 10cm 7.5cm; margin: 0; }
             .print-bar { display: none !important; }
@@ -55,8 +61,22 @@ $imagenesFaltan ??= 0;
         <p><?= count($lpns) ?> etiquetas &middot; 1 por pagina (10cm &times; 7.5cm) &middot; Tracking: <?= htmlspecialchars((string) $carga->trackingNumero()) ?></p>
         <p id="estado-carga"></p>
     </div>
-    <div style="display:flex;gap:8px">
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
         <a href="javascript:history.back()" class="btn-back">&larr; Volver</a>
+        <?php
+        // Por tandas: un solo trabajo de cientos de paginas, si la impresora o Windows falla a mitad,
+        // se reinicia desde la pagina 1. Con tandas de 50 solo se repite la tanda que fallo.
+        $porTanda = 50;
+        $totalLpns = count($lpns);
+        ?>
+        <?php if ($imagenesFaltan === 0 && $totalLpns > $porTanda): ?>
+            <select id="tanda" class="tanda-select" title="Imprima de a 50: si una tanda falla, solo se repite esa">
+                <?php for ($desde = 1; $desde <= $totalLpns; $desde += $porTanda): ?>
+                    <option value="<?= $desde ?>"><?= $desde ?> al <?= min($desde + $porTanda - 1, $totalLpns) ?></option>
+                <?php endfor; ?>
+                <option value="0">Todas (<?= $totalLpns ?>)</option>
+            </select>
+        <?php endif; ?>
         <button type="button" class="btn-print" id="btn-imprimir" disabled onclick="window.print()">Cargando...</button>
     </div>
 </div>
@@ -85,6 +105,38 @@ $imagenesFaltan ??= 0;
     if (imgs.length === 0) {
         boton.textContent = <?= $imagenesFaltan > 0 ? "'Preparando etiquetas...'" : "'Sin etiquetas'" ?>;
         return;
+    }
+
+    // Tandas de 50 (cargas grandes): solo se muestran e imprimen las de la tanda elegida.
+    // Al terminar de imprimir una tanda se pasa sola a la siguiente.
+    var tanda = document.getElementById('tanda');
+    var etiquetas = Array.prototype.slice.call(document.querySelectorAll('.label'));
+    var POR_TANDA = <?= (int) $porTanda ?>;
+
+    function aplicarTanda() {
+        if (!tanda) {
+            return;
+        }
+        var desde = parseInt(tanda.value, 10);
+        var hasta = desde > 0 ? Math.min(desde + POR_TANDA - 1, etiquetas.length) : etiquetas.length;
+        etiquetas.forEach(function (et, i) {
+            et.classList.toggle('fuera-tanda', desde > 0 && (i + 1 < desde || i + 1 > hasta));
+            // La ultima de la tanda no hace salto de pagina (si no, sale una etiqueta en blanco al final).
+            et.classList.toggle('ultima-tanda', i + 1 === hasta);
+        });
+        window.scrollTo(0, 0);
+    }
+
+    if (tanda) {
+        tanda.addEventListener('change', aplicarTanda);
+        aplicarTanda();
+        window.addEventListener('afterprint', function () {
+            if (tanda.value !== '0' && tanda.selectedIndex < tanda.options.length - 2) {
+                tanda.selectedIndex++;
+                aplicarTanda();
+                estado.textContent = 'Siguiente: etiquetas ' + tanda.options[tanda.selectedIndex].text + '. Pulse Imprimir.';
+            }
+        });
     }
 
     function base(img) {
