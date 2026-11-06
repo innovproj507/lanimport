@@ -636,13 +636,20 @@ final class SalidaController extends BaseController
         $ordenes = array_values(array_filter($ordenes, static fn (SalidaOrden $o) => $o->id() !== $orden->id()));
         $clientes = $repositorio->clientesPorOrden(array_map(static fn (SalidaOrden $o) => $o->id(), $ordenes));
 
-        return array_map(static fn (SalidaOrden $o) => [
-            'id' => $o->id(),
-            'etiqueta' => $o->etiquetaDo(),
-            'estado' => $o->estado()->value,
-            'contenedor' => $o->embarque()->contenedorFormateado(),
-            'clientes' => implode(', ', $clientes[$o->id()] ?? []),
-        ], $ordenes);
+        return array_map(static function (SalidaOrden $o) use ($clientes): array {
+            $nombres = $clientes[$o->id()] ?? [];
+
+            return [
+                'id' => $o->id(),
+                'etiqueta' => $o->etiquetaDo(),
+                'estado' => $o->estado()->value,
+                'contenedor' => $o->embarque()->contenedorFormateado(),
+                // Corto para el <select>: con 19 clientes la opcion pasaba de 300 letras y la lista
+                // del navegador salia en blanco. La lista completa va en 'clientesTodos' (title).
+                'clientes' => implode(', ', array_slice($nombres, 0, 2)) . (count($nombres) > 2 ? ' +' . (count($nombres) - 2) . ' mas' : ''),
+                'clientesTodos' => implode(', ', $nombres),
+            ];
+        }, $ordenes);
     }
 
     public function historial(): string

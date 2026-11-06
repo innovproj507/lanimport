@@ -177,7 +177,7 @@ $opcionSalida = static fn (array $s): string => $s['etiqueta']
             <select name="destino_id" class="<?= $claseInput ?>">
                 <option value="">— Elija el DO del contenedor —</option>
                 <?php foreach ($otrasSalidas as $s): ?>
-                    <option value="<?= htmlspecialchars($s['id']) ?>"><?= htmlspecialchars($opcionSalida($s)) ?></option>
+                    <option value="<?= htmlspecialchars($s['id']) ?>" title="<?= htmlspecialchars($s['clientesTodos'] ?? $s['clientes']) ?>"><?= htmlspecialchars($opcionSalida($s)) ?></option>
                 <?php endforeach; ?>
             </select>
         </div>
@@ -257,7 +257,7 @@ $opcionSalida = static fn (array $s): string => $s['etiqueta']
                                             <select name="destino_id" class="flex-1 rounded-lg border border-zinc-300 bg-white text-black px-2 py-1 text-xs">
                                                 <option value="nuevo">A un DO nuevo</option>
                                                 <?php foreach ($otrasSalidas as $s): if ($s['estado'] !== 'pendiente') { continue; } ?>
-                                                    <option value="<?= htmlspecialchars($s['id']) ?>">A <?= htmlspecialchars($opcionSalida($s)) ?></option>
+                                                    <option value="<?= htmlspecialchars($s['id']) ?>" title="<?= htmlspecialchars($s['clientesTodos'] ?? $s['clientes']) ?>">A <?= htmlspecialchars($opcionSalida($s)) ?></option>
                                                 <?php endforeach; ?>
                                             </select>
                                             <button type="submit" class="rounded-lg bg-violet-600 text-white px-3 py-1 text-xs font-medium hover:bg-violet-500">Mover</button>
