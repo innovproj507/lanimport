@@ -508,6 +508,66 @@ final class SalidaController extends BaseController
         return $this->moverCargas($id, $destinoId !== '' ? $destinoId : null, null, true);
     }
 
+    /**
+     * Historial: une varios DO pendientes en uno. Cada DO marcado pasa sus cargas (con lo escaneado y
+     * las fotos) al DO que queda, igual que "Unir" en el detalle, y queda cancelado con la nota.
+     */
+    public function unificar(): RedirectResponse
+    {
+        if (!Csrf::verify($this->request->getPost('_csrf'))) {
+            return redirect()->to('/salidas/historial');
+        }
+
+        $ids = array_values(array_unique(array_filter(array_map('trim', (array) $this->request->getPost('ordenes')))));
+        $destinoId = trim((string) $this->request->getPost('destino_id'));
+
+        if (count($ids) < 2 || !in_array($destinoId, $ids, true)) {
+            $_SESSION['salida_historial_error'] = 'Marque al menos 2 DO pendientes y elija en cual quedan unidos.';
+
+            return redirect()->to('/salidas/historial');
+        }
+
+        $repositorio = $this->container()->get(SalidaOrdenRepositoryInterface::class);
+        $destino = $repositorio->findById($destinoId);
+
+        if ($destino === null) {
+            $_SESSION['salida_historial_error'] = 'El DO elegido ya no existe.';
+
+            return redirect()->to('/salidas/historial');
+        }
+
+        $usuarioId = (string) $this->container()->get(SessionManager::class)->currentUsuarioId();
+        $unidos = [];
+        $errores = [];
+
+        foreach ($ids as $origenId) {
+            if ($origenId === $destinoId) {
+                continue;
+            }
+
+            $etiqueta = $repositorio->findById($origenId)?->etiquetaDo() ?? $origenId;
+
+            try {
+                $this->container()->get(MoverCargasSalidaHandler::class)->handle(
+                    new MoverCargasSalidaCommand($origenId, $destinoId, null, $usuarioId),
+                );
+                $unidos[] = $etiqueta;
+            } catch (NotFoundException|ValidationException|\Courier\Shared\Domain\Exception\DomainException $e) {
+                $errores[] = "{$etiqueta}: {$e->getMessage()}";
+            }
+        }
+
+        if ($unidos !== []) {
+            $_SESSION['salida_mensaje'] = 'Se unieron ' . implode(', ', $unidos) . " a {$destino->etiquetaDo()}. Lo ya escaneado y las fotos se conservan.";
+        }
+
+        if ($errores !== []) {
+            $_SESSION['salida_error'] = 'No se pudieron unir: ' . implode(' · ', $errores);
+        }
+
+        return redirect()->to('/salidas/' . $destinoId);
+    }
+
     /** Pasa una carga de este DO a otro (o a un DO nuevo), por ejemplo si se unio por error. */
     public function moverCarga(string $id): RedirectResponse
     {
@@ -672,7 +732,11 @@ final class SalidaController extends BaseController
         $repositorio = $this->container()->get(SalidaOrdenRepositoryInterface::class);
         $ids = array_map(static fn ($o) => $o->id(), $ordenes);
 
+        $errorUnificar = $_SESSION['salida_historial_error'] ?? null;
+        unset($_SESSION['salida_historial_error']);
+
         return view('salida/historial', [
+            'errorUnificar' => $errorUnificar,
             'ordenes' => $ordenes,
             'mapaClientes' => $mapaClientes,
             // Una salida consolidada lleva cargas de varios clientes y aduaneros.
