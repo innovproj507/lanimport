@@ -114,7 +114,10 @@ The paper delivery form (empresa de transporte, chofer, placa, entregado por, ce
   - `POST /cargas/{id}/whatsapp/{ingreso|despacho}` → `PrepararAvisoWhatsappHandler` builds the text, records a `notificaciones` row with `canal = 'whatsapp'`, and redirects to `https://wa.me/<number>?text=...`; the user presses Send.
   - Phone numbers are normalized by `Notificacion\Domain\TelefonoWhatsapp` (809/829/849 → +1, 7-8 digits → +507).
   - Despacho data comes from `SalidaOrden::datosParaCliente()` of `SalidaOrdenRepositoryInterface::ultimaConfirmadaConCarga()`, the same data the despacho email uses.
-- Reportes (gerente/admin) opens with "Operacion de bodega" (`PdoReporteOperativoRepository::operacionBodega()`):
+- Reportes (gerente/admin) starts with "Flujo de cargas" (`reporte/_flujo_cargas.php`, `ObtenerFlujoCargasHandler`, `PdoFlujoCargasRepository`):
+  - Every carga sits in exactly one of 4 stages: Llegando (ingresado), En deposito (en bodega, in no pending DO), En salida (some bulto in a pending DO, directly or inside a reempaque box), Salieron (despachada, dispatch date within the period).
+  - The cards act as tabs (`etapa` param). Filters are aduanero and cliente, and there is an Excel per stage (`GET reportes/flujo/excel`). It is a live zone.
+- Then "Operacion de bodega" (`PdoReporteOperativoRepository::operacionBodega()`):
   - period movement: ingresos, recepciones completas, salidas, bultos despachados;
   - current stock, bultos por escanear and cargas without LPNs;
   - inventory age, top clients, and receptions pending for more than 24 h.

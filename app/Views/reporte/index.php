@@ -27,8 +27,9 @@ $inventarioColores = [
 ?>
 
 <div class="bg-white rounded-xl shadow-sm p-6 mb-6">
-    <?= card_header('filter', 'Periodo', 'amber') ?>
-    <form method="get" action="/reportes" class="flex items-end gap-4 flex-wrap">
+    <?= card_header('filter', 'Periodo y filtros', 'amber') ?>
+    <form method="get" action="/reportes" class="flex items-end gap-4 flex-wrap" id="reporte-filtros">
+        <input type="hidden" name="etapa" id="flujo-etapa-input" value="<?= htmlspecialchars($etapaActiva) ?>">
         <div>
             <label class="block text-sm font-medium text-zinc-700 mb-1">Desde</label>
             <input type="date" name="desde" value="<?= htmlspecialchars($reporte->desde) ?>"
@@ -39,11 +40,73 @@ $inventarioColores = [
             <input type="date" name="hasta" value="<?= htmlspecialchars($reporte->hasta) ?>"
                    class="rounded-lg border border-zinc-300 bg-white text-black px-3 py-2 text-sm">
         </div>
+        <div>
+            <label class="block text-sm font-medium text-zinc-700 mb-1">Aduanero</label>
+            <select name="aduanero" class="rounded-lg border border-zinc-300 bg-white text-black px-3 py-2 text-sm">
+                <option value="">Todos</option>
+                <?php foreach ($aduaneros as $a): ?>
+                    <option value="<?= htmlspecialchars($a->identificador()) ?>" <?= $filtroAduanero === $a->identificador() ? 'selected' : '' ?>><?= htmlspecialchars($a->nombre()) ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-zinc-700 mb-1">Cliente</label>
+            <select name="cliente" class="max-w-[16rem] rounded-lg border border-zinc-300 bg-white text-black px-3 py-2 text-sm">
+                <option value="">Todos</option>
+                <?php foreach ($clientes as $cl): ?>
+                    <option value="<?= htmlspecialchars($cl->id()) ?>" <?= $filtroCliente === $cl->id() ? 'selected' : '' ?>><?= htmlspecialchars($cl->nombreCompleto()) ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
         <button type="submit" class="inline-flex items-center gap-2 bg-amber-500 text-black rounded-lg px-4 py-2 text-sm font-medium hover:bg-amber-400 transition">
             <?= icon_small('filter') ?><span>Aplicar</span>
         </button>
     </form>
+    <p class="text-xs text-zinc-500 mt-2">El periodo aplica a "Salieron" y a los indicadores de abajo. Aduanero y cliente filtran el Flujo de cargas.</p>
 </div>
+
+<?php require __DIR__ . '/_flujo_cargas.php'; ?>
+
+<script>
+// Flujo de cargas: las tarjetas cambian la lista visible; la etapa se recuerda en la URL
+// (para el Excel y al aplicar filtros) y se vuelve a aplicar cuando "En vivo" refresca la zona.
+(function () {
+    var etapa = document.getElementById('flujo-etapa-input').value;
+
+    function aplicar() {
+        document.querySelectorAll('[data-flujo-panel]').forEach(function (p) {
+            p.classList.toggle('hidden', p.getAttribute('data-flujo-panel') !== etapa);
+        });
+        document.querySelectorAll('[data-flujo-etapa]').forEach(function (t) {
+            var color = t.getAttribute('data-color');
+            var activa = t.getAttribute('data-flujo-etapa') === etapa;
+            t.classList.toggle('ring-2', activa);
+            t.classList.toggle('ring-' + color + '-400', activa);
+            t.classList.toggle('bg-' + color + '-50', activa);
+            t.classList.toggle('bg-white', !activa);
+        });
+        document.getElementById('flujo-etapa-input').value = etapa;
+        var params = new URLSearchParams(new FormData(document.getElementById('reporte-filtros')));
+        var excel = document.getElementById('flujo-excel');
+        if (excel) {
+            excel.href = '/reportes/flujo/excel?' + params.toString();
+        }
+        var url = new URL(window.location.href);
+        url.searchParams.set('etapa', etapa);
+        history.replaceState(null, '', url);
+    }
+
+    document.addEventListener('click', function (e) {
+        var tarjeta = e.target.closest('[data-flujo-etapa]');
+        if (tarjeta) {
+            etapa = tarjeta.getAttribute('data-flujo-etapa');
+            aplicar();
+        }
+    });
+    document.addEventListener('vivo:actualizado', aplicar);
+    aplicar();
+})();
+</script>
 
 <?php require __DIR__ . '/_operacion_bodega.php'; ?>
 

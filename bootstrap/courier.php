@@ -155,8 +155,10 @@ use Courier\Reempaque\Domain\GenealogiaLpnRepositoryInterface;
 use Courier\Reempaque\Domain\ReempaqueOrdenRepositoryInterface;
 use Courier\Reempaque\Infrastructure\Persistence\PdoGenealogiaLpnRepository;
 use Courier\Reempaque\Infrastructure\Persistence\PdoReempaqueOrdenRepository;
+use Courier\Reporte\Application\ObtenerFlujoCargas\ObtenerFlujoCargasHandler;
 use Courier\Reporte\Application\ObtenerReporteOperativo\ObtenerReporteOperativoHandler;
 use Courier\Reporte\Application\ObtenerResumenDashboard\ObtenerResumenDashboardHandler;
+use Courier\Reporte\Infrastructure\Persistence\PdoFlujoCargasRepository;
 use Courier\Reporte\Infrastructure\Persistence\PdoReporteOperativoRepository;
 use Courier\Reporte\Infrastructure\Persistence\PdoResumenDashboardRepository;
 use Courier\Salida\Application\CancelarOrdenSalida\CancelarOrdenSalidaHandler;
@@ -595,6 +597,10 @@ $container->set(ObtenerResumenDashboardHandler::class, fn (Container $c) => new 
 $container->set(PdoReporteOperativoRepository::class, fn (Container $c) => new PdoReporteOperativoRepository($c->get(PDO::class)));
 $container->set(ObtenerReporteOperativoHandler::class, fn (Container $c) => new ObtenerReporteOperativoHandler(
     $c->get(PdoReporteOperativoRepository::class),
+));
+$container->set(PdoFlujoCargasRepository::class, fn (Container $c) => new PdoFlujoCargasRepository($c->get(PDO::class)));
+$container->set(ObtenerFlujoCargasHandler::class, fn (Container $c) => new ObtenerFlujoCargasHandler(
+    $c->get(PdoFlujoCargasRepository::class),
 ));
 
 return $container;
