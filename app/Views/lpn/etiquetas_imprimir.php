@@ -77,6 +77,11 @@ $imagenesFaltan ??= 0;
                 <option value="0">Todas (<?= $totalLpns ?>)</option>
             </select>
         <?php endif; ?>
+        <?php if ($imagenesFaltan === 0 && $totalLpns > 1): ?>
+            <?php // Reimprimir solo las que se perdieron o dañaron: numeros del final del codigo (LPN-XXXXXX-045 = 45). ?>
+            <input type="text" id="solo" class="tanda-select" style="width:15rem" placeholder="Solo estas: 12, 45, 120-130"
+                   title="Numero de bulto (el final del codigo LPN). Separe con comas; use guion para un rango.">
+        <?php endif; ?>
         <button type="button" class="btn-print" id="btn-imprimir" disabled onclick="window.print()">Cargando...</button>
     </div>
 </div>
@@ -89,7 +94,7 @@ $imagenesFaltan ??= 0;
         Vuelva a la pantalla de recepcion de la carga, espere a que la barra termine y luego imprima.
     </p>
 <?php else: foreach ($lpns as $lpn): ?>
-    <div class="label">
+    <div class="label" data-n="<?= (int) substr(strrchr((string) $lpn->codigo(), '-'), 1) ?>">
         <img src="/uploads/lpns/<?= htmlspecialchars((string) $lpn->codigo()) ?>.png?v=<?= @filemtime(FCPATH . 'uploads/lpns/' . $lpn->codigo() . '.png') ?>" alt="Etiqueta <?= htmlspecialchars((string) $lpn->codigo()) ?>">
     </div>
 <?php endforeach; endif; ?>
@@ -113,25 +118,65 @@ $imagenesFaltan ??= 0;
     var etiquetas = Array.prototype.slice.call(document.querySelectorAll('.label'));
     var POR_TANDA = <?= (int) $porTanda ?>;
 
-    function aplicarTanda() {
-        if (!tanda) {
-            return;
+    var solo = document.getElementById('solo');
+
+    // "12, 45, 120-130" -> {12:1, 45:1, 120:1, ..., 130:1}; null si el campo esta vacio.
+    function numerosSolo() {
+        if (!solo || solo.value.trim() === '') {
+            return null;
         }
-        var desde = parseInt(tanda.value, 10);
-        var hasta = desde > 0 ? Math.min(desde + POR_TANDA - 1, etiquetas.length) : etiquetas.length;
-        etiquetas.forEach(function (et, i) {
-            et.classList.toggle('fuera-tanda', desde > 0 && (i + 1 < desde || i + 1 > hasta));
-            // La ultima de la tanda no hace salto de pagina (si no, sale una etiqueta en blanco al final).
-            et.classList.toggle('ultima-tanda', i + 1 === hasta);
+        var numeros = {};
+        solo.value.split(/[,;\s]+/).forEach(function (parte) {
+            var m = parte.match(/^(\d+)(?:-(\d+))?$/);
+            if (!m) {
+                return;
+            }
+            var a = parseInt(m[1], 10), b = m[2] ? parseInt(m[2], 10) : a;
+            for (var n = Math.min(a, b); n <= Math.max(a, b); n++) {
+                numeros[n] = true;
+            }
         });
+        return numeros;
+    }
+
+    function aplicarTanda() {
+        var numeros = numerosSolo();
+        var desde = tanda && !numeros ? parseInt(tanda.value, 10) : 0;
+        var hasta = desde > 0 ? Math.min(desde + POR_TANDA - 1, etiquetas.length) : etiquetas.length;
+        var visibles = [];
+        etiquetas.forEach(function (et, i) {
+            var fuera = numeros
+                ? !numeros[parseInt(et.getAttribute('data-n'), 10)]
+                : desde > 0 && (i + 1 < desde || i + 1 > hasta);
+            et.classList.toggle('fuera-tanda', fuera);
+            et.classList.remove('ultima-tanda');
+            if (!fuera) {
+                visibles.push(et);
+            }
+        });
+        // La ultima que se imprime no hace salto de pagina (si no, sale una etiqueta en blanco al final).
+        if (visibles.length > 0) {
+            visibles[visibles.length - 1].classList.add('ultima-tanda');
+        }
+        if (tanda) {
+            tanda.disabled = !!numeros;
+        }
+        if (numeros) {
+            estado.textContent = visibles.length + ' etiquetas para reimprimir.';
+            boton.disabled = visibles.length === 0 || document.body.classList.contains('cargando');
+        }
         window.scrollTo(0, 0);
+    }
+
+    if (solo) {
+        solo.addEventListener('input', aplicarTanda);
     }
 
     if (tanda) {
         tanda.addEventListener('change', aplicarTanda);
         aplicarTanda();
         window.addEventListener('afterprint', function () {
-            if (tanda.value !== '0' && tanda.selectedIndex < tanda.options.length - 2) {
+            if (!numerosSolo() && tanda.value !== '0' && tanda.selectedIndex < tanda.options.length - 2) {
                 tanda.selectedIndex++;
                 aplicarTanda();
                 estado.textContent = 'Siguiente: etiquetas ' + tanda.options[tanda.selectedIndex].text + '. Pulse Imprimir.';
