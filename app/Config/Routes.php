@@ -165,7 +165,8 @@ $routes->group('bodega/api', ['filter' => array_merge($bodegaFilter, ['csrfheade
     $routes->get('salidas', 'Api\BodegaApiController::salidas');
     $routes->get('salidas/(:segment)', 'Api\BodegaApiController::salida/$1');
     $routes->post('salidas/(:segment)/escanear', 'Api\BodegaApiController::salidaEscanear/$1');
-    $routes->post('salidas/(:segment)/finalizar', 'Api\BodegaApiController::salidaFinalizar/$1');
+    // Confirmar la salida es manual y de trafico/gerencia (cuando el contenedor sale), no de bodega.
+    $routes->post('salidas/(:segment)/finalizar', 'Api\BodegaApiController::salidaFinalizar/$1', ['filter' => 'role:operaciones,gerente,admin']);
     // Fotos de evidencia: de recepcion (por carga) y de salida (por orden). Tambien las usa la web.
     $routes->get('(cargas|salidas)/(:segment)/fotos', 'Api\FotoEvidenciaApiController::listar/$1/$2');
     $routes->post('(cargas|salidas)/(:segment)/fotos', 'Api\FotoEvidenciaApiController::subir/$1/$2');
@@ -189,7 +190,8 @@ $routes->get('salidas', 'SalidaController::index', ['filter' => $planificaSalida
 $routes->post('salidas', 'SalidaController::store', ['filter' => $planificaSalida]);
 $routes->get('salidas/(:segment)', 'SalidaController::show/$1', ['filter' => $bodegaFilter]);
 $routes->post('salidas/(:segment)/escanear', 'SalidaController::confirmarEscaneo/$1', ['filter' => $bodegaFilter]);
-$routes->post('salidas/(:segment)/finalizar', 'SalidaController::finalizar/$1', ['filter' => $bodegaFilter]);
+// Confirmar la salida (el contenedor ya salio): clic manual de trafico/gerencia, nunca al terminar de escanear.
+$routes->post('salidas/(:segment)/finalizar', 'SalidaController::finalizar/$1', ['filter' => $planificaSalida]);
 $routes->post('salidas/(:segment)/cancelar', 'SalidaController::cancelar/$1', ['filter' => $planificaSalida]);
 // Bultos listos de una carga, para "Elegir etiquetas" al armar el contenedor (va antes de salidas/(:segment)).
 $routes->get('salidas/lpns-listos/(:segment)', 'SalidaController::lpnsListos/$1', ['filter' => $planificaSalida]);

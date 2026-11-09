@@ -127,14 +127,23 @@ $claseInput = 'w-full rounded-lg border border-zinc-300 bg-white text-black px-3
 
     <div id="salida-acciones" data-vivo-region="<?= htmlspecialchars($vivoDo) ?>">
     <?php if (!$confirmada && !$cancelada): ?>
-        <div class="mt-4 flex gap-3">
-            <form method="post" action="/salidas/<?= htmlspecialchars($orden->id()) ?>/finalizar">
+        <div class="mt-4 flex gap-3 flex-wrap items-center">
+            <?php // Marca de DO abierto: con "En vivo", si desaparece (otro lo confirmo o cancelo) se deja de escanear. ?>
+            <span id="salida-abierta" hidden></span>
+            <?php if ($planifica): ?>
+            <?php // Manual: terminar de escanear NO confirma. Trafico/gerencia confirman cuando el contenedor sale. ?>
+            <form method="post" action="/salidas/<?= htmlspecialchars($orden->id()) ?>/finalizar"
+                  onsubmit="return confirm('¿El contenedor de <?= htmlspecialchars($orden->etiquetaDo()) ?> YA SALIO?\n\nAl confirmar:\n- Sus cargas pasan a En transito y salen del inventario.\n- Se avisa al cliente por correo que su carga fue despachada.\n\nSi el contenedor todavia no sale, pulse Cancelar.');">
                 <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
                 <button type="submit" id="salida-confirmar-btn" <?= $progreso['escaneadas'] < $progreso['total'] ? 'disabled' : '' ?>
+                        title="Pulse solo cuando el contenedor haya salido"
                         class="inline-flex items-center gap-2 bg-emerald-500 text-black rounded-lg px-4 py-2 text-sm font-medium hover:bg-emerald-400 transition disabled:opacity-40 disabled:cursor-not-allowed">
-                    <?= icon_small('check') ?><span>Confirmar Salida</span>
+                    <?= icon_small('check') ?><span>Confirmar salida (el contenedor salio)</span>
                 </button>
             </form>
+            <?php elseif ($progreso['total'] > 0 && $progreso['escaneadas'] >= $progreso['total']): ?>
+                <p class="text-sm text-emerald-700 font-medium">Escaneo completo. Trafico confirma la salida cuando el contenedor salga.</p>
+            <?php endif; ?>
             <?php if ($planifica): ?>
             <form method="post" action="/salidas/<?= htmlspecialchars($orden->id()) ?>/cancelar"
                   onsubmit="return confirm('¿Cancelar <?= htmlspecialchars($orden->etiquetaDo()) ?>? Se elimina el DO y sus bultos vuelven a quedar disponibles en bodega.');">
@@ -460,7 +469,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         // Si otro usuario confirmo o cancelo el DO, ya no se escanea aqui.
         var scan = document.getElementById('salida-scan-input');
-        if (e.detail.region.id === 'salida-acciones' && scan && !document.getElementById('salida-confirmar-btn')) {
+        if (e.detail.region.id === 'salida-acciones' && scan && !document.getElementById('salida-abierta')) {
             scan.disabled = true;
         }
     });

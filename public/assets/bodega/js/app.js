@@ -440,7 +440,8 @@
                 + '  <div id="sal-progreso" class="progreso-grande"></div>'
                 + (orden.estado === 'pendiente' ? '  <div id="zona-escaneo"></div>' : '<p class="aviso aviso-ok">Orden ' + esc(orden.estado) + '.</p>')
                 + '  <p id="sal-aviso" class="aviso oculto"></p>'
-                + (orden.estado === 'pendiente' ? '  <button type="button" id="sal-finalizar" class="btn btn-primario btn-bloque" disabled>Finalizar salida</button>' : '')
+                // Bodega no finaliza: trafico confirma la salida en la web cuando el contenedor sale.
+                + (orden.estado === 'pendiente' ? '  <p id="sal-completa" class="aviso aviso-ok oculto">Escaneo completo. Trafico confirma la salida cuando el contenedor salga.</p>' : '')
                 + '</section>'
                 + '<section class="tarjeta"><h2>Cargas de la salida</h2>'
                 + '  <p class="sub">📷 Fotos de la carga de cada cliente al subirla al contenedor.</p>'
@@ -479,10 +480,10 @@
                             + '</div>';
                     }).join('');
 
-                var finalizar = document.getElementById('sal-finalizar');
+                var completa = document.getElementById('sal-completa');
 
-                if (finalizar) {
-                    finalizar.disabled = hechos < orden.lineas.length;
+                if (completa) {
+                    completa.classList.toggle('oculto', hechos < orden.lineas.length);
                 }
             }
 
@@ -505,21 +506,6 @@
                     window.Escaner.pitido(false);
                 });
             }, 'Escanee cada bulto que sube al contenedor');
-
-            document.getElementById('sal-finalizar').addEventListener('click', function () {
-                if (!confirm('¿Finalizar la salida ' + orden.do + '? Los LPNs saldran del inventario.')) {
-                    return;
-                }
-
-                this.disabled = true;
-                window.Api.post('/salidas/' + encodeURIComponent(id) + '/finalizar').then(function () {
-                    alert('Salida ' + orden.do + ' finalizada.');
-                    ir('/salidas');
-                }, function (error) {
-                    aviso(avisoSal, error.message, 'error');
-                    document.getElementById('sal-finalizar').disabled = false;
-                });
-            });
         }, function (error) {
             html(cabecera('Salida', '/salidas') + '<p class="aviso aviso-error">' + esc(error.message) + '</p>');
         });
