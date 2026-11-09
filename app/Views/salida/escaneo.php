@@ -317,6 +317,8 @@ $opcionSalida = static fn (array $s): string => $s['etiqueta']
                 <span class="text-zinc-300">|</span>
                 <button type="button" id="ajustar-todos" class="rounded-lg border border-zinc-300 px-2 py-1 hover:bg-slate-100">Todos</button>
                 <button type="button" id="ajustar-ninguno" class="rounded-lg border border-zinc-300 px-2 py-1 hover:bg-slate-100">Ninguno</button>
+                <?php // Lo cargado se queda y lo que bodega no escaneo vuelve a bodega. ?>
+                <button type="button" id="ajustar-escaneados" class="rounded-lg border border-emerald-400 bg-emerald-50 text-emerald-800 px-2 py-1 hover:bg-emerald-100" title="Deja en este DO solo los bultos ya escaneados; los demas vuelven a bodega">Solo escaneados</button>
                 <input type="search" id="ajustar-buscar" placeholder="Buscar..." class="flex-1 min-w-[8rem] rounded-lg border border-zinc-300 px-2 py-1 text-sm">
             </div>
         </div>
@@ -368,7 +370,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     lista.innerHTML = datos.bultos.map(function (b) {
                         var estado = b.enEsteDo ? (b.escaneado ? 'Ya cargado' : 'En este DO') : (b.disponible ? 'En bodega' : b.motivo);
                         return '<label class="flex items-center gap-3 px-3 py-2 border-b border-slate-100 ' + (b.disponible ? 'hover:bg-amber-50 cursor-pointer' : 'opacity-50') + '" data-buscar="' + b.codigo.toLowerCase() + '">'
-                            + '<input type="checkbox" name="lpns[]" value="' + b.id + '" ' + (b.enEsteDo ? 'checked' : '') + ' ' + (b.disponible ? '' : 'disabled') + ' class="rounded border-zinc-300 text-amber-500 focus:ring-amber-400">'
+                            + '<input type="checkbox" name="lpns[]" value="' + b.id + '" data-escaneado="' + (b.enEsteDo && b.escaneado ? '1' : '0') + '" ' + (b.enEsteDo ? 'checked' : '') + ' ' + (b.disponible ? '' : 'disabled') + ' class="rounded border-zinc-300 text-amber-500 focus:ring-amber-400">'
                             + '<span class="font-mono text-sm text-black flex-1">' + b.codigo + '</span>'
                             + '<span class="text-xs text-zinc-500 w-16 text-right">' + (b.numero ? b.numero + '/' + b.total : '') + '</span>'
                             + '<span class="text-xs w-32 text-right ' + (b.escaneado ? 'text-emerald-700' : 'text-zinc-500') + '">' + estado + '</span>'
@@ -384,6 +386,10 @@ document.addEventListener('DOMContentLoaded', function () {
     lista.addEventListener('change', contar);
     document.getElementById('ajustar-todos').addEventListener('click', function () { checks().forEach(function (c) { c.checked = true; }); contar(); });
     document.getElementById('ajustar-ninguno').addEventListener('click', function () { checks().forEach(function (c) { c.checked = false; }); contar(); });
+    document.getElementById('ajustar-escaneados').addEventListener('click', function () {
+        checks().forEach(function (c) { c.checked = c.getAttribute('data-escaneado') === '1'; });
+        contar();
+    });
     document.getElementById('ajustar-aplicar-primeros').addEventListener('click', function () {
         var n = parseInt(document.getElementById('ajustar-primeros').value, 10) || 0;
         checks().forEach(function (c, i) { c.checked = i < n; });
