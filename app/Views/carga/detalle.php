@@ -296,7 +296,7 @@ document.addEventListener('DOMContentLoaded', function () {
 <div class="bg-white rounded-xl shadow p-6 mt-6">
     <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
         <?= card_header('mail', 'Avisos al cliente', 'amber') ?>
-        <?php if (in_array($rolActual, ['operaciones', 'gerente', 'admin'], true)): ?>
+        <?php if (in_array($rolActual, ['inventario', 'operaciones', 'gerente', 'admin'], true)): ?>
             <div class="flex flex-wrap items-center gap-2">
                 <form method="post" action="/cargas/<?= htmlspecialchars($view->cargaId) ?>/reenviar-correo">
                     <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
@@ -321,7 +321,7 @@ document.addEventListener('DOMContentLoaded', function () {
         <?php endif; ?>
     </div>
 
-    <?php if (in_array($rolActual, ['operaciones', 'gerente', 'admin'], true) && $whatsapp['telefonoValido'] === null): ?>
+    <?php if (in_array($rolActual, ['inventario', 'operaciones', 'gerente', 'admin'], true) && $whatsapp['telefonoValido'] === null): ?>
         <p class="text-xs text-zinc-500 mb-3">
             <?php if ($whatsapp['telefono']): ?>
                 El telefono del cliente (<?= htmlspecialchars($whatsapp['telefono']) ?>) no tiene un formato valido para WhatsApp.

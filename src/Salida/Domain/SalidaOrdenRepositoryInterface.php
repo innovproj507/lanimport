@@ -27,6 +27,9 @@ interface SalidaOrdenRepositoryInterface
      */
     public function aduanerosPorOrden(array $ordenIds): array;
 
+    /** Siguiente consecutivo DO del ano (bloquea las filas del ano: llamar dentro del UnitOfWork). */
+    public function siguienteNumeroDo(int $anio): int;
+
     /** Si otro DO (distinto de $exceptoOrdenId) ya tiene ese numero en ese ano. */
     public function existeNumeroDo(int $anio, int $numero, string $exceptoOrdenId): bool;
 

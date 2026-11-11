@@ -50,7 +50,7 @@ if (empty($cargas)):
             <?php endif; ?>
             <?= icon_button('/cargas/' . $carga->id(), 'eye', 'Ver', 'blue') ?>
             <?= icon_button('/cargas/' . $carga->id() . '/editar', 'pencil', 'Editar', 'amber') ?>
-            <?php if (in_array($_SESSION['usuario_rol'] ?? null, ['operaciones', 'gerente', 'admin'], true)): ?>
+            <?php if (in_array($_SESSION['usuario_rol'] ?? null, ['inventario', 'operaciones', 'gerente', 'admin'], true)): ?>
                 <?php // Solo se borra si no tiene etiquetas (LPN); si las tiene, el servidor explica por que no. ?>
                 <form method="post" action="/cargas/<?= htmlspecialchars($carga->id()) ?>/eliminar" class="inline"
                       onsubmit="return confirm('¿Borrar la carga <?= htmlspecialchars((string) $carga->trackingNumero()) ?>? Esta accion no se puede deshacer.');">

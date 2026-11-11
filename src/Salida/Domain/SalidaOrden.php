@@ -136,6 +136,33 @@ final class SalidaOrden extends AggregateRoot
         $this->doNumero = $numero;
     }
 
+    /**
+     * Trafico genera el DO de una orden de salida que armo inventario (sin DO). El siguiente
+     * numero del ano lo calcula el repositorio (siguienteNumeroDo) dentro de la transaccion.
+     */
+    public function asignarDo(int $anio, int $numero): void
+    {
+        if ($this->estado === EstadoSalidaOrden::CANCELADA) {
+            throw new ValidationException('No se puede generar el DO de una salida cancelada.');
+        }
+
+        if ($this->doNumero !== null) {
+            throw new ValidationException("Esta salida ya tiene DO ({$this->etiquetaDo()}).");
+        }
+
+        if ($numero < 1 || $numero > 999999) {
+            throw new ValidationException('Escriba un numero de DO valido (por ejemplo 211).');
+        }
+
+        $this->doAnio = $anio;
+        $this->doNumero = $numero;
+    }
+
+    public function tieneDo(): bool
+    {
+        return $this->doNumero !== null;
+    }
+
     public function embarque(): DatosEmbarque
     {
         return $this->embarque ?? DatosEmbarque::vacio();
@@ -256,6 +283,11 @@ final class SalidaOrden extends AggregateRoot
 
     public function confirmar(string $usuarioId): void
     {
+        // El contenedor lo ordena trafico: sin DO no hay contenedor asignado y no puede salir.
+        if ($this->doNumero === null) {
+            throw new ValidationException("La orden {$this->etiquetaDo()} todavia no tiene DO: trafico debe generar el DO y ordenar el contenedor antes de confirmar la salida.");
+        }
+
         $pendientes = array_values(array_filter(
             $this->lineas,
             fn (SalidaLinea $linea) => !$linea->escaneado(),

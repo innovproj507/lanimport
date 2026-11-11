@@ -32,15 +32,8 @@ final class PdoSalidaOrdenRepository implements SalidaOrdenRepositoryInterface
 
     private function insert(SalidaOrden $orden): void
     {
-        // Consecutivo DO del ano: se bloquean las filas del ano para que dos salidas
-        // creadas al mismo tiempo no tomen el mismo numero (corre dentro del UnitOfWork).
-        $anio = (int) $orden->createdAt()->format('Y');
-        $siguiente = $this->connection->prepare(
-            'SELECT COALESCE(MAX(do_numero), 0) + 1 FROM salida_ordenes WHERE do_anio = :anio FOR UPDATE'
-        );
-        $siguiente->execute([':anio' => $anio]);
-        $doNumero = (int) $siguiente->fetchColumn();
-
+        // El DO lo trae la orden (trafico la arma con DO, o lo genera despues con asignarDo());
+        // una orden de salida de inventario se guarda sin DO (do_anio/do_numero NULL).
         $stmt = $this->connection->prepare(
             'INSERT INTO salida_ordenes (
                 id, do_anio, do_numero, cliente_id, aduanero_identificador, estado, creado_por_usuario_id, created_at, confirmed_at,
@@ -53,8 +46,8 @@ final class PdoSalidaOrdenRepository implements SalidaOrdenRepositoryInterface
 
         $stmt->execute([
             ':id' => $orden->id(),
-            ':do_anio' => $anio,
-            ':do_numero' => $doNumero,
+            ':do_anio' => $orden->doAnio(),
+            ':do_numero' => $orden->doNumero(),
             ':cliente_id' => $orden->clienteId(),
             ':aduanero_identificador' => $orden->aduaneroIdentificador(),
             ':estado' => $orden->estado()->value,
@@ -64,7 +57,8 @@ final class PdoSalidaOrdenRepository implements SalidaOrdenRepositoryInterface
         ] + $this->parametrosEmbarque($orden));
 
         $secuencia = (int) $this->connection->lastInsertId();
-        $codigo = 'SAL-' . str_pad((string) $secuencia, 6, '0', STR_PAD_LEFT);
+        // OS = orden de salida (la arma inventario); el DO lo genera trafico. Las anteriores conservan SAL-.
+        $codigo = 'OS-' . str_pad((string) $secuencia, 6, '0', STR_PAD_LEFT);
 
         $update = $this->connection->prepare('UPDATE salida_ordenes SET codigo = :codigo WHERE id = :id');
         $update->execute([':codigo' => $codigo, ':id' => $orden->id()]);
@@ -88,7 +82,7 @@ final class PdoSalidaOrdenRepository implements SalidaOrdenRepositoryInterface
     private function update(SalidaOrden $orden): void
     {
         $stmt = $this->connection->prepare(
-            'UPDATE salida_ordenes SET estado = :estado, nota = :nota, confirmed_at = :confirmed_at, cliente_id = :cliente_id, do_numero = :do_numero,
+            'UPDATE salida_ordenes SET estado = :estado, nota = :nota, confirmed_at = :confirmed_at, cliente_id = :cliente_id, do_anio = :do_anio, do_numero = :do_numero,
                 numero_contenedor = :numero_contenedor, numero_sello = :numero_sello, naviera_id = :naviera_id,
                 nombre_barco = :nombre_barco, fecha_cargue = :fecha_cargue, fecha_salida_etd = :fecha_salida_etd,
                 destino_final = :destino_final
@@ -101,6 +95,7 @@ final class PdoSalidaOrdenRepository implements SalidaOrdenRepositoryInterface
             ':nota' => $orden->nota(),
             ':confirmed_at' => $orden->confirmedAt()?->format('Y-m-d H:i:s'),
             ':cliente_id' => $orden->clienteId(),
+            ':do_anio' => $orden->doAnio(),
             ':do_numero' => $orden->doNumero(),
         ] + $this->parametrosEmbarque($orden));
 
@@ -193,6 +188,20 @@ final class PdoSalidaOrdenRepository implements SalidaOrdenRepositoryInterface
         }
 
         return $resultado;
+    }
+
+    /**
+     * Siguiente consecutivo DO del ano. Bloquea las filas del ano (FOR UPDATE) para que dos DO
+     * generados al mismo tiempo no tomen el mismo numero: llamar dentro del UnitOfWork.
+     */
+    public function siguienteNumeroDo(int $anio): int
+    {
+        $stmt = $this->connection->prepare(
+            'SELECT COALESCE(MAX(do_numero), 0) + 1 FROM salida_ordenes WHERE do_anio = :anio FOR UPDATE'
+        );
+        $stmt->execute([':anio' => $anio]);
+
+        return (int) $stmt->fetchColumn();
     }
 
     public function existeNumeroDo(int $anio, int $numero, string $exceptoOrdenId): bool
@@ -314,7 +323,7 @@ final class PdoSalidaOrdenRepository implements SalidaOrdenRepositoryInterface
         // otra), para que trafico y bodega sepan cuales no se suben.
         $quedan = $this->connection->prepare(
             "SELECT l.codigo, l.orden_en_carga, l.estado, u.codigo AS ubicacion,
-                    (SELECT CONCAT('DO.', s.do_numero) FROM salida_lineas x JOIN salida_ordenes s ON s.id = x.salida_orden_id
+                    (SELECT COALESCE(CONCAT('DO.', s.do_numero), s.codigo) FROM salida_lineas x JOIN salida_ordenes s ON s.id = x.salida_orden_id
                      WHERE x.lpn_id = l.id AND s.estado <> 'cancelada' ORDER BY s.created_at DESC LIMIT 1) AS otra_salida
              FROM lpns l
              LEFT JOIN ubicaciones u ON u.id = l.ubicacion_id

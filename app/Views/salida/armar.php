@@ -24,10 +24,13 @@ if ($ordenDestino !== null) {
     $pageSubtitle = 'Mismo contenedor: los bultos nuevos se suman a la salida y bodega los escanea';
     $backHref = '/salidas/' . $ordenDestino->id();
 } else {
-    $pageTitle = 'Armar salida';
-    $pageSubtitle = 'Contenedor y cargas que suben; bodega las escanea al cargar';
-    $backHref = '/salidas/historial';
+    // Toda salida empieza como OS: solo se arman las cargas. El DO y el contenedor los pone
+    // trafico despues, desde Orden de Salida ("Generar DO").
+    $pageTitle = 'Crear OS (orden de salida)';
+    $pageSubtitle = 'Elija las cargas que salen; bodega las escanea y trafico genera el DO y el contenedor';
+    $backHref = '/salidas/ordenes';
 }
+$conContenedor = false;
 require __DIR__ . '/../partials/header.php';
 
 $valor = static fn (string $campo): string => htmlspecialchars($embarque[$campo] ?? '');
@@ -51,6 +54,10 @@ $listas = count(array_filter($cargas, static fn (array $c) => $c['listos'] > 0))
             <span>Naviera: <strong class="text-black"><?= htmlspecialchars($ordenDestino->embarque()->navieraNombre ?? '—') ?></strong></span>
             <span>Ya lleva: <strong class="text-black"><?= $progresoDestino['total'] ?></strong> bultos (<?= $progresoDestino['escaneadas'] ?> escaneados)</span>
         </div>
+    </div>
+    <?php elseif (!$conContenedor): ?>
+    <div class="bg-sky-50 border border-sky-200 text-sky-900 text-sm rounded-xl px-4 py-3 mb-6">
+        Se crea una <strong>OS (orden de salida)</strong>, todavia sin DO. Bodega ya puede escanearla; <strong>trafico</strong> genera el DO y llena el contenedor (naviera, barco, fechas).
     </div>
     <?php else: ?>
     <div class="bg-white rounded-xl shadow-sm p-6 mb-6">
@@ -96,7 +103,7 @@ $listas = count(array_filter($cargas, static fn (array $c) => $c['listos'] > 0))
 
     <div class="bg-white rounded-xl shadow-sm p-6 mb-4">
         <div class="flex flex-wrap items-start justify-between gap-4 mb-4">
-            <?= card_header('box', $ordenDestino !== null ? 'Cargas que se agregan al contenedor' : '2. Cargas que suben al contenedor', 'amber') ?>
+            <?= card_header('box', $ordenDestino !== null ? 'Cargas que se agregan al contenedor' : ($conContenedor ? '2. Cargas que suben al contenedor' : 'Cargas que salen'), 'amber') ?>
             <div class="flex flex-wrap items-center gap-3">
                 <input type="search" id="armar-buscar" placeholder="Buscar cliente, marca, tracking o compania..."
                        class="w-72 rounded-lg border border-zinc-300 bg-white text-black px-3 py-2 text-sm focus:ring-2 focus:ring-amber-400 focus:outline-none">
@@ -259,7 +266,7 @@ $listas = count(array_filter($cargas, static fn (array $c) => $c['listos'] > 0))
             </div>
             <button type="submit" id="armar-crear" disabled
                     class="inline-flex items-center gap-2 bg-amber-500 text-black rounded-lg px-6 py-2.5 font-medium hover:bg-amber-400 transition disabled:opacity-40 disabled:cursor-not-allowed">
-                <?= icon_small('check') ?><span><?= $ordenDestino !== null ? 'Agregar a ' . htmlspecialchars($ordenDestino->numeroDo()) : 'Crear salida (DO)' ?></span>
+                <?= icon_small('check') ?><span><?= $ordenDestino !== null ? 'Agregar a ' . htmlspecialchars($ordenDestino->numeroDo()) : ($conContenedor ? 'Crear salida (DO)' : 'Crear OS') ?></span>
             </button>
         </div>
     </div>

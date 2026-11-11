@@ -84,7 +84,25 @@ function badge(string $texto, string $color = 'slate'): string
 /** Imprimir (etiquetas, comprobantes, manifiestos, reportes) es de trafico, gerencia y owner; bodega no imprime. */
 function puede_imprimir(): bool
 {
+    return in_array($_SESSION['usuario_rol'] ?? null, ['inventario', 'operaciones', 'gerente', 'admin'], true);
+}
+
+/** Armar la orden de salida: elegir cargas/bultos, agregar, ajustar, devolver a bodega, cancelar. */
+function puede_armar_salida(): bool
+{
+    return in_array($_SESSION['usuario_rol'] ?? null, ['inventario', 'operaciones', 'gerente', 'admin'], true);
+}
+
+/** Ordenar el contenedor: generar el DO, datos del embarque, unir y mover cargas entre DO (trafico). */
+function puede_ordenar_contenedor(): bool
+{
     return in_array($_SESSION['usuario_rol'] ?? null, ['operaciones', 'gerente', 'admin'], true);
+}
+
+/** Confirmar la salida cuando el contenedor sale (inventario). */
+function puede_confirmar_salida(): bool
+{
+    return in_array($_SESSION['usuario_rol'] ?? null, ['inventario', 'gerente', 'admin'], true);
 }
 
 function url_archivo_publico(string $ruta): string

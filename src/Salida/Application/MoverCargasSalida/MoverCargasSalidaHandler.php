@@ -75,6 +75,12 @@ final class MoverCargasSalidaHandler implements CommandHandlerInterface
         $cargaIds = [];
 
         $this->unitOfWork->run(function () use ($origen, $destino, $despachar, $lpnsMovidos, &$cargaIds): void {
+            // DO nueva (trafico saco la carga a otro contenedor): recibe su consecutivo DO.
+            if (!$destino->tieneDo() && $this->ordenes->findById($destino->id()) === null) {
+                $anio = (int) date('Y');
+                $destino->asignarDo($anio, $this->ordenes->siguienteNumeroDo($anio));
+            }
+
             $this->ordenes->save($destino);
             $this->ordenes->save($origen);
             $this->ordenes->pasarFotosDeCargasMovidas($origen->id(), $destino->id());

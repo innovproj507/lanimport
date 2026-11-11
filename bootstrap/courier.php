@@ -295,6 +295,7 @@ $container->set(SalidaOrdenRepositoryInterface::class, fn (Container $c) => new 
 $container->set(ActualizarEmbarqueSalidaHandler::class, fn (Container $c) => new ActualizarEmbarqueSalidaHandler(
     $c->get(SalidaOrdenRepositoryInterface::class),
     $c->get(NavieraRepositoryInterface::class),
+    $c->get(UnitOfWork::class),
 ));
 
 $container->set(CrearOrdenSalidaHandler::class, fn (Container $c) => new CrearOrdenSalidaHandler(

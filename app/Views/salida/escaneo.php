@@ -9,12 +9,17 @@ use App\Libraries\Csrf;
 require_once __DIR__ . '/../partials/view_helpers.php';
 $pageTitle = 'Salida ' . $orden->etiquetaDo();
 $pageSubtitle = (str_contains($clienteNombre, ', ') ? 'Clientes: ' : 'Cliente: ') . $clienteNombre;
-$backHref = '/salidas/historial';
+// Una OS sin DO vuelve a Orden de Salida; con DO, a Salidas.
+$backHref = !$orden->tieneDo() && $orden->estado()->value === 'pendiente' ? '/salidas/ordenes' : '/salidas/historial';
 // Bodega escanea desde la PDA mientras trafico mira: la pantalla revisa cambios cada 8 s (vivo.js).
 $vivoSegundos = 8;
-// Bodega escanea y finaliza; agregar cargas, cancelar y el embarque los decide trafico/gerencia.
-$planifica = in_array($_SESSION['usuario_rol'] ?? null, ['operaciones', 'gerente', 'admin'], true);
-$headerActions = ($planifica && $orden->estado()->value === 'pendiente' ? header_button('/salidas/' . $orden->id() . '/agregar', 'plus', 'Agregar cargas', 'emerald') : '')
+// Bodega escanea. Inventario (y trafico) arma la orden: agregar, ajustar, devolver, cancelar.
+// Trafico ordena el contenedor: genera el DO, embarque, unir y mover. Inventario confirma la salida.
+$armaSalida = puede_armar_salida();
+$ordenaContenedor = puede_ordenar_contenedor();
+$confirmaSalida = puede_confirmar_salida();
+$sinDo = !$orden->tieneDo();
+$headerActions = ($armaSalida && $orden->estado()->value === 'pendiente' ? header_button('/salidas/' . $orden->id() . '/agregar', 'plus', 'Agregar cargas', 'emerald') : '')
     // Lo que trafico imprime y entrega a bodega (bodega no imprime): las etiquetas exactas que suben al contenedor.
     . (puede_imprimir()
         ? header_button('/salidas/' . $orden->id() . '/orden-carga', 'printer', 'Orden de carga (bodega)', 'emerald')
@@ -45,10 +50,23 @@ $claseInput = 'w-full rounded-lg border border-zinc-300 bg-white text-black px-3
 <form method="post" action="/salidas/<?= htmlspecialchars($orden->id()) ?>/embarque" id="salida-embarque" data-vivo-region="<?= htmlspecialchars($vivoDo) ?>" class="bg-white rounded-xl shadow-sm p-6 mb-6">
     <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
     <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
-        <?= card_header('truck', 'Datos del embarque', 'sky') ?>
-        <span class="text-sm text-zinc-500">Consecutivo: <strong class="text-black"><?= htmlspecialchars($orden->etiquetaDo()) ?></strong></span>
+        <?= card_header('truck', $sinDo ? 'Generar DO y ordenar contenedor' : 'Datos del embarque', 'sky') ?>
+        <span class="text-sm text-zinc-500">
+            <?php if ($sinDo): ?>
+                Orden <strong class="text-black"><?= htmlspecialchars($orden->etiquetaDo()) ?></strong> <?= badge('Sin DO', 'amber') ?>
+            <?php else: ?>
+                Consecutivo: <strong class="text-black"><?= htmlspecialchars($orden->etiquetaDo()) ?></strong>
+            <?php endif; ?>
+        </span>
     </div>
-    <fieldset <?= $cancelada || !$planifica ? 'disabled' : '' ?> class="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <?php if ($sinDo && !$cancelada): ?>
+        <p class="text-sm mb-4 rounded-lg px-3 py-2 <?= $ordenaContenedor ? 'bg-sky-50 text-sky-900' : 'bg-amber-50 text-amber-900' ?>">
+            <?= $ordenaContenedor
+                ? 'OS armada por inventario. Llene el contenedor y pulse "Generar DO": toma el siguiente numero del ano (o escriba uno).'
+                : 'Esperando que trafico genere el DO y ordene el contenedor. Bodega ya puede escanear.' ?>
+        </p>
+    <?php endif; ?>
+    <fieldset <?= $cancelada || !$ordenaContenedor ? 'disabled' : '' ?> class="grid grid-cols-1 md:grid-cols-3 gap-4">
         <?php if ($orden->doNumero() !== null): ?>
             <?php // Trafico puede corregir el consecutivo; si ya existe otro DO con ese numero en el ano, avisa. ?>
             <div>
@@ -57,6 +75,16 @@ $claseInput = 'w-full rounded-lg border border-zinc-300 bg-white text-black px-3
                     <span class="text-sm font-medium text-zinc-500">DO.</span>
                     <input type="number" name="numero_do" min="1" max="999999" required value="<?= (int) $orden->doNumero() ?>" class="<?= $claseInput ?>">
                     <span class="text-sm font-medium text-zinc-500 whitespace-nowrap">/ <?= (int) $orden->doAnio() ?></span>
+                </div>
+            </div>
+        <?php elseif ($ordenaContenedor): ?>
+            <?php // Sin DO: vacio = siguiente consecutivo del ano; o trafico escribe el numero. ?>
+            <div>
+                <label class="block text-sm font-medium text-zinc-700 mb-1">Numero de DO</label>
+                <div class="flex items-center gap-2">
+                    <span class="text-sm font-medium text-zinc-500">DO.</span>
+                    <input type="number" name="numero_do" min="1" max="999999" placeholder="Siguiente" class="<?= $claseInput ?>">
+                    <span class="text-sm font-medium text-zinc-500 whitespace-nowrap">/ <?= date('Y') ?></span>
                 </div>
             </div>
         <?php endif; ?>
@@ -91,13 +119,13 @@ $claseInput = 'w-full rounded-lg border border-zinc-300 bg-white text-black px-3
             <label class="block text-sm font-medium text-zinc-700 mb-1">Fecha de salida (ETD)</label>
             <input type="date" name="fecha_salida_etd" value="<?= htmlspecialchars($embarque->fechaSalidaEtd?->format('Y-m-d') ?? '') ?>" class="<?= $claseInput ?>">
         </div>
-        <div class="<?= $orden->doNumero() !== null ? '' : 'md:col-span-2' ?>">
+        <div class="<?= $orden->doNumero() !== null || $ordenaContenedor ? '' : 'md:col-span-2' ?>">
             <label class="block text-sm font-medium text-zinc-700 mb-1">Destino final</label>
             <input type="text" name="destino_final" maxlength="190" placeholder="Ej: Caracas, Venezuela" value="<?= htmlspecialchars($embarque->destinoFinal ?? '') ?>" class="<?= $claseInput ?>">
         </div>
         <div class="flex items-end">
             <button type="submit" class="w-full inline-flex justify-center items-center gap-2 bg-amber-500 text-black rounded-lg px-4 py-2 font-medium hover:bg-amber-400 transition disabled:opacity-40">
-                <?= icon_small('check') ?><span>Guardar datos del embarque</span>
+                <?= icon_small('check') ?><span><?= $sinDo ? 'Generar DO' : 'Guardar datos del embarque' ?></span>
             </button>
         </div>
     </fieldset>
@@ -130,21 +158,22 @@ $claseInput = 'w-full rounded-lg border border-zinc-300 bg-white text-black px-3
         <div class="mt-4 flex gap-3 flex-wrap items-center">
             <?php // Marca de DO abierto: con "En vivo", si desaparece (otro lo confirmo o cancelo) se deja de escanear. ?>
             <span id="salida-abierta" hidden></span>
-            <?php if ($planifica): ?>
-            <?php // Manual: terminar de escanear NO confirma. Trafico/gerencia confirman cuando el contenedor sale. ?>
+            <?php if ($confirmaSalida): ?>
+            <?php // Manual: terminar de escanear NO confirma. Inventario confirma cuando el contenedor sale (con DO). ?>
             <form method="post" action="/salidas/<?= htmlspecialchars($orden->id()) ?>/finalizar"
                   onsubmit="return confirm('¿El contenedor de <?= htmlspecialchars($orden->etiquetaDo()) ?> YA SALIO?\n\nAl confirmar:\n- Sus cargas pasan a En transito y salen del inventario.\n- Se avisa al cliente por correo que su carga fue despachada.\n\nSi el contenedor todavia no sale, pulse Cancelar.');">
                 <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
-                <button type="submit" id="salida-confirmar-btn" <?= $progreso['escaneadas'] < $progreso['total'] ? 'disabled' : '' ?>
-                        title="Pulse solo cuando el contenedor haya salido"
+                <button type="submit" id="salida-confirmar-btn" <?= $progreso['escaneadas'] < $progreso['total'] || $sinDo ? 'disabled' : '' ?> <?= $sinDo ? 'data-sin-do' : '' ?>
+                        title="<?= $sinDo ? 'Falta que trafico genere el DO' : 'Pulse solo cuando el contenedor haya salido' ?>"
                         class="inline-flex items-center gap-2 bg-emerald-500 text-black rounded-lg px-4 py-2 text-sm font-medium hover:bg-emerald-400 transition disabled:opacity-40 disabled:cursor-not-allowed">
                     <?= icon_small('check') ?><span>Confirmar salida (el contenedor salio)</span>
                 </button>
             </form>
+            <?php if ($sinDo): ?><span class="text-xs text-amber-700">Se puede confirmar cuando trafico genere el DO.</span><?php endif; ?>
             <?php elseif ($progreso['total'] > 0 && $progreso['escaneadas'] >= $progreso['total']): ?>
-                <p class="text-sm text-emerald-700 font-medium">Escaneo completo. Trafico confirma la salida cuando el contenedor salga.</p>
+                <p class="text-sm text-emerald-700 font-medium">Escaneo completo. Inventario confirma la salida cuando el contenedor salga.</p>
             <?php endif; ?>
-            <?php if ($planifica): ?>
+            <?php if ($armaSalida): ?>
             <form method="post" action="/salidas/<?= htmlspecialchars($orden->id()) ?>/cancelar"
                   onsubmit="return confirm('¿Cancelar <?= htmlspecialchars($orden->etiquetaDo()) ?>? Se elimina el DO y sus bultos vuelven a quedar disponibles en bodega.');">
                 <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
@@ -165,7 +194,7 @@ $claseInput = 'w-full rounded-lg border border-zinc-300 bg-white text-black px-3
 <?php
 // Organizar el contenedor (trafico/gerencia): unir este DO a otro del mismo contenedor.
 $otrasSalidas ??= [];
-$puedeOrganizar = $planifica && !$confirmada && !$cancelada && $otrasSalidas !== [];
+$puedeOrganizar = $ordenaContenedor && !$confirmada && !$cancelada && $otrasSalidas !== [];
 $opcionSalida = static fn (array $s): string => $s['etiqueta']
     . ($s['estado'] === 'confirmada' ? ' (confirmada)' : '')
     . ($s['contenedor'] ? ' · ' . $s['contenedor'] : '')
@@ -248,18 +277,19 @@ $opcionSalida = static fn (array $s): string => $s['etiqueta']
                                     Parcial: <?= $grupo['total'] ?> de <?= $grupo['total'] + count($quedan) ?> suben · <?= count($quedan) ?> se quedan
                                 </span>
                             <?php endif; ?>
-                            <?php if ($planifica && !$confirmada && !$cancelada && !str_starts_with($grupo['cargaId'], 'caja-')): ?>
+                            <?php if ($armaSalida && !$confirmada && !$cancelada && !str_starts_with($grupo['cargaId'], 'caja-')): ?>
                                 <?php // Elegir que bultos de esta carga suben a este contenedor (p.ej. 20 de 143); el resto vuelve a bodega. ?>
                                 <button type="button" class="salida-ajustar mt-1 inline-flex items-center gap-1 rounded-lg border border-amber-400 bg-amber-50 px-2 py-0.5 font-sans font-medium text-xs text-amber-800 hover:bg-amber-100"
                                         data-carga="<?= htmlspecialchars($grupo['cargaId']) ?>" data-tracking="<?= htmlspecialchars($grupo['tracking']) ?>">
                                     <?= icon_small('pencil', 'w-3 h-3') ?> Ajustar bultos
                                 </button>
                             <?php endif; ?>
-                            <?php if ($planifica && !$confirmada && !$cancelada): ?>
-                                <?php // Sacar la carga de este DO: a otro DO (conserva lo escaneado) o de vuelta a bodega. ?>
+                            <?php if ($armaSalida && !$confirmada && !$cancelada): ?>
+                                <?php // Sacar la carga de este DO: a otro DO (trafico; conserva lo escaneado) o de vuelta a bodega. ?>
                                 <details class="mt-1 font-sans font-normal">
                                     <summary class="text-xs text-violet-700 cursor-pointer hover:underline">Sacar</summary>
                                     <div class="mt-2 p-3 rounded-lg border border-slate-200 bg-white space-y-2 w-80">
+                                        <?php if ($ordenaContenedor): ?>
                                         <form method="post" action="/salidas/<?= htmlspecialchars($orden->id()) ?>/mover-carga" class="flex gap-2 items-center">
                                             <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
                                             <input type="hidden" name="grupo" value="<?= htmlspecialchars($grupo['cargaId']) ?>">
@@ -271,6 +301,7 @@ $opcionSalida = static fn (array $s): string => $s['etiqueta']
                                             </select>
                                             <button type="submit" class="rounded-lg bg-violet-600 text-white px-3 py-1 text-xs font-medium hover:bg-violet-500">Mover</button>
                                         </form>
+                                        <?php endif; ?>
                                         <form method="post" action="/salidas/<?= htmlspecialchars($orden->id()) ?>/devolver-carga"
                                               onsubmit="return confirm('¿Devolver <?= htmlspecialchars($grupo['tracking']) ?> a bodega? Sus <?= $grupo['total'] ?> bultos salen de este DO y quedan disponibles.');">
                                             <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
@@ -310,7 +341,7 @@ $opcionSalida = static fn (array $s): string => $s['etiqueta']
     </div>
 </div>
 
-<?php if ($planifica && !$confirmada && !$cancelada): ?>
+<?php if ($armaSalida && !$confirmada && !$cancelada): ?>
 <!-- Ajustar bultos: trafico deja marcados solo los bultos de la carga que suben a este contenedor -->
 <div id="modal-ajustar" class="hidden fixed inset-0 bg-black/60 z-50 items-center justify-center p-4">
     <form method="post" action="/salidas/<?= htmlspecialchars($orden->id()) ?>/ajustar-carga" class="bg-white rounded-xl shadow-xl max-w-xl w-full flex flex-col max-h-[88vh]">

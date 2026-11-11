@@ -5,7 +5,7 @@
 require_once __DIR__ . '/../partials/view_helpers.php';
 
 $headerActions = '';
-if (in_array($rol, ['operaciones', 'bodega', 'gerente', 'admin'], true)) {
+if (in_array($rol, ['inventario', 'operaciones', 'bodega', 'gerente', 'admin'], true)) {
     $headerActions .= header_button('/cargas/ingreso', 'plus', 'Ingreso de Carga', 'amber');
 }
 

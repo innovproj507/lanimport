@@ -5,8 +5,8 @@
 /** @var array<string, array<int, string>> $aduanerosPorOrden ordenId => aduaneros de sus cargas */
 /** @var array<int, \Courier\Cliente\Domain\Cliente> $clientes */
 /** @var array{estado: string, cliente_id: string} $filtros */
-$pageTitle = 'Historial de salidas';
-$pageSubtitle = 'Ordenes de salida creadas';
+$pageTitle = 'Contenedor';
+$pageSubtitle = 'DO de cada contenedor: datos del embarque, escaneo y confirmacion';
 require __DIR__ . '/../partials/header.php';
 
 $estados = [
@@ -37,9 +37,9 @@ foreach ($clientes as $c) {
 }
 ?>
 
-<?php if (in_array($_SESSION['usuario_rol'] ?? null, ['operaciones', 'gerente', 'admin'], true)): // armar salidas: trafico/gerencia ?>
+<?php if (puede_armar_salida()): // armar orden de salida: inventario y trafico ?>
 <div class="flex justify-end mb-4">
-    <?= header_button('/salidas', 'plus', 'Armar salida', 'amber') ?>
+    <?= puede_ordenar_contenedor() ? header_button('/salidas/crear-do', 'plus', 'Crear DO', 'amber') : header_button('/salidas', 'plus', 'Crear OS', 'amber') ?>
 </div>
 <?php endif; ?>
 
@@ -84,7 +84,7 @@ foreach ($clientes as $c) {
 
 <?php
 // Unificar: trafico/gerencia marcan varios DO pendientes y eligen en cual quedan (mismo contenedor).
-$puedeUnificar = in_array($_SESSION['usuario_rol'] ?? null, ['operaciones', 'gerente', 'admin'], true);
+$puedeUnificar = puede_ordenar_contenedor();
 ?>
 <?php if (!empty($errorUnificar)): ?>
     <div class="bg-red-50 border border-red-300 text-red-800 rounded-xl px-4 py-3 mb-4 text-sm"><?= htmlspecialchars($errorUnificar) ?></div>
@@ -138,6 +138,10 @@ $puedeUnificar = in_array($_SESSION['usuario_rol'] ?? null, ['operaciones', 'ger
                             <a href="/salidas/<?= htmlspecialchars($orden->id()) ?>" class="text-amber-600 hover:underline">
                                 <?= htmlspecialchars($orden->etiquetaDo()) ?>
                             </a>
+                            <?php if (!$orden->tieneDo() && $orden->estado()->value === 'pendiente'): ?>
+                                <?php // Orden de salida de inventario: trafico debe generar el DO y ordenar el contenedor. ?>
+                                <span class="block mt-1"><?= badge('Sin DO', 'amber') ?></span>
+                            <?php endif; ?>
                         </td>
                         <?php // Se muestra el aduanero; los clientes quedan al pasar el mouse. ?>
                         <td class="py-2 pr-4 text-zinc-700" title="Clientes: <?= htmlspecialchars(implode(', ', $clientesPorOrden[$orden->id()] ?? [$mapaClientes[$orden->clienteId() ?? ''] ?? '—'])) ?>"><?= htmlspecialchars(implode(', ', $aduanerosPorOrden[$orden->id()] ?? ['—'])) ?></td>

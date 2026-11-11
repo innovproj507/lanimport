@@ -224,24 +224,19 @@ final class SalidaController extends BaseController
             // Por cada carga marcada entran sus bultos escaneados y libres (o solo los N que indico
             // trafico); el resto queda en bodega.
             $lpnIds = array_merge($this->lpnsDeCargasMarcadas($cargaIds), $cajaIds);
-
+            // Toda salida nace como OS (solo cargas): sin DO ni contenedor. Trafico los pone despues
+            // desde Orden de Salida ("Generar DO").
             $ordenId = $this->container()->get(CrearOrdenSalidaHandler::class)->handle(new CrearOrdenSalidaCommand(
                 null,
                 $lpnIds,
                 null,
                 (string) $sessionManager->currentUsuarioId(),
-                [
-                    'numeroContenedor' => $embarque['numero_contenedor'],
-                    'numeroSello' => $embarque['numero_sello'],
-                    'navieraId' => $embarque['naviera_id'],
-                    'nombreBarco' => $embarque['nombre_barco'],
-                    'fechaCargue' => $embarque['fecha_cargue'],
-                    'fechaSalidaEtd' => $embarque['fecha_salida_etd'],
-                    'destinoFinal' => $embarque['destino_final'],
-                ],
+                null,
+                false,
             ));
 
-            $_SESSION['salida_mensaje'] = 'Salida creada con ' . count($lpnIds) . ' bultos (' . count($cargaIds) . ' carga(s)' . ($cajaIds !== [] ? ' y ' . count($cajaIds) . ' caja(s) reempacada(s)' : '') . '). Imprima la "Orden de carga (bodega)" y entreguela a bodega para que los escanee al cargar el contenedor.';
+            $resumen = count($lpnIds) . ' bultos (' . count($cargaIds) . ' carga(s)' . ($cajaIds !== [] ? ' y ' . count($cajaIds) . ' caja(s) reempacada(s)' : '') . ')';
+            $_SESSION['salida_mensaje'] = "OS creada con {$resumen}. Bodega ya puede escanearla; trafico debe generar el DO y ordenar el contenedor.";
 
             return redirect()->to('/salidas/' . $ordenId);
         } catch (ValidationException $e) {
@@ -293,6 +288,9 @@ final class SalidaController extends BaseController
     public function guardarEmbarque(string $id): RedirectResponse
     {
         if (Csrf::verify($this->request->getPost('_csrf'))) {
+            $repositorio = $this->container()->get(SalidaOrdenRepositoryInterface::class);
+            $teniaDo = $repositorio->findById($id)?->tieneDo() ?? true;
+
             try {
                 $this->container()->get(ActualizarEmbarqueSalidaHandler::class)->handle(new ActualizarEmbarqueSalidaCommand(
                     $id,
@@ -305,7 +303,9 @@ final class SalidaController extends BaseController
                     (string) $this->request->getPost('destino_final'),
                     (string) $this->request->getPost('numero_do'),
                 ));
-                $_SESSION['salida_mensaje'] = 'Datos del embarque guardados.';
+                $_SESSION['salida_mensaje'] = $teniaDo
+                    ? 'Datos del embarque guardados.'
+                    : 'DO generado: ' . ($repositorio->findById($id)?->etiquetaDo() ?? '') . '. Inventario confirma la salida cuando el contenedor salga.';
             } catch (ValidationException|NotFoundException $e) {
                 $_SESSION['salida_error'] = $e->getMessage();
             }
@@ -480,8 +480,11 @@ final class SalidaController extends BaseController
             $this->container()->get(ConfirmarSalidaHandler::class)->handle($command);
 
             return redirect()->to('/salidas/' . $id);
-        } catch (NotFoundException|ValidationException) {
-            return $this->show($id);
+        } catch (NotFoundException|ValidationException $e) {
+            // Se dice por que no se confirmo (p.ej. falta escanear o trafico aun no genera el DO).
+            $_SESSION['salida_error'] = $e->getMessage();
+
+            return redirect()->to('/salidas/' . $id);
         }
     }
 
@@ -712,6 +715,134 @@ final class SalidaController extends BaseController
         }, $ordenes);
     }
 
+    /**
+     * Crear DO (Salidas, trafico): datos del contenedor + las OS que suben a el. La primera OS
+     * marcada recibe el DO y el embarque; las demas se le unen (con lo escaneado y sus fotos).
+     */
+    public function crearDoForm(): string
+    {
+        $os = trim((string) ($this->request->getGet('os') ?? ''));
+
+        return $this->renderCrearDo(null, $os !== '' ? [$os] : [], []);
+    }
+
+    public function crearDo(): RedirectResponse|string
+    {
+        $osIds = array_values(array_unique(array_filter(array_map('trim', (array) $this->request->getPost('os_ids')))));
+        $embarque = [];
+
+        foreach (['numero_do', 'numero_contenedor', 'numero_sello', 'naviera_id', 'nombre_barco', 'fecha_cargue', 'fecha_salida_etd', 'destino_final'] as $campo) {
+            $embarque[$campo] = trim((string) ($this->request->getPost($campo) ?? ''));
+        }
+
+        if (!Csrf::verify($this->request->getPost('_csrf'))) {
+            return $this->renderCrearDo('Sesion expirada, intente de nuevo.', $osIds, $embarque);
+        }
+
+        if ($osIds === []) {
+            return $this->renderCrearDo('Marque al menos una OS que sube a este contenedor.', $osIds, $embarque);
+        }
+
+        $repositorio = $this->container()->get(SalidaOrdenRepositoryInterface::class);
+        $destino = $repositorio->findById($osIds[0]);
+
+        if ($destino === null || $destino->tieneDo() || $destino->estado()->value !== 'pendiente') {
+            return $this->renderCrearDo('La OS elegida ya no esta pendiente de DO. Recargue la pagina.', $osIds, $embarque);
+        }
+
+        try {
+            // La primera OS recibe el DO y el contenedor (valida contenedor y numero de DO).
+            $this->container()->get(ActualizarEmbarqueSalidaHandler::class)->handle(new ActualizarEmbarqueSalidaCommand(
+                $destino->id(),
+                $embarque['numero_contenedor'],
+                $embarque['numero_sello'],
+                $embarque['naviera_id'],
+                $embarque['nombre_barco'],
+                $embarque['fecha_cargue'],
+                $embarque['fecha_salida_etd'],
+                $embarque['destino_final'],
+                $embarque['numero_do'],
+            ));
+        } catch (ValidationException|NotFoundException $e) {
+            return $this->renderCrearDo($e->getMessage(), $osIds, $embarque);
+        }
+
+        // Las demas OS del mismo contenedor se unen a ese DO.
+        $usuarioId = (string) $this->container()->get(SessionManager::class)->currentUsuarioId();
+        $errores = [];
+
+        foreach (array_slice($osIds, 1) as $origenId) {
+            $etiqueta = $repositorio->findById($origenId)?->etiquetaDo() ?? $origenId;
+
+            try {
+                $this->container()->get(MoverCargasSalidaHandler::class)->handle(
+                    new MoverCargasSalidaCommand($origenId, $destino->id(), null, $usuarioId),
+                );
+            } catch (NotFoundException|ValidationException|\Courier\Shared\Domain\Exception\DomainException $e) {
+                $errores[] = "{$etiqueta}: {$e->getMessage()}";
+            }
+        }
+
+        $do = $repositorio->findById($destino->id());
+        $_SESSION['salida_mensaje'] = 'DO creado: ' . ($do?->etiquetaDo() ?? '') . ' con ' . count($osIds) . ' OS. Inventario confirma la salida cuando el contenedor salga.';
+
+        if ($errores !== []) {
+            $_SESSION['salida_error'] = 'No se pudieron unir: ' . implode(' · ', $errores);
+        }
+
+        return redirect()->to('/salidas/' . $destino->id());
+    }
+
+    /**
+     * @param array<int, string> $seleccionadas OS marcadas
+     * @param array<string, string> $embarque datos ya escritos (si hubo un error)
+     */
+    private function renderCrearDo(?string $error, array $seleccionadas, array $embarque): string
+    {
+        if ($error !== null) {
+            $this->response->setStatusCode(422);
+        }
+
+        $ordenes = array_values(array_filter(
+            $this->container()->get(ListarOrdenesSalidaHandler::class)->handle(new ListarOrdenesSalidaQuery('pendiente', null)),
+            static fn ($o) => !$o->tieneDo(),
+        ));
+        usort($ordenes, static fn ($a, $b) => $a->createdAt() <=> $b->createdAt());
+        $repositorio = $this->container()->get(SalidaOrdenRepositoryInterface::class);
+        $ids = array_map(static fn ($o) => $o->id(), $ordenes);
+
+        return view('salida/crear_do', [
+            'ordenes' => $ordenes,
+            'clientesPorOrden' => $repositorio->clientesPorOrden($ids),
+            'aduanerosPorOrden' => $repositorio->aduanerosPorOrden($ids),
+            'navieras' => $this->container()->get(ListarNavierasHandler::class)->handle(new ListarNavierasQuery(true)),
+            'seleccionadas' => $seleccionadas,
+            'embarque' => $embarque,
+            'error' => $error,
+        ]);
+    }
+
+    /**
+     * Orden de Salida (menu propio): las OS que armo inventario y aun no tienen DO. Bodega ya las
+     * puede escanear; trafico las abre para generar el DO y entonces pasan a Salidas.
+     */
+    public function ordenes(): string
+    {
+        $ordenes = array_values(array_filter(
+            $this->container()->get(ListarOrdenesSalidaHandler::class)->handle(new ListarOrdenesSalidaQuery('pendiente', null)),
+            static fn ($o) => !$o->tieneDo(),
+        ));
+
+        $repositorio = $this->container()->get(SalidaOrdenRepositoryInterface::class);
+        $ids = array_map(static fn ($o) => $o->id(), $ordenes);
+
+        return view('salida/ordenes', [
+            'ordenes' => $ordenes,
+            'clientesPorOrden' => $repositorio->clientesPorOrden($ids),
+            'aduanerosPorOrden' => $repositorio->aduanerosPorOrden($ids),
+        ]);
+    }
+
     public function historial(): string
     {
         $estado = (string) ($this->request->getGet('estado') ?? '');
@@ -720,6 +851,12 @@ final class SalidaController extends BaseController
         $ordenes = $this->container()->get(ListarOrdenesSalidaHandler::class)->handle(new ListarOrdenesSalidaQuery(
             $estado !== '' ? $estado : null,
             $clienteId !== '' ? $clienteId : null,
+        ));
+
+        // Salidas = las que ya tienen DO. Las OS pendientes sin DO estan en "Orden de Salida" (ordenes()).
+        $ordenes = array_values(array_filter(
+            $ordenes,
+            static fn ($o) => $o->tieneDo() || $o->estado()->value !== 'pendiente',
         ));
 
         $clientes = $this->container()->get(ListarClientesHandler::class)->handle(new ListarClientesQuery());

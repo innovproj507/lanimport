@@ -14,6 +14,8 @@ final class CrearOrdenSalidaCommand implements CommandInterface
      * @param array<int, string> $lpnIds
      * @param array<string, string|null>|null $embarque datos del contenedor (claves de DatosEmbarque::desdeArreglo,
      *                                                  con navieraId en vez de navieraNombre); null = se cargan despues
+     * @param bool $generarDo true = trafico arma la salida y recibe el DO al crearla; false = orden de
+     *                        salida de inventario, sin DO (trafico lo genera despues al ordenar el contenedor)
      */
     public function __construct(
         public readonly ?string $clienteId,
@@ -21,6 +23,7 @@ final class CrearOrdenSalidaCommand implements CommandInterface
         public readonly ?string $aduaneroIdentificador,
         public readonly string $usuarioId,
         public readonly ?array $embarque = null,
+        public readonly bool $generarDo = true,
     ) {
     }
 }

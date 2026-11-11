@@ -13,7 +13,7 @@
 use App\Libraries\Csrf;
 
 $rolFotos = $_SESSION['usuario_rol'] ?? null;
-$puedeSubirFotos = in_array($rolFotos, ['operaciones', 'bodega', 'gerente', 'admin'], true);
+$puedeSubirFotos = in_array($rolFotos, ['inventario', 'operaciones', 'bodega', 'gerente', 'admin'], true);
 $puedeBorrarFotos = in_array($rolFotos, ['gerente', 'admin'], true);
 $totalFotos = array_sum(array_map(static fn (array $g) => count($g['fotos']), $fotosGrupos));
 ?>

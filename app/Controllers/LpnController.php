@@ -42,7 +42,7 @@ final class LpnController extends BaseController
 
         if ($this->request->getGet('print') !== null) {
             // Bodega no imprime: las etiquetas las imprime trafico, gerencia u owner.
-            if (!in_array($this->container()->get(SessionManager::class)->currentRol(), ['operaciones', 'gerente', 'admin'], true)) {
+            if (!in_array($this->container()->get(SessionManager::class)->currentRol(), ['inventario', 'operaciones', 'gerente', 'admin'], true)) {
                 $this->response->setStatusCode(403);
 
                 return 'Bodega no imprime etiquetas: las imprime trafico, gerencia u owner.';

@@ -27,7 +27,7 @@ $routes->get('/vivo/campana', 'VivoController::campana', ['filter' => 'auth']);
 $routes->get('/portal', 'PortalController::index', ['filter' => ['auth', 'role:cliente']]);
 
 // Tracking — requiere sesion (cualquier rol, salvo bodega)
-$rastreoFilter = ['auth', 'role:cliente,aduanero,operaciones,gerente,admin'];
+$rastreoFilter = ['auth', 'role:cliente,aduanero,inventario,operaciones,gerente,admin'];
 $routes->get('/tracking', 'TrackingController::showLookupForm', ['filter' => $rastreoFilter]);
 $routes->post('/tracking/buscar', 'TrackingController::lookup', ['filter' => $rastreoFilter]);
 
@@ -42,7 +42,7 @@ $routes->group('paises', ['filter' => ['auth', 'role:admin']], static function (
 });
 
 // Aduaneros — requiere sesion + rol operaciones/gerente/admin (igual que $gestionRoles en WebRoutes.php)
-$routes->group('aduaneros', ['filter' => ['auth', 'role:operaciones,gerente,admin']], static function ($routes) {
+$routes->group('aduaneros', ['filter' => ['auth', 'role:inventario,operaciones,gerente,admin']], static function ($routes) {
     $routes->get('/', 'AduaneroController::index');
     $routes->get('buscar', 'AduaneroController::buscar');
     $routes->get('nuevo', 'AduaneroController::showCreateForm');
@@ -54,7 +54,7 @@ $routes->group('aduaneros', ['filter' => ['auth', 'role:operaciones,gerente,admi
 });
 
 // Proveedores — requiere sesion + rol operaciones/gerente/admin (igual que $gestionRoles en WebRoutes.php)
-$routes->group('proveedores', ['filter' => ['auth', 'role:operaciones,gerente,admin']], static function ($routes) {
+$routes->group('proveedores', ['filter' => ['auth', 'role:inventario,operaciones,gerente,admin']], static function ($routes) {
     $routes->get('/', 'ProveedorController::index');
     $routes->get('buscar', 'ProveedorController::buscar');
     $routes->get('nuevo', 'ProveedorController::showCreateForm');
@@ -85,11 +85,11 @@ $routes->post('navieras/(:segment)/eliminar', 'NavieraController::eliminar/$1', 
 
 // rapido de Cliente/Proveedor se usan desde el picker de Ingreso de Carga — requieren
 // $bodegaRoles (incluye bodega), no $gestionRoles, igual que WebRoutes.php linea 62-63.
-$routes->post('clientes/rapido', 'ClienteController::storeRapido', ['filter' => ['auth', 'role:operaciones,bodega,gerente,admin']]);
-$routes->post('proveedores/rapido', 'ProveedorController::storeRapido', ['filter' => ['auth', 'role:operaciones,bodega,gerente,admin']]);
+$routes->post('clientes/rapido', 'ClienteController::storeRapido', ['filter' => ['auth', 'role:inventario,operaciones,bodega,gerente,admin']]);
+$routes->post('proveedores/rapido', 'ProveedorController::storeRapido', ['filter' => ['auth', 'role:inventario,operaciones,bodega,gerente,admin']]);
 
 // Ubicaciones — requiere sesion + rol operaciones/gerente/admin (igual que $gestionRoles en WebRoutes.php)
-$routes->group('ubicaciones', ['filter' => ['auth', 'role:operaciones,gerente,admin']], static function ($routes) {
+$routes->group('ubicaciones', ['filter' => ['auth', 'role:inventario,operaciones,gerente,admin']], static function ($routes) {
     $routes->get('/', 'UbicacionController::index');
     $routes->get('buscar', 'UbicacionController::buscar');
     $routes->get('nuevo', 'UbicacionController::showCreateForm');
@@ -101,7 +101,7 @@ $routes->group('ubicaciones', ['filter' => ['auth', 'role:operaciones,gerente,ad
 });
 
 // Clientes — requiere sesion + rol operaciones/gerente/admin (igual que $gestionRoles en WebRoutes.php)
-$routes->group('clientes', ['filter' => ['auth', 'role:operaciones,gerente,admin']], static function ($routes) {
+$routes->group('clientes', ['filter' => ['auth', 'role:inventario,operaciones,gerente,admin']], static function ($routes) {
     $routes->get('/', 'ClienteController::index');
     $routes->get('buscar', 'ClienteController::buscar');
     $routes->get('nuevo', 'ClienteController::showCreateForm');
@@ -117,9 +117,9 @@ $routes->group('clientes', ['filter' => ['auth', 'role:operaciones,gerente,admin
 
 // Cargas — roles mixtos por ruta, igual que WebRoutes.php (bodegaRoles = operaciones/bodega/gerente/admin,
 // salvo detalle que solo exige sesion, y lpns/eliminar que exige gerente/admin).
-$bodegaFilter = ['auth', 'role:operaciones,bodega,gerente,admin'];
+$bodegaFilter = ['auth', 'role:inventario,operaciones,bodega,gerente,admin'];
 // Imprimir (etiquetas, comprobante, manifiesto, orden de carga, reporte): bodega no imprime.
-$imprimeFilter = ['auth', 'role:operaciones,gerente,admin'];
+$imprimeFilter = ['auth', 'role:inventario,operaciones,gerente,admin'];
 $routes->get('cargas', 'CargaController::redirectToIngreso', ['filter' => $bodegaFilter]);
 $routes->get('cargas/ingreso', 'CargaController::showIngresoForm', ['filter' => $bodegaFilter]);
 $routes->post('cargas', 'CargaController::store', ['filter' => $bodegaFilter]);
@@ -136,13 +136,13 @@ $routes->post('cargas/masiva/confirmar', 'CargaMasivaController::confirmar', ['f
 $routes->get('cargas/(:segment)', 'CargaController::showDetalle/$1', ['filter' => 'auth']);
 $routes->get('cargas/(:segment)/editar', 'CargaController::showEditForm/$1', ['filter' => $bodegaFilter]);
 $routes->post('cargas/(:segment)/editar', 'CargaController::update/$1', ['filter' => $bodegaFilter]);
-$routes->post('cargas/(:segment)/reenviar-correo', 'CargaController::reenviarCorreo/$1', ['filter' => ['auth', 'role:operaciones,gerente,admin']]);
+$routes->post('cargas/(:segment)/reenviar-correo', 'CargaController::reenviarCorreo/$1', ['filter' => ['auth', 'role:inventario,operaciones,gerente,admin']]);
 // Aviso al cliente por WhatsApp (abre wa.me con el mensaje listo): ingreso o despacho.
-$routes->post('cargas/(:segment)/whatsapp/(ingreso|despacho)', 'CargaController::avisarWhatsapp/$1/$2', ['filter' => ['auth', 'role:operaciones,gerente,admin']]);
+$routes->post('cargas/(:segment)/whatsapp/(ingreso|despacho)', 'CargaController::avisarWhatsapp/$1/$2', ['filter' => ['auth', 'role:inventario,operaciones,gerente,admin']]);
 $routes->post('cargas/(:segment)/lpns/generar', 'CargaController::generarLpns/$1', ['filter' => $bodegaFilter]);
 $routes->post('cargas/(:segment)/lpns/imagenes', 'LpnController::generarImagenes/$1', ['filter' => $bodegaFilter]);
 // Borrar una carga ingresada por error (solo sin etiquetas LPN): trafico, gerencia y owner.
-$routes->post('cargas/(:segment)/eliminar', 'CargaController::eliminar/$1', ['filter' => ['auth', 'role:operaciones,gerente,admin']]);
+$routes->post('cargas/(:segment)/eliminar', 'CargaController::eliminar/$1', ['filter' => ['auth', 'role:inventario,operaciones,gerente,admin']]);
 $routes->post('cargas/(:segment)/lpns/eliminar', 'CargaController::eliminarLpns/$1', ['filter' => ['auth', 'role:gerente,admin']]);
 // Fotos de evidencia (se suben por bodega/api/.../fotos): borrarlas, solo gerencia y owner.
 $routes->post('fotos-evidencia/(:segment)/eliminar', 'FotoEvidenciaController::eliminar/$1', ['filter' => ['auth', 'role:gerente,admin']]);
@@ -165,8 +165,8 @@ $routes->group('bodega/api', ['filter' => array_merge($bodegaFilter, ['csrfheade
     $routes->get('salidas', 'Api\BodegaApiController::salidas');
     $routes->get('salidas/(:segment)', 'Api\BodegaApiController::salida/$1');
     $routes->post('salidas/(:segment)/escanear', 'Api\BodegaApiController::salidaEscanear/$1');
-    // Confirmar la salida es manual y de trafico/gerencia (cuando el contenedor sale), no de bodega.
-    $routes->post('salidas/(:segment)/finalizar', 'Api\BodegaApiController::salidaFinalizar/$1', ['filter' => 'role:operaciones,gerente,admin']);
+    // Confirmar la salida es manual y de inventario/gerencia (cuando el contenedor sale), no de bodega.
+    $routes->post('salidas/(:segment)/finalizar', 'Api\BodegaApiController::salidaFinalizar/$1', ['filter' => 'role:inventario,gerente,admin']);
     // Fotos de evidencia: de recepcion (por carga) y de salida (por orden). Tambien las usa la web.
     $routes->get('(cargas|salidas)/(:segment)/fotos', 'Api\FotoEvidenciaApiController::listar/$1/$2');
     $routes->post('(cargas|salidas)/(:segment)/fotos', 'Api\FotoEvidenciaApiController::subir/$1/$2');
@@ -182,30 +182,37 @@ $routes->post('recepcion/escanear', 'LpnController::escanearRecepcion', ['filter
 // Inventario — requiere sesion + rol operaciones/bodega/gerente/admin
 $routes->get('inventario', 'InventarioController::index', ['filter' => $bodegaFilter]);
 
-// Salidas — bodega ve, escanea, finaliza y toma fotos; armar, agregar cargas, cancelar y el embarque
-// los decide trafico/gerencia/owner (bodega no toma decisiones).
+// Salidas — bodega ve, escanea y toma fotos. Inventario (y trafico) arma la orden de salida; trafico
+// ordena el contenedor (genera el DO, embarque, unir/mover); inventario confirma cuando el contenedor sale.
+$armaSalida = ['auth', 'role:inventario,operaciones,gerente,admin'];
+$confirmaSalida = ['auth', 'role:inventario,gerente,admin'];
 $planificaSalida = ['auth', 'role:operaciones,gerente,admin'];
 $routes->get('salidas/historial', 'SalidaController::historial', ['filter' => $bodegaFilter]);
-$routes->get('salidas', 'SalidaController::index', ['filter' => $planificaSalida]);
-$routes->post('salidas', 'SalidaController::store', ['filter' => $planificaSalida]);
+// Orden de Salida: OS de inventario que aun no tienen DO (va antes de salidas/(:segment)).
+$routes->get('salidas/ordenes', 'SalidaController::ordenes', ['filter' => $bodegaFilter]);
+// Crear DO (Salidas): contenedor + las OS que suben a el. Trafico/gerencia/owner.
+$routes->get('salidas/crear-do', 'SalidaController::crearDoForm', ['filter' => $planificaSalida]);
+$routes->post('salidas/crear-do', 'SalidaController::crearDo', ['filter' => $planificaSalida]);
+$routes->get('salidas', 'SalidaController::index', ['filter' => $armaSalida]);
+$routes->post('salidas', 'SalidaController::store', ['filter' => $armaSalida]);
 $routes->get('salidas/(:segment)', 'SalidaController::show/$1', ['filter' => $bodegaFilter]);
 $routes->post('salidas/(:segment)/escanear', 'SalidaController::confirmarEscaneo/$1', ['filter' => $bodegaFilter]);
-// Confirmar la salida (el contenedor ya salio): clic manual de trafico/gerencia, nunca al terminar de escanear.
-$routes->post('salidas/(:segment)/finalizar', 'SalidaController::finalizar/$1', ['filter' => $planificaSalida]);
-$routes->post('salidas/(:segment)/cancelar', 'SalidaController::cancelar/$1', ['filter' => $planificaSalida]);
+// Confirmar la salida (el contenedor ya salio): clic manual de inventario/gerencia, nunca al terminar de escanear.
+$routes->post('salidas/(:segment)/finalizar', 'SalidaController::finalizar/$1', ['filter' => $confirmaSalida]);
+$routes->post('salidas/(:segment)/cancelar', 'SalidaController::cancelar/$1', ['filter' => $armaSalida]);
 // Bultos listos de una carga, para "Elegir etiquetas" al armar el contenedor (va antes de salidas/(:segment)).
-$routes->get('salidas/lpns-listos/(:segment)', 'SalidaController::lpnsListos/$1', ['filter' => $planificaSalida]);
-$routes->get('salidas/(:segment)/agregar', 'SalidaController::agregarForm/$1', ['filter' => $planificaSalida]);
-$routes->post('salidas/(:segment)/agregar', 'SalidaController::agregar/$1', ['filter' => $planificaSalida]);
+$routes->get('salidas/lpns-listos/(:segment)', 'SalidaController::lpnsListos/$1', ['filter' => $armaSalida]);
+$routes->get('salidas/(:segment)/agregar', 'SalidaController::agregarForm/$1', ['filter' => $armaSalida]);
+$routes->post('salidas/(:segment)/agregar', 'SalidaController::agregar/$1', ['filter' => $armaSalida]);
 // Unir este DO a otro del mismo contenedor, pasar una carga a otro DO o devolverla a bodega.
 $routes->post('salidas/(:segment)/unir', 'SalidaController::unir/$1', ['filter' => $planificaSalida]);
 // Unificar varios DO del historial en uno (los marcados pasan al que se elige).
 $routes->post('salidas/unificar', 'SalidaController::unificar', ['filter' => $planificaSalida]);
 $routes->post('salidas/(:segment)/mover-carga', 'SalidaController::moverCarga/$1', ['filter' => $planificaSalida]);
 // Ajustar que bultos de una carga van en el DO (p.ej. 20 de 143): lista y guardar.
-$routes->get('salidas/(:segment)/carga-bultos/(:segment)', 'SalidaController::bultosCarga/$1/$2', ['filter' => $planificaSalida]);
-$routes->post('salidas/(:segment)/ajustar-carga', 'SalidaController::ajustarCarga/$1', ['filter' => $planificaSalida]);
-$routes->post('salidas/(:segment)/devolver-carga', 'SalidaController::devolverCarga/$1', ['filter' => $planificaSalida]);
+$routes->get('salidas/(:segment)/carga-bultos/(:segment)', 'SalidaController::bultosCarga/$1/$2', ['filter' => $armaSalida]);
+$routes->post('salidas/(:segment)/ajustar-carga', 'SalidaController::ajustarCarga/$1', ['filter' => $armaSalida]);
+$routes->post('salidas/(:segment)/devolver-carga', 'SalidaController::devolverCarga/$1', ['filter' => $armaSalida]);
 $routes->post('salidas/(:segment)/embarque','SalidaController::guardarEmbarque/$1', ['filter' => $planificaSalida]);
 $routes->get('salidas/(:segment)/manifiesto', 'SalidaController::manifiesto/$1', ['filter' => $imprimeFilter]);
 $routes->get('salidas/(:segment)/orden-carga', 'SalidaController::ordenCarga/$1', ['filter' => $imprimeFilter]);
@@ -222,7 +229,7 @@ $routes->get('reempaques/(:segment)', 'ReempaqueController::show/$1', ['filter' 
 $routes->post('reempaques/(:segment)/cancelar', 'ReempaqueController::cancelar/$1', ['filter' => $ordenaReempaque]);
 
 // Impresoras — trafico/gerencia/owner (bodega no configura impresoras)
-$routes->get('impresoras', 'ImpresoraController::index', ['filter' => ['auth', 'role:operaciones,gerente,admin']]);
+$routes->get('impresoras', 'ImpresoraController::index', ['filter' => ['auth', 'role:inventario,operaciones,gerente,admin']]);
 
 // Usuarios — solo Owner (rol admin): es parte de Configuracion
 $routes->group('usuarios', ['filter' => ['auth', 'role:admin']], static function ($routes) {

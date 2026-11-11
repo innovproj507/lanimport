@@ -158,7 +158,7 @@ final class PdoCargasParaSalida implements CargasParaSalidaInterface
             "SELECT l.id, l.codigo, l.orden_en_carga, l.estado, u.codigo AS ubicacion,
                     (SELECT COUNT(*) FROM lpns t WHERE t.carga_id = l.carga_id) AS total,
                     aqui.escaneado AS escaneado_aqui, aqui.id AS linea_aqui,
-                    (SELECT CONCAT('DO.', s.do_numero) FROM salida_lineas x JOIN salida_ordenes s ON s.id = x.salida_orden_id
+                    (SELECT COALESCE(CONCAT('DO.', s.do_numero), s.codigo) FROM salida_lineas x JOIN salida_ordenes s ON s.id = x.salida_orden_id
                      WHERE x.lpn_id = l.id AND x.salida_orden_id <> :orden1 AND s.estado = 'pendiente' LIMIT 1) AS otra_salida
              FROM lpns l
              LEFT JOIN ubicaciones u ON u.id = l.ubicacion_id

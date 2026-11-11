@@ -11,13 +11,18 @@ use Courier\Salida\Domain\ValueObject\DatosEmbarque;
 use Courier\Shared\Application\CommandHandlerInterface;
 use Courier\Shared\Application\CommandInterface;
 use Courier\Shared\Domain\Exception\ValidationException;
+use Courier\Shared\Infrastructure\Persistence\UnitOfWork;
 
-/** Guarda o corrige los datos de embarque (contenedor, sello, naviera, barco, fechas, destino). */
+/**
+ * Guarda o corrige los datos de embarque (contenedor, sello, naviera, barco, fechas, destino).
+ * Si la orden de salida aun no tiene DO (la armo inventario), trafico la ordena aqui y se genera el DO.
+ */
 final class ActualizarEmbarqueSalidaHandler implements CommandHandlerInterface
 {
     public function __construct(
         private readonly SalidaOrdenRepositoryInterface $ordenes,
         private readonly NavieraRepositoryInterface $navieras,
+        private readonly UnitOfWork $unitOfWork,
     ) {
     }
 
@@ -45,8 +50,10 @@ final class ActualizarEmbarqueSalidaHandler implements CommandHandlerInterface
         }
 
         $numeroDo = preg_replace('/\D/', '', (string) $command->numeroDo);
+        // Orden de salida de inventario sin DO: se genera abajo, dentro de la transaccion.
+        $generarDo = !$orden->tieneDo();
 
-        if ($numeroDo !== '' && (int) $numeroDo !== $orden->doNumero()) {
+        if (!$generarDo && $numeroDo !== '' && (int) $numeroDo !== $orden->doNumero()) {
             if ($orden->doAnio() !== null && $this->ordenes->existeNumeroDo($orden->doAnio(), (int) $numeroDo, $orden->id())) {
                 throw new ValidationException("Ya existe el DO.{$numeroDo} / {$orden->doAnio()}. Escriba otro numero.");
             }
@@ -65,7 +72,23 @@ final class ActualizarEmbarqueSalidaHandler implements CommandHandlerInterface
             'destinoFinal' => $command->destinoFinal,
         ]));
 
-        $this->ordenes->save($orden);
+        $this->unitOfWork->run(function () use ($orden, $generarDo, $numeroDo): void {
+            if ($generarDo) {
+                $anio = (int) date('Y');
+
+                if ($numeroDo !== '') {
+                    if ($this->ordenes->existeNumeroDo($anio, (int) $numeroDo, $orden->id())) {
+                        throw new ValidationException("Ya existe el DO.{$numeroDo} / {$anio}. Escriba otro numero o dejelo vacio para tomar el siguiente.");
+                    }
+
+                    $orden->asignarDo($anio, (int) $numeroDo);
+                } else {
+                    $orden->asignarDo($anio, $this->ordenes->siguienteNumeroDo($anio));
+                }
+            }
+
+            $this->ordenes->save($orden);
+        });
 
         return null;
     }

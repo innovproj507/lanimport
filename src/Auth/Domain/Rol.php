@@ -12,6 +12,7 @@ enum Rol: string
     case BODEGA = 'bodega';
     case GERENTE = 'gerente';
     case ADMIN = 'admin';
+    case INVENTARIO = 'inventario';
 
     /** Nombre que ve el usuario (el valor interno se conserva por compatibilidad con la BD y la API). */
     public function label(): string
@@ -23,6 +24,7 @@ enum Rol: string
             self::BODEGA => 'Bodega',
             self::GERENTE => 'Gerencia',
             self::ADMIN => 'Owner',
+            self::INVENTARIO => 'Inventario',
         };
     }
 

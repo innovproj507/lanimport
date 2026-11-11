@@ -81,8 +81,13 @@ final class CrearOrdenSalidaHandler implements CommandHandlerInterface
                 $command->usuarioId,
             );
 
-            if ($embarque !== null) {
-                $orden->actualizarEmbarque($embarque);
+            if ($command->generarDo) {
+                $anio = (int) date('Y');
+                $orden->asignarDo($anio, $this->ordenes->siguienteNumeroDo($anio));
+
+                if ($embarque !== null) {
+                    $orden->actualizarEmbarque($embarque);
+                }
             }
 
             $this->ordenes->save($orden);

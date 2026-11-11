@@ -7,8 +7,10 @@ if (session_status() !== PHP_SESSION_ACTIVE) {
 
 $rolActual = $_SESSION['usuario_rol'] ?? null;
 $nombreActual = $_SESSION['usuario_nombre'] ?? null;
-$puedeIngresar = in_array($rolActual, ['operaciones', 'bodega', 'gerente', 'admin'], true);
-$puedeGestionar = in_array($rolActual, ['operaciones', 'gerente', 'admin'], true);
+$puedeIngresar = in_array($rolActual, ['inventario', 'operaciones', 'bodega', 'gerente', 'admin'], true);
+$puedeGestionar = in_array($rolActual, ['inventario', 'operaciones', 'gerente', 'admin'], true);
+// Trafico (y gerencia/owner): navieras, reempaque y ordenar el contenedor. Inventario no.
+$esTrafico = in_array($rolActual, ['operaciones', 'gerente', 'admin'], true);
 $esAdminOGerente = in_array($rolActual, ['gerente', 'admin'], true);
 // Configuracion (usuarios, paises, correo, empresa...) es solo del Owner (rol admin).
 $esOwner = $rolActual === 'admin';
@@ -79,8 +81,9 @@ require_once __DIR__ . '/view_helpers.php';
                         <?= nav_item('/recepcion', 'scan', 'Recepcion', $currentPath, false, 'text-lime-400') ?>
                         <?= nav_item('/bodega', 'scan', 'App movil de bodega', $currentPath, false, 'text-lime-300') ?>
                         <?= nav_item('/inventario', 'box', 'Inventario', $currentPath, false, 'text-emerald-400') ?>
-                        <?= nav_item('/salidas/historial', 'truck', 'Salidas', $currentPath, false, 'text-orange-400') ?>
-                        <?= nav_item($esBodega ? '/reempaques/historial' : '/reempaques', 'box', 'Reempaque', $currentPath, false, 'text-violet-400') ?>
+                        <?= nav_item('/salidas/ordenes', 'receipt', 'Orden de Salida', $currentPath, false, 'text-sky-400') ?>
+                        <?= nav_item('/salidas/historial', 'truck', 'Contenedor', $currentPath, false, 'text-orange-400') ?>
+                        <?= nav_item(!$esTrafico ? '/reempaques/historial' : '/reempaques', 'box', 'Reempaque', $currentPath, false, 'text-violet-400') ?>
                     <?php endif; ?>
                     <?php if (!$esBodega): ?>
                         <?= nav_item('/tracking', 'search', 'Rastreo', $currentPath, false, 'text-cyan-400') ?>
@@ -95,7 +98,7 @@ require_once __DIR__ . '/view_helpers.php';
                     <?= nav_item('/clientes', 'users', 'Clientes', $currentPath, false, 'text-pink-400') ?>
                     <?= nav_item('/aduaneros', 'shield', 'Aduaneros', $currentPath, false, 'text-yellow-400') ?>
                     <?= nav_item('/proveedores', 'truck', 'Proveedores', $currentPath, false, 'text-lime-400') ?>
-                    <?= nav_item('/navieras', 'globe', 'Navieras', $currentPath, false, 'text-blue-400') ?>
+                    <?php if ($esTrafico): ?><?= nav_item('/navieras', 'globe', 'Navieras', $currentPath, false, 'text-blue-400') ?><?php endif; ?>
                     <?= nav_item('/ubicaciones', 'box', 'Ubicaciones', $currentPath, false, 'text-teal-400') ?>
                     <?= nav_item('/facturas', 'receipt', 'Facturas', $currentPath, true) ?>
                     <?php if ($puedeVerReportes): ?>
