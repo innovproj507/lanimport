@@ -63,8 +63,8 @@
             + '  <input id="escaneo" class="escaneo-input" type="text" autocomplete="off" autocorrect="off"'
             + '         autocapitalize="characters" spellcheck="false" inputmode="none" enterkeyhint="go"'
             + '         placeholder="Escanee la etiqueta">'
-            + '  <button type="button" class="btn-icono" data-accion="teclado" title="Escribir el codigo a mano">⌨</button>'
-            + (window.Escaner.disponible() ? '  <button type="button" class="btn-icono" data-accion="camara" title="Usar la camara">📷</button>' : '')
+            // Sin escritura a mano. La camara solo en celulares: el PDA escanea con su boton SCAN.
+            + (window.Escaner.disponible() && tipoEquipo() !== 'pda' ? '  <button type="button" class="btn-icono" data-accion="camara" title="Usar la camara">📷</button>' : '')
             + '</div>';
 
         var input = contenedor.querySelector('#escaneo');
@@ -92,18 +92,9 @@
             }
         }
 
-        // Enter, Tab, salto de linea o lector sin sufijo (lector-codigos.js). Con el teclado
-        // en pantalla activado (escritura a mano) solo envia con Enter.
+        // Enter, Tab, salto de linea o lector sin sufijo (lector-codigos.js).
         window.LectorCodigos.conectar(input, recibir, {
-            autoEnviar: function () { return input.getAttribute('inputmode') === 'none'; },
-        });
-
-        contenedor.querySelector('[data-accion="teclado"]').addEventListener('click', function () {
-            var manual = input.getAttribute('inputmode') === 'none';
-            input.setAttribute('inputmode', manual ? 'text' : 'none');
-            this.classList.toggle('activo', manual);
-            input.blur();
-            input.focus();
+            autoEnviar: function () { return true; },
         });
 
         var botonCamara = contenedor.querySelector('[data-accion="camara"]');
@@ -152,17 +143,59 @@
 
     // ---------- pantallas ----------
 
+    /**
+     * Que equipo es este (se elige una vez y se recuerda en el equipo): 'pda' escanea con su boton
+     * SCAN y no muestra la camara; 'celular' escanea con la camara. '' = aun no se eligio.
+     */
+    function tipoEquipo() {
+        try {
+            return localStorage.getItem('lanBodegaEquipo') || '';
+        } catch (e) {
+            return '';
+        }
+    }
+
+    function guardarTipoEquipo(tipo) {
+        try {
+            localStorage.setItem('lanBodegaEquipo', tipo);
+        } catch (e) {
+            // Sin almacenamiento (modo privado): se pregunta de nuevo la proxima vez.
+        }
+    }
+
+    function selectorEquipo() {
+        var actual = tipoEquipo();
+        var boton = function (tipo, texto) {
+            return '<button type="button" class="btn ' + (actual === tipo ? 'btn-primario' : 'btn-claro') + '" data-equipo="' + tipo + '">' + texto + '</button>';
+        };
+
+        return '<section class="tarjeta" id="equipo">'
+            + '<h2>' + (actual === '' ? '¿Que equipo es este?' : 'Este equipo') + '</h2>'
+            + (actual === '' ? '<p class="sub">Elija una vez: en el PDA se escanea con el boton SCAN y no se muestra la camara.</p>' : '')
+            + '<div class="fotos-acciones">' + boton('pda', 'PDA (boton SCAN)') + boton('celular', 'Celular (camara)') + '</div>'
+            + '</section>';
+    }
+
     function vistaInicio() {
         html(
-            '<div class="saludo">Hola, ' + esc(window.Api.sesion().nombre) + '</div>'
+            (tipoEquipo() === '' ? selectorEquipo() : '')
+            + '<div class="saludo">Hola, ' + esc(window.Api.sesion().nombre) + '</div>'
             + '<nav class="menu">'
             + '  <a class="menu-item menu-recepcion" href="#/recepcion"><span class="menu-icono">⬇</span><span class="menu-titulo">Recepcion</span><span class="menu-detalle" id="cuenta-recepcion">Escanear etiquetas nuevas</span></a>'
             + '  <a class="menu-item menu-consulta" href="#/consulta"><span class="menu-icono">🔍</span><span class="menu-titulo">Consultar LPN</span><span class="menu-detalle">Ver estado y ubicacion de un bulto</span></a>'
             + '  <a class="menu-item menu-salidas" href="#/salidas"><span class="menu-icono">⬆</span><span class="menu-titulo">Salidas</span><span class="menu-detalle" id="cuenta-salidas">Despachar ordenes</span></a>'
             + '  <a class="menu-item menu-reempaque" href="#/reempaques"><span class="menu-icono">📦</span><span class="menu-titulo">Reempaque</span><span class="menu-detalle" id="cuenta-reempaques">Ordenes de trafico</span></a>'
             + '</nav>'
+            + (tipoEquipo() !== '' ? selectorEquipo() : '')
             + '<p class="pie"><a href="/recepcion">Ir a la version completa del sistema</a></p>'
         );
+
+        document.querySelectorAll('[data-equipo]').forEach(function (b) {
+            b.addEventListener('click', function () {
+                guardarTipoEquipo(b.getAttribute('data-equipo'));
+                vistaInicio();
+            });
+        });
 
         window.Api.get('/recepcion').then(function (cargas) {
             var faltan = cargas.reduce(function (s, c) { return s + c.total - c.recibidos; }, 0);
