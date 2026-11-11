@@ -419,6 +419,69 @@ final class SalidaController extends BaseController
         ]);
     }
 
+    /** Manifiesto en Excel: las mismas filas y totales que el impreso, mas los datos del embarque al final. */
+    public function manifiestoExcel(string $id): ResponseInterface|string
+    {
+        $orden = $this->container()->get(VerOrdenSalidaHandler::class)->handle(new VerOrdenSalidaQuery($id));
+
+        if ($orden === null) {
+            $this->response->setStatusCode(404);
+
+            return 'Orden de salida no encontrada.';
+        }
+
+        $repositorio = $this->container()->get(SalidaOrdenRepositoryInterface::class);
+        $titulo = implode(' / ', $repositorio->aduanerosPorOrden([$orden->id()])[$orden->id()] ?? []);
+        $embarque = $orden->embarque();
+
+        $filas = [['NOMBRE', 'MARCA', 'COMPAÑÍA', 'BULTOS', 'KILOS', 'CUB/MT', 'VALOR']];
+        $totales = ['bultos' => 0, 'kilos' => 0.0, 'm3' => 0.0, 'valor' => 0.0];
+
+        foreach ($repositorio->manifiesto($orden->id()) as $f) {
+            $filas[] = [
+                mb_strtoupper($f['cliente']), mb_strtoupper($f['marca']), mb_strtoupper($f['compania']),
+                (int) $f['bultos'], round((float) $f['kilos'], 2), $f['m3'] > 0 ? round((float) $f['m3'], 3) : '', round((float) $f['valor'], 2),
+            ];
+
+            foreach ($totales as $k => $_) {
+                $totales[$k] += $f[$k];
+            }
+        }
+
+        $filas[] = ['TOTALES', '', '', (int) $totales['bultos'], round($totales['kilos'], 2), $totales['m3'] > 0 ? round($totales['m3'], 3) : '', round($totales['valor'], 2)];
+
+        // Datos del embarque, debajo de la tabla (la primera fila del Excel es el encabezado fijo).
+        $filas[] = [];
+        $datos = [
+            'DO' => $orden->etiquetaDo(),
+            'ADUANERO' => mb_strtoupper($titulo),
+            'FECHA' => ($embarque->fechaCargue ?? $orden->createdAt())->format('d/m/Y'),
+            'CONTENEDOR' => $embarque->contenedorFormateado() ?? '',
+            'SELLO' => $embarque->numeroSello ?? '',
+            'NAVIERA' => $embarque->navieraNombre ?? '',
+            'BARCO' => $embarque->nombreBarco ?? '',
+            'ETD' => $embarque->fechaSalidaEtd?->format('d/m/Y') ?? '',
+            'DESTINO FINAL' => mb_strtoupper($embarque->destinoFinal ?? ''),
+        ];
+
+        foreach ($datos as $campo => $valor) {
+            if ($valor !== '') {
+                $filas[] = [$campo, $valor];
+            }
+        }
+
+        $contenido = $this->container()->get(EscritorXlsx::class)->generar([
+            'Manifiesto' => ['filas' => $filas, 'anchos' => [34, 20, 24, 10, 12, 11, 14]],
+        ]);
+        // "DO.261 / 2026" (+ aduanero) -> manifiesto-do-261-2026-alen.xlsx
+        $slug = trim((string) preg_replace('/[^a-z0-9]+/', '-', strtolower($orden->etiquetaDo() . ' ' . $titulo)), '-');
+
+        return $this->response
+            ->setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+            ->setHeader('Content-Disposition', 'attachment; filename="manifiesto-' . $slug . '.xlsx"')
+            ->setBody($contenido);
+    }
+
     public function manifiesto(string $id): string
     {
         $orden = $this->container()->get(VerOrdenSalidaHandler::class)->handle(new VerOrdenSalidaQuery($id));

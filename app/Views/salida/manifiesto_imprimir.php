@@ -33,6 +33,7 @@ $filasVacias = max(0, 8 - count($filas));
         .print-bar { background: #1a1d27; color: #f1f5f9; padding: 14px 24px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; font-family: 'Segoe UI', Arial, sans-serif; }
         .print-bar h2 { font-size: 14px; }
         .btn-back { color: #94a3b8; font-size: 13px; text-decoration: none; padding: 8px 14px; border-radius: 8px; border: 1px solid rgba(255,255,255,.15); }
+        .btn-excel { background: #15803d; color: #fff; text-decoration: none; padding: 10px 18px; border-radius: 8px; font-size: 14px; font-weight: 600; }
         .btn-print { background: #059669; color: #fff; border: none; padding: 10px 22px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; }
         .hoja { width: 26cm; max-width: calc(100% - 24px); margin: 1cm auto; font-size: 12px; }
         .encabezado { text-align: center; margin-bottom: 10px; }
@@ -60,6 +61,7 @@ $filasVacias = max(0, 8 - count($filas));
     <h2>Manifiesto <?= $e($orden->etiquetaDo()) ?></h2>
     <div style="display:flex; gap:8px;">
         <a href="/salidas/<?= $e($orden->id()) ?>" class="btn-back">Volver</a>
+        <a href="/salidas/<?= $e($orden->id()) ?>/manifiesto/excel" class="btn-excel">Descargar Excel</a>
         <button type="button" class="btn-print" onclick="window.print()">Imprimir</button>
     </div>
 </div>

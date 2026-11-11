@@ -215,6 +215,7 @@ $routes->post('salidas/(:segment)/ajustar-carga', 'SalidaController::ajustarCarg
 $routes->post('salidas/(:segment)/devolver-carga', 'SalidaController::devolverCarga/$1', ['filter' => $armaSalida]);
 $routes->post('salidas/(:segment)/embarque','SalidaController::guardarEmbarque/$1', ['filter' => $planificaSalida]);
 $routes->get('salidas/(:segment)/manifiesto', 'SalidaController::manifiesto/$1', ['filter' => $imprimeFilter]);
+$routes->get('salidas/(:segment)/manifiesto/excel', 'SalidaController::manifiestoExcel/$1', ['filter' => $imprimeFilter]);
 $routes->get('salidas/(:segment)/orden-carga', 'SalidaController::ordenCarga/$1', ['filter' => $imprimeFilter]);
 $routes->get('salidas/(:segment)/reporte', 'SalidaController::reporte/$1', ['filter' => $imprimeFilter]);
 $routes->get('salidas/(:segment)/reporte/excel', 'SalidaController::reporteExcel/$1', ['filter' => $imprimeFilter]);
