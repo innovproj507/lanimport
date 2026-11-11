@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 /** @var \Courier\Salida\Domain\SalidaOrden $orden */
 /** @var string $titulo aduanero(s) de las cargas de la salida */
-/** @var array<int, array{cliente: string, marca: string, compania: string, tracking: ?string, bultos: int, kilos: float, m3: float, valor: float}> $filas */
+/** @var array<int, array{cliente: string, marca: string, compania: string, tracking: ?string, bultos: int, kilos: float, pies3: float, valor: float}> $filas */
 /** @var \Courier\Configuracion\Domain\DatosEmpresa $empresa */
 
 $e = static fn (?string $t): string => htmlspecialchars($t ?? '');
@@ -14,7 +14,8 @@ $meses = [1 => 'ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO', 'JULIO', '
 $fechaLarga = static fn (?DateTimeImmutable $f): string => $f !== null ? $f->format('d') . ' DE ' . $meses[(int) $f->format('n')] . ' ' . $f->format('Y') : '';
 // "FECHA" del manifiesto: la de cargue; si aun no se registra, la de creacion de la salida.
 $fecha = $embarque->fechaCargue ?? $orden->createdAt();
-$totales = ['bultos' => 0, 'kilos' => 0.0, 'm3' => 0.0, 'valor' => 0.0];
+// Cubicaje en p3, tal como se captura (sin convertir a metros cubicos).
+$totales = ['bultos' => 0, 'kilos' => 0.0, 'pies3' => 0.0, 'valor' => 0.0];
 foreach ($filas as $f) {
     foreach ($totales as $k => $_) {
         $totales[$k] += $f[$k];
@@ -89,9 +90,10 @@ $filasVacias = max(0, 8 - count($filas));
                 <th>NOMBRE</th>
                 <th>MARCA</th>
                 <th>COMPAÑÍA</th>
+                <th>ADUANERO</th>
                 <th class="n">BULTOS</th>
                 <th class="n">KILOS</th>
-                <th class="n">CUB/MT</th>
+                <th class="n">CUB/P3</th>
                 <th class="n">VALOR</th>
             </tr>
         </thead>
@@ -101,22 +103,23 @@ $filasVacias = max(0, 8 - count($filas));
                     <td><?= $e(mb_strtoupper($f['cliente'])) ?></td>
                     <td><?= $e(mb_strtoupper($f['marca'])) ?></td>
                     <td><?= $e(mb_strtoupper($f['compania'])) ?></td>
+                    <td><?= $e(mb_strtoupper($f['aduanero'])) ?></td>
                     <td class="n"><?= $f['bultos'] ?></td>
                     <td class="n"><?= $n($f['kilos']) ?></td>
-                    <td class="n"><?= $f['m3'] > 0 ? $n($f['m3'], 3) : '-' ?></td>
+                    <td class="n"><?= $f['pies3'] > 0 ? $n($f['pies3']) : '-' ?></td>
                     <td class="n"><?= $n($f['valor']) ?></td>
                 </tr>
             <?php endforeach; ?>
             <?php for ($i = 0; $i < $filasVacias; $i++): ?>
-                <tr class="vacia"><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+                <tr class="vacia"><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
             <?php endfor; ?>
         </tbody>
         <tfoot>
             <tr>
-                <td colspan="3">TOTALES</td>
+                <td colspan="4">TOTALES</td>
                 <td class="n"><?= $totales['bultos'] ?></td>
                 <td class="n"><?= $n($totales['kilos']) ?></td>
-                <td class="n"><?= $totales['m3'] > 0 ? $n($totales['m3'], 3) : '-' ?></td>
+                <td class="n"><?= $totales['pies3'] > 0 ? $n($totales['pies3']) : '-' ?></td>
                 <td class="n"><?= $n($totales['valor']) ?></td>
             </tr>
         </tfoot>

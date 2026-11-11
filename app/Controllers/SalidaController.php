@@ -434,13 +434,13 @@ final class SalidaController extends BaseController
         $titulo = implode(' / ', $repositorio->aduanerosPorOrden([$orden->id()])[$orden->id()] ?? []);
         $embarque = $orden->embarque();
 
-        $filas = [['NOMBRE', 'MARCA', 'COMPAÑÍA', 'BULTOS', 'KILOS', 'CUB/MT', 'VALOR']];
-        $totales = ['bultos' => 0, 'kilos' => 0.0, 'm3' => 0.0, 'valor' => 0.0];
+        $filas = [['NOMBRE', 'MARCA', 'COMPAÑÍA', 'ADUANERO', 'BULTOS', 'KILOS', 'CUB/P3', 'VALOR']];
+        $totales = ['bultos' => 0, 'kilos' => 0.0, 'pies3' => 0.0, 'valor' => 0.0];
 
         foreach ($repositorio->manifiesto($orden->id()) as $f) {
             $filas[] = [
-                mb_strtoupper($f['cliente']), mb_strtoupper($f['marca']), mb_strtoupper($f['compania']),
-                (int) $f['bultos'], round((float) $f['kilos'], 2), $f['m3'] > 0 ? round((float) $f['m3'], 3) : '', round((float) $f['valor'], 2),
+                mb_strtoupper($f['cliente']), mb_strtoupper($f['marca']), mb_strtoupper($f['compania']), mb_strtoupper($f['aduanero']),
+                (int) $f['bultos'], round((float) $f['kilos'], 2), $f['pies3'] > 0 ? round((float) $f['pies3'], 2) : '', round((float) $f['valor'], 2),
             ];
 
             foreach ($totales as $k => $_) {
@@ -448,7 +448,7 @@ final class SalidaController extends BaseController
             }
         }
 
-        $filas[] = ['TOTALES', '', '', (int) $totales['bultos'], round($totales['kilos'], 2), $totales['m3'] > 0 ? round($totales['m3'], 3) : '', round($totales['valor'], 2)];
+        $filas[] = ['TOTALES', '', '', '', (int) $totales['bultos'], round($totales['kilos'], 2), $totales['pies3'] > 0 ? round($totales['pies3'], 2) : '', round($totales['valor'], 2)];
 
         // Datos del embarque, debajo de la tabla (la primera fila del Excel es el encabezado fijo).
         $filas[] = [];
@@ -471,7 +471,7 @@ final class SalidaController extends BaseController
         }
 
         $contenido = $this->container()->get(EscritorXlsx::class)->generar([
-            'Manifiesto' => ['filas' => $filas, 'anchos' => [34, 20, 24, 10, 12, 11, 14]],
+            'Manifiesto' => ['filas' => $filas, 'anchos' => [34, 20, 24, 22, 10, 12, 11, 14]],
         ]);
         // "DO.261 / 2026" (+ aduanero) -> manifiesto-do-261-2026-alen.xlsx
         $slug = trim((string) preg_replace('/[^a-z0-9]+/', '-', strtolower($orden->etiquetaDo() . ' ' . $titulo)), '-');
