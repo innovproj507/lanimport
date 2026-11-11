@@ -61,7 +61,9 @@
             '<label class="etiqueta" for="escaneo">' + esc(etiqueta) + '</label>'
             + '<div class="escaneo">'
             + '  <input id="escaneo" class="escaneo-input" type="text" autocomplete="off" autocorrect="off"'
-            + '         autocapitalize="characters" spellcheck="false" inputmode="none" enterkeyhint="go"'
+            // En PDA el campo es normal (como en Google): algunos lectores escriben a traves del teclado
+            // de Android y con inputmode="none" el texto no llega. En celular no se abre el teclado.
+            + '         autocapitalize="characters" spellcheck="false"' + (tipoEquipo() === 'pda' ? '' : ' inputmode="none"') + ' enterkeyhint="go"'
             + '         placeholder="Escanee la etiqueta">'
             // Sin escritura a mano. La camara solo en celulares: el PDA escanea con su boton SCAN.
             + (window.Escaner.disponible() && tipoEquipo() !== 'pda' ? '  <button type="button" class="btn-icono" data-accion="camara" title="Usar la camara">📷</button>' : '')
@@ -117,8 +119,34 @@
         }
 
         document.addEventListener('click', reenfocar);
+
+        // PDA: si el lector manda teclas y el foco no esta en el campo, se escriben en el campo igual.
+        function capturarTeclas(evento) {
+            if (tipoEquipo() !== 'pda' || evento.target === input || evento.target.closest('input, select, textarea, [contenteditable]')) {
+                return;
+            }
+
+            if (evento.key === 'Enter' || evento.keyCode === 13) {
+                if (input.value.trim() !== '') {
+                    evento.preventDefault();
+                    recibir(input.value.replace(/[\r\n\t]+/g, ''));
+                    input.value = '';
+                }
+                return;
+            }
+
+            if (evento.key && evento.key.length === 1 && !evento.ctrlKey && !evento.altKey && !evento.metaKey) {
+                evento.preventDefault();
+                input.value += evento.key;
+                input.focus();
+                input.dispatchEvent(new Event('input'));
+            }
+        }
+
+        document.addEventListener('keydown', capturarTeclas);
         limpiarVista.push(function () {
             document.removeEventListener('click', reenfocar);
+            document.removeEventListener('keydown', capturarTeclas);
             window.Escaner.cerrar();
         });
 
