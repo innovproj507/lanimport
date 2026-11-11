@@ -518,7 +518,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
 
                 if (confirmarBtn) {
-                    confirmarBtn.disabled = data.progreso.escaneadas < data.progreso.total;
+                    // Sin DO no se confirma aunque este todo escaneado (trafico debe generarlo).
+                    confirmarBtn.disabled = data.progreso.escaneadas < data.progreso.total || confirmarBtn.hasAttribute('data-sin-do');
                 }
 
                 mensaje.textContent = 'LPN ' + data.codigo + ' escaneado.';
@@ -736,20 +737,36 @@ document.addEventListener('DOMContentLoaded', function () {
         return;
     }
 
-    function recalcularCubicaje(row) {
-        if (row.dataset.cubicajeManual === 'true') {
-            return;
-        }
-
+    function calculoCubicaje(row) {
         var ancho = parseFloat(row.querySelector('.carga-linea-ancho').value) || 0;
         var alto = parseFloat(row.querySelector('.carga-linea-alto').value) || 0;
         var largo = parseFloat(row.querySelector('.carga-linea-largo').value) || 0;
         var cantidad = parseFloat(row.querySelector('[name="linea_cantidad[]"]').value) || 0;
-        // p3 TOTAL de la linea (como el peso y el valor): medidas por pieza x cantidad.
-        var cubicaje = (ancho * alto * largo * cantidad) / 28316.846592;
 
-        // Sin medidas queda en blanco (no "0.000000").
-        row.querySelector('.carga-linea-cubicaje').value = cubicaje > 0 ? cubicaje.toFixed(6) : '';
+        // p3 TOTAL de la linea (como el peso y el valor): medidas por pieza x cantidad. Sin medidas, null.
+        return ancho > 0 && alto > 0 && largo > 0 && cantidad > 0 ? (ancho * alto * largo * cantidad) / 28316.846592 : null;
+    }
+
+    /**
+     * El p3 se calcula solo con medidas, y solo si el campo esta vacio o lo lleno este calculo:
+     * un p3 escrito a mano o ya guardado NUNCA se reemplaza (antes, al cambiar la cantidad de una
+     * carga sin medidas, el p3 quedaba en blanco y se guardaba 0).
+     */
+    function recalcularCubicaje(row) {
+        var campo = row.querySelector('.carga-linea-cubicaje');
+
+        if (campo.value.trim() !== '' && row.dataset.cubicajeAuto !== 'true') {
+            return;
+        }
+
+        var cubicaje = calculoCubicaje(row);
+
+        if (cubicaje === null) {
+            return;
+        }
+
+        campo.value = cubicaje.toFixed(6);
+        row.dataset.cubicajeAuto = 'true';
     }
 
     function bindFila(row) {
@@ -769,9 +786,15 @@ document.addEventListener('DOMContentLoaded', function () {
             });
         });
 
+        // Lo que escribe el usuario manda (si lo borra, vuelve a calcularse con las medidas).
         row.querySelector('.carga-linea-cubicaje').addEventListener('input', function () {
-            row.dataset.cubicajeManual = 'true';
+            row.dataset.cubicajeAuto = this.value.trim() === '' ? 'true' : 'false';
         });
+
+        // Al editar, el p3 guardado es del usuario salvo que sea justo el calculo de sus medidas.
+        var guardado = parseFloat(row.querySelector('.carga-linea-cubicaje').value);
+        var calculado = calculoCubicaje(row);
+        row.dataset.cubicajeAuto = !isNaN(guardado) && calculado !== null && Math.abs(guardado - calculado) < 0.000001 ? 'true' : 'false';
     }
 
     tbody.querySelectorAll('.carga-linea-row').forEach(bindFila);
@@ -785,7 +808,7 @@ document.addEventListener('DOMContentLoaded', function () {
             input.value = '';
         });
 
-        delete nuevaFila.dataset.cubicajeManual;
+        delete nuevaFila.dataset.cubicajeAuto;
 
         var nuevoQuitarBtn = nuevaFila.querySelector('.carga-linea-quitar');
 
