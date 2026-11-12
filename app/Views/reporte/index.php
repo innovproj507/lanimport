@@ -31,6 +31,7 @@ $inventarioColores = [
     <form method="get" action="/reportes" class="flex items-end gap-4 flex-wrap" id="reporte-filtros">
         <input type="hidden" name="etapa" id="flujo-etapa-input" value="<?= htmlspecialchars($etapaActiva) ?>">
         <input type="hidden" name="resumen" id="resumen-input" value="<?= htmlspecialchars($resumenActivo) ?>">
+        <input type="hidden" name="alerta" id="alerta-input" value="<?= htmlspecialchars($alertaActiva) ?>">
         <div>
             <label class="block text-sm font-medium text-zinc-700 mb-1">Desde</label>
             <input type="date" name="desde" value="<?= htmlspecialchars($reporte->desde) ?>"
@@ -68,6 +69,7 @@ $inventarioColores = [
 
 <?php require __DIR__ . '/_flujo_cargas.php'; ?>
 <?php require __DIR__ . '/_resumenes.php'; ?>
+<?php require __DIR__ . '/_alertas.php'; ?>
 
 <script>
 // Flujo de cargas: las tarjetas cambian la lista visible; la etapa se recuerda en la URL
@@ -139,6 +141,39 @@ $inventarioColores = [
     });
     document.addEventListener('vivo:actualizado', aplicarResumen);
     aplicarResumen();
+
+    // Alertas: pestanas (antiguedad / OS sin DO / contenedores incompletos) y su Excel.
+    function aplicarAlerta() {
+        var activa = document.getElementById('alerta-input').value;
+        document.querySelectorAll('[data-alerta-panel]').forEach(function (p) {
+            p.classList.toggle('hidden', p.getAttribute('data-alerta-panel') !== activa);
+        });
+        document.querySelectorAll('[data-alerta-tab]').forEach(function (t) {
+            var esta = t.getAttribute('data-alerta-tab') === activa;
+            t.classList.toggle('bg-white', esta);
+            t.classList.toggle('shadow', esta);
+            t.classList.toggle('text-zinc-900', esta);
+            t.classList.toggle('text-zinc-500', !esta);
+        });
+        var params = new URLSearchParams(new FormData(document.getElementById('reporte-filtros')));
+        var excel = document.getElementById('alerta-excel');
+        if (excel) {
+            excel.href = '/reportes/alertas/excel?' + params.toString();
+        }
+        var url = new URL(window.location.href);
+        url.searchParams.set('alerta', activa);
+        history.replaceState(null, '', url);
+    }
+
+    document.addEventListener('click', function (e) {
+        var tab = e.target.closest('[data-alerta-tab]');
+        if (tab) {
+            document.getElementById('alerta-input').value = tab.getAttribute('data-alerta-tab');
+            aplicarAlerta();
+        }
+    });
+    document.addEventListener('vivo:actualizado', aplicarAlerta);
+    aplicarAlerta();
     aplicar();
 })();
 </script>

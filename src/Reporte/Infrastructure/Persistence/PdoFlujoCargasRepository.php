@@ -75,7 +75,7 @@ final class PdoFlujoCargasRepository
     {
         $stmt = $this->connection->query(
             "SELECT x.carga_id, so.id, so.do_anio, so.do_numero, so.codigo, so.estado, so.numero_contenedor,
-                    so.numero_sello, so.nombre_barco, so.fecha_salida_etd, so.destino_final,
+                    so.numero_sello, so.nombre_barco, so.fecha_cargue, so.fecha_salida_etd, so.destino_final,
                     so.confirmed_at, so.created_at, n.nombre AS naviera,
                     COUNT(*) AS bultos, SUM(sl.escaneado) AS escaneados
              FROM (SELECT lp.carga_id, lp.id AS lpn_salida FROM lpns lp WHERE lp.carga_id IS NOT NULL
@@ -87,7 +87,7 @@ final class PdoFlujoCargasRepository
              JOIN salida_ordenes so ON so.id = sl.salida_orden_id AND so.estado IN ('pendiente', 'confirmada')
              LEFT JOIN navieras n ON n.id = so.naviera_id
              GROUP BY x.carga_id, so.id, so.do_anio, so.do_numero, so.codigo, so.estado, so.numero_contenedor,
-                      so.numero_sello, so.nombre_barco, so.fecha_salida_etd, so.destino_final,
+                      so.numero_sello, so.nombre_barco, so.fecha_cargue, so.fecha_salida_etd, so.destino_final,
                       so.confirmed_at, so.created_at, n.nombre
              ORDER BY so.created_at"
         );

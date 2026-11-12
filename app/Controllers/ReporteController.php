@@ -38,12 +38,56 @@ final class ReporteController extends BaseController
             // Resumen de salidas por cliente, aduanero y contenedor (mismos filtros que el flujo).
             'resumen' => $flujo['resumen'],
             'resumenActivo' => in_array($resumen, ['cliente', 'aduanero', 'contenedor'], true) ? $resumen : 'cliente',
+            // Alertas: antiguedad por cliente, OS sin DO y contenedores con escaneo incompleto.
+            'alertas' => $flujo['alertas'],
+            'alertaActiva' => in_array($this->request->getGet('alerta'), ['antiguedad', 'os', 'incompletos'], true) ? (string) $this->request->getGet('alerta') : 'antiguedad',
             'etapaActiva' => isset(ObtenerFlujoCargasHandler::ETAPAS[$etapa]) ? $etapa : 'llegando',
             'aduaneros' => $this->container()->get(ListarAduanerosHandler::class)->handle(new ListarAduanerosQuery()),
             'clientes' => $clientes,
             'filtroAduanero' => $aduanero ?? '',
             'filtroCliente' => $clienteId ?? '',
         ]);
+    }
+
+    /** Excel de una alerta (antiguedad, os, incompletos), con los filtros de la pantalla. */
+    public function alertaExcel(): ResponseInterface
+    {
+        [$desde, $hasta, $aduanero, $clienteId] = $this->filtros();
+        $tipo = (string) ($this->request->getGet('alerta') ?? 'antiguedad');
+        $tipo = in_array($tipo, ['antiguedad', 'os', 'incompletos'], true) ? $tipo : 'antiguedad';
+        $alertas = $this->container()->get(ObtenerFlujoCargasHandler::class)
+            ->handle(new ObtenerFlujoCargasQuery($desde, $hasta, $aduanero, $clienteId))['alertas'];
+
+        if ($tipo === 'antiguedad') {
+            $filas = [['CLIENTE', 'CARGAS', '0-15 DIAS', '16-30 DIAS', '31-60 DIAS', '+60 DIAS', 'TOTAL BULTOS', 'CARGA MAS ANTIGUA', 'DIAS']];
+
+            foreach ($alertas['antiguedad'] as $a) {
+                $filas[] = [$a['nombre'], $a['cargas'], $a['r15'], $a['r30'], $a['r60m'], $a['r60'], $a['total'], $a['masVieja']['tracking'], $a['diasMax']];
+            }
+
+            $hoja = ['Antiguedad por cliente' => ['filas' => $filas, 'anchos' => [34, 8, 10, 11, 11, 10, 13, 20, 7]]];
+        } elseif ($tipo === 'os') {
+            $filas = [['OS', 'CREADA', 'DIAS ESPERANDO', 'ADUANEROS', 'CLIENTES', 'CARGAS', 'BULTOS', 'ESCANEADOS', 'KG', 'P3']];
+
+            foreach ($alertas['osSinDo'] as $o) {
+                $filas[] = [$o['etiqueta'], $o['creada']->format('d/m/Y H:i'), $o['dias'], implode(', ', $o['aduanerosLista']), implode(', ', $o['clientesLista']), $o['cargas'], $o['bultos'], $o['escaneados'], round($o['kg'], 2), round($o['p3'], 2)];
+            }
+
+            $hoja = ['OS sin DO' => ['filas' => $filas, 'anchos' => [14, 17, 14, 26, 40, 8, 9, 11, 12, 12]]];
+        } else {
+            $filas = [['DO', 'CONTENEDOR', 'NAVIERA', 'CARGUE', 'ETD', 'FALTAN', 'ESCANEADOS', 'BULTOS', 'ADUANEROS', 'CLIENTES']];
+
+            foreach ($alertas['incompletos'] as $d) {
+                $filas[] = [$d['etiqueta'], $d['contenedor'] ?? '', $d['naviera'] ?? '', $d['cargue']?->format('d/m/Y') ?? '', $d['etd']?->format('d/m/Y') ?? '', $d['bultos'] - $d['escaneados'], $d['escaneados'], $d['bultos'], implode(', ', $d['aduanerosLista']), implode(', ', $d['clientesLista'])];
+            }
+
+            $hoja = ['Contenedores incompletos' => ['filas' => $filas, 'anchos' => [14, 16, 16, 12, 12, 9, 11, 9, 26, 40]]];
+        }
+
+        return $this->response
+            ->setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+            ->setHeader('Content-Disposition', 'attachment; filename="alerta-' . $tipo . '-' . date('Y-m-d') . '.xlsx"')
+            ->setBody($this->container()->get(EscritorXlsx::class)->generar($hoja));
     }
 
     /** Excel del resumen de salidas (por cliente, aduanero o contenedor), con los filtros de la pantalla. */

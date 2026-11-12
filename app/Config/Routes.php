@@ -267,6 +267,8 @@ $routes->get('reportes', 'ReporteController::index', ['filter' => ['auth', 'role
 $routes->get('reportes/flujo/excel', 'ReporteController::flujoExcel', ['filter' => ['auth', 'role:gerente,admin']]);
 // Resumen de salidas por cliente, aduanero o contenedor (resumen=cliente|aduanero|contenedor).
 $routes->get('reportes/resumen/excel', 'ReporteController::resumenExcel', ['filter' => ['auth', 'role:gerente,admin']]);
+// Alertas: antiguedad por cliente, OS sin DO y contenedores incompletos (alerta=antiguedad|os|incompletos).
+$routes->get('reportes/alertas/excel', 'ReporteController::alertaExcel', ['filter' => ['auth', 'role:gerente,admin']]);
 
 // API (JWT, sin sesion de navegador) — igual que interfaces/Api/Router/ApiRoutes.php
 $routes->group('api/v1', static function ($routes) {

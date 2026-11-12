@@ -121,6 +121,7 @@ The paper delivery form (empresa de transporte, chofer, placa, entregado por, ce
 - Then "Resumen de salidas" (`reporte/_resumenes.php`, tabs `resumen=cliente|aduanero|contenedor`, Excel `GET reportes/resumen/excel`), computed in the same pass by `ObtenerFlujoCargasHandler::acumularResumenes()` and returned as `['resumen']`:
   - por cliente / por aduanero: bultos en bodega, en OS, en contenedor (DO pendiente), kg/p3/valor of what is in salida (prorated by the carga's bultos in each OS/DO), bultos that left in the period, and the OS/DO list;
   - por contenedor: pending DOs and DOs confirmed in the period, with container, naviera, barco, destino, ETD/confirmada, aduaneros, clientes, cargas, bultos (escaneados), kg, p3, valor.
+- Then "Alertas" (`reporte/_alertas.php`, tabs `alerta=antiguedad|os|incompletos`, Excel `GET reportes/alertas/excel`), from the same pass (`['alertas']`): bultos in bodega without an order per client by age (0-15/16-30/31-60/+60 days, oldest carga); pending OS without DO, oldest first (red after 3 days); pending DOs with bultos still to scan, ordered by fecha de cargue or ETD (red when 2 days or less away).
 - Then "Operacion de bodega" (`PdoReporteOperativoRepository::operacionBodega()`):
   - period movement: ingresos, recepciones completas, salidas, bultos despachados;
   - current stock, bultos por escanear and cargas without LPNs;
