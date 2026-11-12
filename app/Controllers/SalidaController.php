@@ -236,7 +236,7 @@ final class SalidaController extends BaseController
             ));
 
             $resumen = count($lpnIds) . ' bultos (' . count($cargaIds) . ' carga(s)' . ($cajaIds !== [] ? ' y ' . count($cajaIds) . ' caja(s) reempacada(s)' : '') . ')';
-            $_SESSION['salida_mensaje'] = "OS creada con {$resumen}. Bodega ya puede escanearla; trafico debe generar el DO y ordenar el contenedor.";
+            $_SESSION['salida_mensaje'] = "OS creada con {$resumen}. Puede agregarle mas cargas; bodega ya puede escanearla.";
 
             return redirect()->to('/salidas/' . $ordenId);
         } catch (ValidationException $e) {
@@ -557,13 +557,17 @@ final class SalidaController extends BaseController
             return redirect()->to('/salidas');
         }
 
+        // Una OS (sin DO) vuelve a Orden de Salida; un DO, a Contenedor.
+        $orden = $this->container()->get(SalidaOrdenRepositoryInterface::class)->findById($id);
+        $volver = $orden !== null && $orden->tieneDo() ? '/salidas/historial' : '/salidas/ordenes';
+
         try {
             $this->container()->get(CancelarOrdenSalidaHandler::class)->handle(new CancelarOrdenSalidaCommand($id));
         } catch (NotFoundException|ValidationException) {
             // si la orden ya no puede cancelarse, simplemente se vuelve al listado
         }
 
-        return redirect()->to('/salidas');
+        return redirect()->to($volver);
     }
 
     /** Une este DO a otro del mismo contenedor: pasan todas sus cargas (con lo escaneado) y este se cancela. */

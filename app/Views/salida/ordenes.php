@@ -9,21 +9,19 @@
  */
 require_once __DIR__ . '/../partials/view_helpers.php';
 $pageTitle = 'Orden de Salida';
-$pageSubtitle = 'OS armadas por inventario que esperan el DO de trafico';
+$pageSubtitle = 'Ordenes de salida armadas por inventario';
 $headerActions = puede_armar_salida() ? header_button('/salidas', 'plus', 'Crear OS', 'amber') : '';
 require __DIR__ . '/../partials/header.php';
-$ordenaContenedor = puede_ordenar_contenedor();
+$armaOs = puede_armar_salida();
 ?>
 
 <div class="bg-sky-50 border border-sky-200 text-sky-900 text-sm rounded-xl px-4 py-3 mb-4">
-    <?= $ordenaContenedor
-        ? 'Pulse <strong>Generar DO</strong> en una OS (o <strong>Crear DO</strong> en Contenedor para juntar varias OS en un contenedor): se llena el contenedor y la OS pasa a <strong>Contenedor</strong>.'
-        : 'Bodega ya puede escanear estas OS. Cuando trafico genere el DO pasan a <strong>Contenedor</strong>, y ahi se confirma la salida cuando el contenedor sale.' ?>
+    Aqui se arman las ordenes de salida: <strong>Crear OS</strong>, agregar o quitar cargas, devolverlas a bodega o eliminar la OS. Bodega ya puede escanearlas.
 </div>
 
 <div class="bg-white rounded-xl shadow-sm p-6" id="ordenes-salida" data-vivo-region="global">
     <?php if ($ordenes === []): ?>
-        <p class="text-sm text-zinc-500">No hay ordenes de salida esperando DO.</p>
+        <p class="text-sm text-zinc-500">No hay ordenes de salida.</p>
     <?php else: ?>
         <div class="overflow-x-auto">
         <table class="w-full text-sm">
@@ -42,7 +40,6 @@ $ordenaContenedor = puede_ordenar_contenedor();
                     <tr class="border-b border-slate-200">
                         <td class="py-2 pr-4 font-medium whitespace-nowrap">
                             <a href="/salidas/<?= htmlspecialchars($orden->id()) ?>" class="text-amber-600 hover:underline"><?= htmlspecialchars($orden->etiquetaDo()) ?></a>
-                            <span class="block mt-1"><?= badge('Sin DO', 'amber') ?></span>
                         </td>
                         <td class="py-2 pr-4 text-zinc-700"><?= htmlspecialchars(implode(', ', $aduanerosPorOrden[$orden->id()] ?? ['—'])) ?></td>
                         <?php $clientes = $clientesPorOrden[$orden->id()] ?? []; ?>
@@ -55,10 +52,20 @@ $ordenaContenedor = puede_ordenar_contenedor();
                         </td>
                         <td class="py-2 pr-4 text-zinc-700 whitespace-nowrap"><?= htmlspecialchars($orden->createdAt()->format('Y-m-d H:i')) ?></td>
                         <td class="py-2 text-right whitespace-nowrap">
-                            <a href="<?= $ordenaContenedor ? '/salidas/crear-do?os=' . htmlspecialchars($orden->id()) : '/salidas/' . htmlspecialchars($orden->id()) ?>"
-                               class="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-medium transition <?= $ordenaContenedor ? 'bg-sky-600 text-white hover:bg-sky-500' : 'bg-slate-100 text-zinc-700 hover:bg-slate-200' ?>">
-                                <?= icon_small($ordenaContenedor ? 'truck' : 'eye', 'w-3.5 h-3.5') ?><?= $ordenaContenedor ? 'Generar DO' : 'Ver' ?>
+                            <a href="/salidas/<?= htmlspecialchars($orden->id()) ?>"
+                               class="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-medium transition bg-amber-500 text-black hover:bg-amber-400">
+                                <?= icon_small($armaOs ? 'pencil' : 'eye', 'w-3.5 h-3.5') ?><?= $armaOs ? 'Modificar' : 'Ver' ?>
                             </a>
+                            <?php if ($armaOs): ?>
+                                <?php // Eliminar la OS: sus bultos vuelven a quedar disponibles en bodega. ?>
+                                <form method="post" action="/salidas/<?= htmlspecialchars($orden->id()) ?>/cancelar" class="inline"
+                                      onsubmit="return confirm('¿Eliminar la <?= htmlspecialchars($orden->etiquetaDo()) ?>? Sus <?= $p['total'] ?> bultos vuelven a quedar disponibles en bodega.');">
+                                    <input type="hidden" name="_csrf" value="<?= htmlspecialchars(\App\Libraries\Csrf::token()) ?>">
+                                    <button type="submit" class="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-medium transition bg-red-500/10 text-red-600 hover:bg-red-500/20">
+                                        <?= icon_small('trash', 'w-3.5 h-3.5') ?>Eliminar
+                                    </button>
+                                </form>
+                            <?php endif; ?>
                         </td>
                     </tr>
                 <?php endforeach; ?>

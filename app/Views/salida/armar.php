@@ -21,16 +21,21 @@ require_once __DIR__ . '/../partials/view_helpers.php';
 $ordenDestino ??= null;
 if ($ordenDestino !== null) {
     $pageTitle = 'Agregar cargas a ' . $ordenDestino->etiquetaDo();
-    $pageSubtitle = 'Mismo contenedor: los bultos nuevos se suman a la salida y bodega los escanea';
+    $pageSubtitle = $ordenDestino->tieneDo()
+        ? 'Mismo contenedor: los bultos nuevos se suman a la salida y bodega los escanea'
+        : 'Los bultos nuevos se suman a la OS y bodega los escanea';
     $backHref = '/salidas/' . $ordenDestino->id();
 } else {
     // Toda salida empieza como OS: solo se arman las cargas. El DO y el contenedor los pone
     // trafico despues, desde Orden de Salida ("Generar DO").
     $pageTitle = 'Crear OS (orden de salida)';
-    $pageSubtitle = 'Elija las cargas que salen; bodega las escanea y trafico genera el DO y el contenedor';
+    $pageSubtitle = 'Elija las cargas que salen; bodega las escanea';
     $backHref = '/salidas/ordenes';
 }
 $conContenedor = false;
+// Crear OS o agregar a una OS sin DO: los textos no hablan de DO ni de contenedor.
+$esOs = $ordenDestino === null || !$ordenDestino->tieneDo();
+$aDonde = $esOs ? 'esta OS' : 'este contenedor';
 require __DIR__ . '/../partials/header.php';
 
 $valor = static fn (string $campo): string => htmlspecialchars($embarque[$campo] ?? '');
@@ -48,16 +53,18 @@ $listas = count(array_filter($cargas, static fn (array $c) => $c['listos'] > 0))
 
     <?php if ($ordenDestino !== null): $progresoDestino = $ordenDestino->progreso(); ?>
     <div class="bg-white rounded-xl shadow-sm p-6 mb-6">
-        <?= card_header('truck', 'Salida ' . $ordenDestino->etiquetaDo(), 'sky') ?>
+        <?= card_header('truck', ($esOs ? 'Orden de salida ' : 'Salida ') . $ordenDestino->etiquetaDo(), 'sky') ?>
         <div class="flex flex-wrap gap-x-8 gap-y-2 text-sm text-zinc-700">
+            <?php if (!$esOs): ?>
             <span>Contenedor: <strong class="text-black font-mono"><?= htmlspecialchars($ordenDestino->embarque()->contenedorFormateado() ?? '—') ?></strong></span>
             <span>Naviera: <strong class="text-black"><?= htmlspecialchars($ordenDestino->embarque()->navieraNombre ?? '—') ?></strong></span>
+            <?php endif; ?>
             <span>Ya lleva: <strong class="text-black"><?= $progresoDestino['total'] ?></strong> bultos (<?= $progresoDestino['escaneadas'] ?> escaneados)</span>
         </div>
     </div>
     <?php elseif (!$conContenedor): ?>
     <div class="bg-sky-50 border border-sky-200 text-sky-900 text-sm rounded-xl px-4 py-3 mb-6">
-        Se crea una <strong>OS (orden de salida)</strong>, todavia sin DO. Bodega ya puede escanearla; <strong>trafico</strong> genera el DO y llena el contenedor (naviera, barco, fechas).
+        Se crea una <strong>OS (orden de salida)</strong> con las cargas que marque. Despues puede agregarle mas cargas o devolverlas a bodega. Bodega ya puede escanearla.
     </div>
     <?php else: ?>
     <div class="bg-white rounded-xl shadow-sm p-6 mb-6">
@@ -103,7 +110,7 @@ $listas = count(array_filter($cargas, static fn (array $c) => $c['listos'] > 0))
 
     <div class="bg-white rounded-xl shadow-sm p-6 mb-4">
         <div class="flex flex-wrap items-start justify-between gap-4 mb-4">
-            <?= card_header('box', $ordenDestino !== null ? 'Cargas que se agregan al contenedor' : ($conContenedor ? '2. Cargas que suben al contenedor' : 'Cargas que salen'), 'amber') ?>
+            <?= card_header('box', $ordenDestino !== null ? ($esOs ? 'Cargas que se agregan a la OS' : 'Cargas que se agregan al contenedor') : 'Cargas que salen', 'amber') ?>
             <div class="flex flex-wrap items-center gap-3">
                 <input type="search" id="armar-buscar" placeholder="Buscar cliente, marca, tracking o compania..."
                        class="w-72 rounded-lg border border-zinc-300 bg-white text-black px-3 py-2 text-sm focus:ring-2 focus:ring-amber-400 focus:outline-none">
@@ -121,7 +128,7 @@ $listas = count(array_filter($cargas, static fn (array $c) => $c['listos'] > 0))
             </div>
         </div>
         <p class="text-xs text-zinc-500 mb-4">
-            Al marcar una carga suben sus bultos ya escaneados; en <strong>Bultos a subir</strong> se puede poner menos (por ejemplo 25 de 115) y el resto queda en bodega para otro contenedor.
+            Al marcar una carga entran sus bultos ya escaneados; en <strong>Bultos a subir</strong> se puede poner menos (por ejemplo 25 de 115) y el resto queda en bodega para otra orden.
             Los bultos sin escanear tambien se quedan en bodega como saldo.
             Las cargas en gris aun no pueden salir; el motivo esta en la ultima columna.
         </p>
@@ -139,7 +146,7 @@ $listas = count(array_filter($cargas, static fn (array $c) => $c['listos'] > 0))
                             <th class="py-2 pr-3">Marca</th>
                             <th class="py-2 pr-3">Compania</th>
                             <th class="py-2 pr-3">Aduanero</th>
-                            <th class="py-2 pr-3 text-right" title="Al marcar una carga se puede indicar cuantos de sus bultos suben a este contenedor">Bultos a subir</th>
+                            <th class="py-2 pr-3 text-right" title="Al marcar una carga se puede indicar cuantos de sus bultos van en <?= $aDonde ?>">Bultos a subir</th>
                             <th class="py-2 pr-3 text-right">Kilos</th>
                             <th class="py-2 pr-3 text-right">Valor</th>
                             <th class="py-2 pr-3 text-right">Dias</th>
@@ -198,7 +205,7 @@ $listas = count(array_filter($cargas, static fn (array $c) => $c['listos'] > 0))
                                         <?php // Trafico decide cuantos bultos (o cuales, con "Elegir etiquetas") suben a este contenedor; el resto queda en bodega. ?>
                                         <input type="number" name="cantidad[<?= htmlspecialchars($c['cargaId']) ?>]" min="1" max="<?= $c['listos'] ?>" step="1"
                                                value="<?= $yaElegidas !== [] ? count($yaElegidas) : (int) ($cantidades[$c['cargaId']] ?? $c['listos']) ?>" data-listos="<?= $c['listos'] ?>"
-                                               title="Bultos de esta carga que suben a este contenedor (de <?= $c['listos'] ?> listos)"
+                                               title="Bultos de esta carga que van en <?= $aDonde ?> (de <?= $c['listos'] ?> listos)"
                                                class="armar-cantidad w-20 rounded-lg border border-zinc-300 bg-white text-black text-right px-2 py-1 text-sm focus:ring-2 focus:ring-amber-400 focus:outline-none disabled:bg-slate-100 disabled:text-zinc-400 read-only:bg-amber-50"
                                                <?= $marcada ? '' : 'disabled' ?> <?= $yaElegidas !== [] ? 'readonly' : '' ?>>
                                         <span class="text-xs text-zinc-500">de <?= $n($c['listos']) ?></span>
@@ -277,7 +284,7 @@ $listas = count(array_filter($cargas, static fn (array $c) => $c['listos'] > 0))
     <div class="bg-white rounded-xl shadow-xl max-w-lg w-full flex flex-col max-h-[85vh]">
         <div class="p-5 border-b border-slate-200">
             <h2 class="font-semibold text-black text-lg">Elegir etiquetas · <span id="elegir-titulo" class="font-mono"></span></h2>
-            <p class="text-xs text-zinc-500 mt-1">Marque los bultos de esta carga que suben a este contenedor. Solo aparecen los escaneados y libres. Los demas quedan en bodega.</p>
+            <p class="text-xs text-zinc-500 mt-1">Marque los bultos de esta carga que van en <?= $aDonde ?>. Solo aparecen los escaneados y libres. Los demas quedan en bodega.</p>
             <div class="flex items-center gap-2 mt-3">
                 <input type="search" id="elegir-buscar" placeholder="Buscar etiqueta o ubicacion..."
                        class="flex-1 rounded-lg border border-zinc-300 bg-white text-black px-3 py-1.5 text-sm focus:ring-2 focus:ring-amber-400 focus:outline-none">

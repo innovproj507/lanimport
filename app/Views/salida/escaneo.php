@@ -20,6 +20,8 @@ $armaSalida = puede_armar_salida();
 $ordenaContenedor = puede_ordenar_contenedor();
 $confirmaSalida = puede_confirmar_salida();
 $sinDo = !$orden->tieneDo();
+$esteDoc = $sinDo ? 'esta OS' : 'este DO';
+$enEsteDoc = $sinDo ? 'en esta OS' : 'en este contenedor';
 $headerActions = ($armaSalida && $orden->estado()->value === 'pendiente' ? header_button('/salidas/' . $orden->id() . '/agregar', 'plus', 'Agregar cargas', 'emerald') : '')
     // Lo que trafico imprime y entrega a bodega (bodega no imprime): las etiquetas exactas que suben al contenedor.
     . (puede_imprimir()
@@ -53,8 +55,8 @@ $claseInput = 'w-full rounded-lg border border-zinc-300 bg-white text-black px-3
 <?php // OS sin DO: aqui solo se arman las cargas. El DO y el contenedor se llenan en Contenedor > Crear DO. ?>
 <div class="bg-white rounded-xl shadow-sm p-6 mb-6 flex flex-wrap items-center justify-between gap-3" id="salida-embarque" data-vivo-region="<?= htmlspecialchars($vivoDo) ?>">
     <div>
-        <p class="font-semibold text-black">OS <?= htmlspecialchars($orden->etiquetaDo()) ?> <?= badge('Sin DO', 'amber') ?></p>
-        <p class="text-sm text-zinc-600 mt-1">Puede agregar mas cargas con <strong>Agregar cargas</strong>. Bodega ya puede escanearla. El DO y el contenedor se crean despues, en el menu <strong>Contenedor</strong>.</p>
+        <p class="font-semibold text-black">Orden de salida <?= htmlspecialchars($orden->etiquetaDo()) ?></p>
+        <p class="text-sm text-zinc-600 mt-1">Puede agregar mas cargas con <strong>Agregar cargas</strong>, ajustar sus bultos o devolverlas a bodega. Bodega ya puede escanearla.</p>
     </div>
 </div>
 <?php else: ?>
@@ -189,10 +191,10 @@ $claseInput = 'w-full rounded-lg border border-zinc-300 bg-white text-black px-3
             <?php endif; ?>
             <?php if ($armaSalida): ?>
             <form method="post" action="/salidas/<?= htmlspecialchars($orden->id()) ?>/cancelar"
-                  onsubmit="return confirm('¿Cancelar <?= htmlspecialchars($orden->etiquetaDo()) ?>? Se elimina el DO y sus bultos vuelven a quedar disponibles en bodega.');">
+                  onsubmit="return confirm('¿Cancelar <?= htmlspecialchars($orden->etiquetaDo()) ?>? Se elimina <?= $sinDo ? 'la OS' : 'el DO' ?> y sus bultos vuelven a quedar disponibles en bodega.');">
                 <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
                 <button type="submit" class="inline-flex items-center gap-2 bg-red-500/10 text-red-600 rounded-lg px-4 py-2 text-sm font-medium hover:bg-red-500/20 transition">
-                    <?= icon_small('x') ?><span>Cancelar Orden</span>
+                    <?= icon_small('x') ?><span><?= $sinDo ? 'Eliminar OS' : 'Cancelar Orden' ?></span>
                 </button>
             </form>
             <?php endif; ?>
@@ -244,8 +246,8 @@ $opcionSalida = static fn (array $s): string => $s['etiqueta']
 <div class="bg-white rounded-xl shadow-sm p-6">
     <div class="flex flex-wrap items-start justify-between gap-3 mb-4">
         <div>
-            <h2 class="font-semibold text-black mb-1">Cargas de esta salida <span id="salida-num-cargas" data-vivo-region="<?= htmlspecialchars($vivoDo) ?>" class="text-zinc-400 font-normal">· <?= count($avance) ?></span></h2>
-            <p class="text-xs text-zinc-500">Bodega escanea cada bulto al subirlo al contenedor. Las cargas con bultos pendientes aparecen primero. Use <strong>+</strong> para ver los LPN de una carga.</p>
+            <h2 class="font-semibold text-black mb-1">Cargas de <?= $sinDo ? 'esta OS' : 'esta salida' ?> <span id="salida-num-cargas" data-vivo-region="<?= htmlspecialchars($vivoDo) ?>" class="text-zinc-400 font-normal">· <?= count($avance) ?></span></h2>
+            <p class="text-xs text-zinc-500">Bodega escanea cada bulto<?= $sinDo ? ' de la OS' : ' al subirlo al contenedor' ?>. Las cargas con bultos pendientes aparecen primero. Use <strong>+</strong> para ver los LPN de una carga.</p>
         </div>
         <div class="flex gap-2 text-xs">
             <button type="button" id="salida-expandir-todo" class="rounded-lg border border-zinc-300 px-3 py-1.5 text-zinc-700 hover:bg-slate-100">Ver todos los LPN</button>
@@ -317,10 +319,10 @@ $opcionSalida = static fn (array $s): string => $s['etiqueta']
                                         </form>
                                         <?php endif; ?>
                                         <form method="post" action="/salidas/<?= htmlspecialchars($orden->id()) ?>/devolver-carga"
-                                              onsubmit="return confirm('¿Devolver <?= htmlspecialchars($grupo['tracking']) ?> a bodega? Sus <?= $grupo['total'] ?> bultos salen de este DO y quedan disponibles.');">
+                                              onsubmit="return confirm('¿Devolver <?= htmlspecialchars($grupo['tracking']) ?> a bodega? Sus <?= $grupo['total'] ?> bultos salen de <?= $esteDoc ?> y quedan disponibles.');">
                                             <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
                                             <input type="hidden" name="grupo" value="<?= htmlspecialchars($grupo['cargaId']) ?>">
-                                            <button type="submit" class="text-xs text-red-600 hover:underline">Devolver a bodega (sale de este DO)</button>
+                                            <button type="submit" class="text-xs text-red-600 hover:underline">Devolver a bodega (sale de <?= $esteDoc ?>)</button>
                                         </form>
                                     </div>
                                 </details>
@@ -363,7 +365,7 @@ $opcionSalida = static fn (array $s): string => $s['etiqueta']
         <input type="hidden" name="carga_id" id="ajustar-carga-id">
         <div class="p-5 border-b border-slate-200">
             <h2 class="font-semibold text-black text-lg">Ajustar bultos · <span id="ajustar-titulo" class="font-mono"></span></h2>
-            <p class="text-xs text-zinc-500 mt-1">Deje marcados <strong>solo los bultos que suben a este contenedor</strong>. Los que desmarque vuelven a bodega (disponibles para otro contenedor). Lo ya escaneado se conserva.</p>
+            <p class="text-xs text-zinc-500 mt-1">Deje marcados <strong>solo los bultos que van <?= $enEsteDoc ?></strong>. Los que desmarque vuelven a bodega (disponibles para otra orden). Lo ya escaneado se conserva.</p>
             <div class="flex flex-wrap items-center gap-2 mt-3 text-xs">
                 <span>Marcar los primeros</span>
                 <input type="number" id="ajustar-primeros" min="1" class="w-20 rounded-lg border border-zinc-300 px-2 py-1 text-sm">
@@ -372,7 +374,7 @@ $opcionSalida = static fn (array $s): string => $s['etiqueta']
                 <button type="button" id="ajustar-todos" class="rounded-lg border border-zinc-300 px-2 py-1 hover:bg-slate-100">Todos</button>
                 <button type="button" id="ajustar-ninguno" class="rounded-lg border border-zinc-300 px-2 py-1 hover:bg-slate-100">Ninguno</button>
                 <?php // Lo cargado se queda y lo que bodega no escaneo vuelve a bodega. ?>
-                <button type="button" id="ajustar-escaneados" class="rounded-lg border border-emerald-400 bg-emerald-50 text-emerald-800 px-2 py-1 hover:bg-emerald-100" title="Deja en este DO solo los bultos ya escaneados; los demas vuelven a bodega">Solo escaneados</button>
+                <button type="button" id="ajustar-escaneados" class="rounded-lg border border-emerald-400 bg-emerald-50 text-emerald-800 px-2 py-1 hover:bg-emerald-100" title="Deja en <?= $esteDoc ?> solo los bultos ya escaneados; los demas vuelven a bodega">Solo escaneados</button>
                 <input type="search" id="ajustar-buscar" placeholder="Buscar..." class="flex-1 min-w-[8rem] rounded-lg border border-zinc-300 px-2 py-1 text-sm">
             </div>
         </div>
@@ -422,7 +424,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 .then(function (r) { return r.json(); })
                 .then(function (datos) {
                     lista.innerHTML = datos.bultos.map(function (b) {
-                        var estado = b.enEsteDo ? (b.escaneado ? 'Ya cargado' : 'En este DO') : (b.disponible ? 'En bodega' : b.motivo);
+                        var estado = b.enEsteDo ? (b.escaneado ? 'Ya cargado' : <?= json_encode($sinDo ? 'En esta OS' : 'En este DO') ?>) : (b.disponible ? 'En bodega' : b.motivo);
                         return '<label class="flex items-center gap-3 px-3 py-2 border-b border-slate-100 ' + (b.disponible ? 'hover:bg-amber-50 cursor-pointer' : 'opacity-50') + '" data-buscar="' + b.codigo.toLowerCase() + '">'
                             + '<input type="checkbox" name="lpns[]" value="' + b.id + '" data-escaneado="' + (b.enEsteDo && b.escaneado ? '1' : '0') + '" ' + (b.enEsteDo ? 'checked' : '') + ' ' + (b.disponible ? '' : 'disabled') + ' class="rounded border-zinc-300 text-amber-500 focus:ring-amber-400">'
                             + '<span class="font-mono text-sm text-black flex-1">' + b.codigo + '</span>'
@@ -457,7 +459,7 @@ document.addEventListener('DOMContentLoaded', function () {
     modal.querySelector('form').addEventListener('submit', function (e) {
         var marcados = checks().filter(function (c) { return c.checked; }).length;
         if (marcados === 0) { e.preventDefault(); alert('Deje marcado al menos un bulto. Para sacar toda la carga use "Sacar > Devolver a bodega".'); return; }
-        if (!confirm('¿Guardar? Suben ' + marcados + ' bultos de esta carga en este contenedor; los demas quedan en bodega.')) { e.preventDefault(); }
+        if (!confirm('¿Guardar? Van ' + marcados + ' bultos de esta carga <?= $enEsteDoc ?>; los demas quedan en bodega.')) { e.preventDefault(); }
     });
 });
 </script>
@@ -524,7 +526,7 @@ document.addEventListener('DOMContentLoaded', function () {
 <?php
 // Fotos por carga del cliente (sus bultos/paletas desde varios angulos), no por etiqueta.
 $fotosTitulo = 'Fotos de la salida';
-$fotosAyuda = 'Una galeria por carga: bodega fotografia la carga de cada cliente al subirla al contenedor (app movil); tambien se pueden agregar aqui.';
+$fotosAyuda = 'Una galeria por carga: bodega fotografia la carga de cada cliente' . ($sinDo ? '' : ' al subirla al contenedor') . ' (app movil); tambien se pueden agregar aqui.';
 $fotosPorCarga = [];
 foreach ($fotos as $foto) {
     $fotosPorCarga[$foto['cargaId'] ?? ''][] = $foto;
