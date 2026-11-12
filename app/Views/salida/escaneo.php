@@ -7,7 +7,8 @@ use App\Libraries\Csrf;
 /** @var string|null $mensaje */
 /** @var string|null $error */
 require_once __DIR__ . '/../partials/view_helpers.php';
-$pageTitle = 'Salida ' . $orden->etiquetaDo();
+// Sin DO es una OS (orden de salida); con DO, la salida del contenedor.
+$pageTitle = ($orden->tieneDo() ? 'Salida ' : 'Orden de Salida ') . $orden->etiquetaDo();
 $pageSubtitle = (str_contains($clienteNombre, ', ') ? 'Clientes: ' : 'Cliente: ') . $clienteNombre;
 // Una OS sin DO vuelve a Orden de Salida; con DO, a Salidas.
 $backHref = !$orden->tieneDo() && $orden->estado()->value === 'pendiente' ? '/salidas/ordenes' : '/salidas/historial';
@@ -47,6 +48,20 @@ $claseInput = 'w-full rounded-lg border border-zinc-300 bg-white text-black px-3
     <div class="bg-red-500/10 text-red-600 text-sm rounded-lg px-4 py-3 mb-4 border border-red-500/30"><?= htmlspecialchars($error) ?></div>
 <?php endif; ?>
 
+<?php if ($sinDo && !$cancelada): ?>
+<?php // OS sin DO: aqui solo se arman las cargas. El DO y el contenedor se llenan en Contenedor > Crear DO. ?>
+<div class="bg-white rounded-xl shadow-sm p-6 mb-6 flex flex-wrap items-center justify-between gap-3" id="salida-embarque" data-vivo-region="<?= htmlspecialchars($vivoDo) ?>">
+    <div>
+        <p class="font-semibold text-black">OS <?= htmlspecialchars($orden->etiquetaDo()) ?> <?= badge('Sin DO', 'amber') ?></p>
+        <p class="text-sm text-zinc-600 mt-1">Puede agregar mas cargas con <strong>Agregar cargas</strong>. Bodega ya puede escanearla. El DO y el contenedor los pone trafico en <strong>Contenedor</strong>.</p>
+    </div>
+    <?php if ($ordenaContenedor): ?>
+        <a href="/salidas/crear-do?os=<?= htmlspecialchars($orden->id()) ?>" class="inline-flex items-center gap-2 bg-sky-600 text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-sky-500 transition">
+            <?= icon_small('truck') ?><span>Crear DO en Contenedor</span>
+        </a>
+    <?php endif; ?>
+</div>
+<?php else: ?>
 <form method="post" action="/salidas/<?= htmlspecialchars($orden->id()) ?>/embarque" id="salida-embarque" data-vivo-region="<?= htmlspecialchars($vivoDo) ?>" class="bg-white rounded-xl shadow-sm p-6 mb-6">
     <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
     <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
@@ -130,6 +145,7 @@ $claseInput = 'w-full rounded-lg border border-zinc-300 bg-white text-black px-3
         </div>
     </fieldset>
 </form>
+<?php endif; ?>
 
 <div class="bg-white rounded-xl shadow-sm p-6 mb-6">
     <div class="flex items-end gap-4 flex-wrap justify-between">
