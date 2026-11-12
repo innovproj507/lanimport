@@ -166,6 +166,13 @@ final class SalidaController extends BaseController
             return redirect()->to('/salidas/' . $orden->id());
         }
 
+        // A un DO no se le agregan cargas a mano: todo entra por una OS ("Agregar OS").
+        if ($orden->tieneDo()) {
+            $_SESSION['salida_error'] = "A {$orden->etiquetaDo()} no se le agregan cargas directamente: arme una OS en Orden de Salida y use \"Agregar OS\".";
+
+            return redirect()->to('/salidas/' . $orden->id());
+        }
+
         return $this->renderArmar(null, [], [], $orden);
     }
 
@@ -177,6 +184,13 @@ final class SalidaController extends BaseController
             $this->response->setStatusCode(404);
 
             return 'Orden de salida no encontrada.';
+        }
+
+        // A un DO no se le agregan cargas a mano: todo entra por una OS ("Agregar OS").
+        if ($orden->tieneDo()) {
+            $_SESSION['salida_error'] = "A {$orden->etiquetaDo()} no se le agregan cargas directamente: arme una OS en Orden de Salida y use \"Agregar OS\".";
+
+            return redirect()->to('/salidas/' . $orden->id());
         }
 
         $cargaIds = $this->request->getPost('carga_ids') ?? [];
@@ -707,14 +721,27 @@ final class SalidaController extends BaseController
         }
 
         $lpns = $this->request->getPost('lpns');
+        $lpns = is_array($lpns) ? array_values(array_map('strval', $lpns)) : [];
+        $orden = $this->container()->get(SalidaOrdenRepositoryInterface::class)->findById($id);
+
+        // En un DO solo se quitan bultos (vuelven a bodega): los que entran llegan por una OS.
+        if ($orden !== null && $orden->tieneDo()) {
+            $enElDo = array_map(static fn ($l) => $l->lpnId(), $orden->lineas());
+
+            if (array_diff($lpns, $enElDo) !== []) {
+                $_SESSION['salida_error'] = "A {$orden->etiquetaDo()} no se le agregan bultos a mano: arme una OS en Orden de Salida y use \"Agregar OS\".";
+
+                return redirect()->to('/salidas/' . $id);
+            }
+        }
 
         try {
             $r = $this->container()->get(AjustarBultosCargaSalidaHandler::class)->handle(new AjustarBultosCargaSalidaCommand(
                 $id,
                 trim((string) $this->request->getPost('carga_id')),
-                is_array($lpns) ? $lpns : [],
+                $lpns,
             ));
-            $_SESSION['salida_mensaje'] = "Bultos ajustados: quedan {$r['quedan']} en este DO"
+            $_SESSION['salida_mensaje'] = "Bultos ajustados: quedan {$r['quedan']} en " . ($orden?->tieneDo() ? 'este DO' : 'esta OS')
                 . ($r['quitados'] > 0 ? ", {$r['quitados']} volvieron a bodega" : '')
                 . ($r['agregados'] > 0 ? ", se agregaron {$r['agregados']}" : '') . '.';
         } catch (NotFoundException|ValidationException|\Courier\Shared\Domain\Exception\DomainException $e) {
@@ -780,6 +807,105 @@ final class SalidaController extends BaseController
                 'clientesTodos' => implode(', ', $nombres),
             ];
         }, $ordenes);
+    }
+
+    /** Agregar OS a un DO que ya existe (trafico): lista de OS pendientes para marcar. */
+    public function agregarOsForm(string $id): RedirectResponse|string
+    {
+        $destino = $this->container()->get(SalidaOrdenRepositoryInterface::class)->findById($id);
+
+        if ($destino === null) {
+            $this->response->setStatusCode(404);
+
+            return 'Orden de salida no encontrada.';
+        }
+
+        if (!$destino->tieneDo() || $destino->estado()->value === 'cancelada') {
+            return redirect()->to('/salidas/' . $id);
+        }
+
+        return $this->renderAgregarOs($destino, null, []);
+    }
+
+    /**
+     * Pasa las OS marcadas al DO: sus cargas entran con lo que bodega ya escaneo y sus fotos,
+     * y cada OS queda vacia y se elimina (MoverCargasSalidaHandler, igual que unir).
+     */
+    public function agregarOs(string $id): RedirectResponse|string
+    {
+        $repositorio = $this->container()->get(SalidaOrdenRepositoryInterface::class);
+        $destino = $repositorio->findById($id);
+
+        if ($destino === null || !$destino->tieneDo()) {
+            return redirect()->to('/salidas/' . $id);
+        }
+
+        $osIds = array_values(array_unique(array_filter(array_map('trim', (array) $this->request->getPost('os_ids')))));
+
+        if (!Csrf::verify($this->request->getPost('_csrf'))) {
+            return $this->renderAgregarOs($destino, 'Sesion expirada, intente de nuevo.', $osIds);
+        }
+
+        if ($osIds === []) {
+            return $this->renderAgregarOs($destino, 'Marque al menos una OS.', $osIds);
+        }
+
+        $usuarioId = (string) $this->container()->get(SessionManager::class)->currentUsuarioId();
+        $agregadas = [];
+        $errores = [];
+
+        foreach ($osIds as $osId) {
+            $os = $repositorio->findById($osId);
+
+            if ($os === null || $os->tieneDo() || $os->estado()->value !== 'pendiente') {
+                $errores[] = ($os?->etiquetaDo() ?? 'OS') . ': ya no es una OS pendiente.';
+                continue;
+            }
+
+            try {
+                $this->container()->get(MoverCargasSalidaHandler::class)->handle(
+                    new MoverCargasSalidaCommand($os->id(), $destino->id(), null, $usuarioId),
+                );
+                $agregadas[] = $os->etiquetaDo();
+            } catch (NotFoundException|ValidationException|\Courier\Shared\Domain\Exception\DomainException $e) {
+                $errores[] = "{$os->etiquetaDo()}: {$e->getMessage()}";
+            }
+        }
+
+        if ($agregadas !== []) {
+            $_SESSION['salida_mensaje'] = 'Se agregaron ' . implode(', ', $agregadas) . " a {$destino->etiquetaDo()}. Lo ya escaneado y las fotos se conservan.";
+        }
+
+        if ($errores !== []) {
+            $_SESSION['salida_error'] = 'No se pudieron agregar: ' . implode(' · ', $errores);
+        }
+
+        return redirect()->to('/salidas/' . $destino->id());
+    }
+
+    /** @param array<int, string> $seleccionadas */
+    private function renderAgregarOs(SalidaOrden $destino, ?string $error, array $seleccionadas): string
+    {
+        if ($error !== null) {
+            $this->response->setStatusCode(422);
+        }
+
+        $ordenes = array_values(array_filter(
+            $this->container()->get(ListarOrdenesSalidaHandler::class)->handle(new ListarOrdenesSalidaQuery('pendiente', null)),
+            static fn ($o) => !$o->tieneDo(),
+        ));
+        usort($ordenes, static fn ($a, $b) => $a->createdAt() <=> $b->createdAt());
+        $repositorio = $this->container()->get(SalidaOrdenRepositoryInterface::class);
+        $ids = array_map(static fn ($o) => $o->id(), $ordenes);
+
+        return view('salida/agregar_os', [
+            'destino' => $destino,
+            'ordenes' => $ordenes,
+            'clientesPorOrden' => $repositorio->clientesPorOrden($ids),
+            'aduanerosPorOrden' => $repositorio->aduanerosPorOrden($ids),
+            'seleccionadas' => $seleccionadas,
+            'error' => $error,
+        ]);
     }
 
     /**

@@ -204,6 +204,9 @@ $routes->post('salidas/(:segment)/cancelar', 'SalidaController::cancelar/$1', ['
 $routes->get('salidas/lpns-listos/(:segment)', 'SalidaController::lpnsListos/$1', ['filter' => $armaSalida]);
 $routes->get('salidas/(:segment)/agregar', 'SalidaController::agregarForm/$1', ['filter' => $armaSalida]);
 $routes->post('salidas/(:segment)/agregar', 'SalidaController::agregar/$1', ['filter' => $armaSalida]);
+// Agregar OS a un DO existente (trafico): al DO no se le agregan cargas a mano, todo entra por una OS.
+$routes->get('salidas/(:segment)/agregar-os', 'SalidaController::agregarOsForm/$1', ['filter' => $planificaSalida]);
+$routes->post('salidas/(:segment)/agregar-os', 'SalidaController::agregarOs/$1', ['filter' => $planificaSalida]);
 // Unir este DO a otro del mismo contenedor, pasar una carga a otro DO o devolverla a bodega.
 $routes->post('salidas/(:segment)/unir', 'SalidaController::unir/$1', ['filter' => $planificaSalida]);
 // Unificar varios DO del historial en uno (los marcados pasan al que se elige).

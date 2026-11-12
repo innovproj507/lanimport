@@ -22,7 +22,12 @@ $confirmaSalida = puede_confirmar_salida();
 $sinDo = !$orden->tieneDo();
 $esteDoc = $sinDo ? 'esta OS' : 'este DO';
 $enEsteDoc = $sinDo ? 'en esta OS' : 'en este contenedor';
-$headerActions = ($armaSalida && $orden->estado()->value === 'pendiente' ? header_button('/salidas/' . $orden->id() . '/agregar', 'plus', 'Agregar cargas', 'emerald') : '')
+// A una OS se le agregan cargas; a un DO se le agregan OS (no cargas sueltas).
+$headerActions = ($orden->estado()->value === 'pendiente'
+        ? ($sinDo
+            ? ($armaSalida ? header_button('/salidas/' . $orden->id() . '/agregar', 'plus', 'Agregar cargas', 'emerald') : '')
+            : ($ordenaContenedor ? header_button('/salidas/' . $orden->id() . '/agregar-os', 'plus', 'Agregar OS', 'emerald') : ''))
+        : '')
     // Lo que trafico imprime y entrega a bodega (bodega no imprime): las etiquetas exactas que suben al contenedor.
     . (puede_imprimir()
         ? header_button('/salidas/' . $orden->id() . '/orden-carga', 'printer', 'Orden de carga (bodega)', 'emerald')
@@ -426,7 +431,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     lista.innerHTML = datos.bultos.map(function (b) {
                         var estado = b.enEsteDo ? (b.escaneado ? 'Ya cargado' : <?= json_encode($sinDo ? 'En esta OS' : 'En este DO') ?>) : (b.disponible ? 'En bodega' : b.motivo);
                         return '<label class="flex items-center gap-3 px-3 py-2 border-b border-slate-100 ' + (b.disponible ? 'hover:bg-amber-50 cursor-pointer' : 'opacity-50') + '" data-buscar="' + b.codigo.toLowerCase() + '">'
-                            + '<input type="checkbox" name="lpns[]" value="' + b.id + '" data-escaneado="' + (b.enEsteDo && b.escaneado ? '1' : '0') + '" ' + (b.enEsteDo ? 'checked' : '') + ' ' + (b.disponible ? '' : 'disabled') + ' class="rounded border-zinc-300 text-amber-500 focus:ring-amber-400">'
+                            + '<input type="checkbox" name="lpns[]" value="' + b.id + '" data-escaneado="' + (b.enEsteDo && b.escaneado ? '1' : '0') + '" ' + (b.enEsteDo ? 'checked' : '') + ' ' + (b.disponible && (b.enEsteDo || <?= $sinDo ? 'true' : 'false' ?>) ? '' : 'disabled') + ' class="rounded border-zinc-300 text-amber-500 focus:ring-amber-400">'
                             + '<span class="font-mono text-sm text-black flex-1">' + b.codigo + '</span>'
                             + '<span class="text-xs text-zinc-500 w-16 text-right">' + (b.numero ? b.numero + '/' + b.total : '') + '</span>'
                             + '<span class="text-xs w-32 text-right ' + (b.escaneado ? 'text-emerald-700' : 'text-zinc-500') + '">' + estado + '</span>'
