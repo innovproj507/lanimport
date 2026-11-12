@@ -24,8 +24,9 @@ $headerActions = ($armaSalida && $orden->estado()->value === 'pendiente' ? heade
     // Lo que trafico imprime y entrega a bodega (bodega no imprime): las etiquetas exactas que suben al contenedor.
     . (puede_imprimir()
         ? header_button('/salidas/' . $orden->id() . '/orden-carga', 'printer', 'Orden de carga (bodega)', 'emerald')
-            . header_button('/salidas/' . $orden->id() . '/reporte', 'chart', 'Reporte de salida', 'amber')
-            . header_button('/salidas/' . $orden->id() . '/manifiesto', 'printer', 'Imprimir manifiesto', 'blue')
+            // Reporte y manifiesto son documentos del DO: una OS sin DO no los muestra.
+            . ($sinDo ? '' : header_button('/salidas/' . $orden->id() . '/reporte', 'chart', 'Reporte de salida', 'amber')
+                . header_button('/salidas/' . $orden->id() . '/manifiesto', 'printer', 'Imprimir manifiesto', 'blue'))
         : '');
 require __DIR__ . '/../partials/header.php';
 
@@ -53,13 +54,8 @@ $claseInput = 'w-full rounded-lg border border-zinc-300 bg-white text-black px-3
 <div class="bg-white rounded-xl shadow-sm p-6 mb-6 flex flex-wrap items-center justify-between gap-3" id="salida-embarque" data-vivo-region="<?= htmlspecialchars($vivoDo) ?>">
     <div>
         <p class="font-semibold text-black">OS <?= htmlspecialchars($orden->etiquetaDo()) ?> <?= badge('Sin DO', 'amber') ?></p>
-        <p class="text-sm text-zinc-600 mt-1">Puede agregar mas cargas con <strong>Agregar cargas</strong>. Bodega ya puede escanearla. El DO y el contenedor los pone trafico en <strong>Contenedor</strong>.</p>
+        <p class="text-sm text-zinc-600 mt-1">Puede agregar mas cargas con <strong>Agregar cargas</strong>. Bodega ya puede escanearla. El DO y el contenedor se crean despues, en el menu <strong>Contenedor</strong>.</p>
     </div>
-    <?php if ($ordenaContenedor): ?>
-        <a href="/salidas/crear-do?os=<?= htmlspecialchars($orden->id()) ?>" class="inline-flex items-center gap-2 bg-sky-600 text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-sky-500 transition">
-            <?= icon_small('truck') ?><span>Crear DO en Contenedor</span>
-        </a>
-    <?php endif; ?>
 </div>
 <?php else: ?>
 <form method="post" action="/salidas/<?= htmlspecialchars($orden->id()) ?>/embarque" id="salida-embarque" data-vivo-region="<?= htmlspecialchars($vivoDo) ?>" class="bg-white rounded-xl shadow-sm p-6 mb-6">
@@ -174,7 +170,9 @@ $claseInput = 'w-full rounded-lg border border-zinc-300 bg-white text-black px-3
         <div class="mt-4 flex gap-3 flex-wrap items-center">
             <?php // Marca de DO abierto: con "En vivo", si desaparece (otro lo confirmo o cancelo) se deja de escanear. ?>
             <span id="salida-abierta" hidden></span>
-            <?php if ($confirmaSalida): ?>
+            <?php if ($sinDo): ?>
+                <?php // Una OS no se confirma: se confirma el DO, en Contenedor. ?>
+            <?php elseif ($confirmaSalida): ?>
             <?php // Manual: terminar de escanear NO confirma. Inventario confirma cuando el contenedor sale (con DO). ?>
             <form method="post" action="/salidas/<?= htmlspecialchars($orden->id()) ?>/finalizar"
                   onsubmit="return confirm('¿El contenedor de <?= htmlspecialchars($orden->etiquetaDo()) ?> YA SALIO?\n\nAl confirmar:\n- Sus cargas pasan a En transito y salen del inventario.\n- Se avisa al cliente por correo que su carga fue despachada.\n\nSi el contenedor todavia no sale, pulse Cancelar.');">
@@ -210,7 +208,7 @@ $claseInput = 'w-full rounded-lg border border-zinc-300 bg-white text-black px-3
 <?php
 // Organizar el contenedor (trafico/gerencia): unir este DO a otro del mismo contenedor.
 $otrasSalidas ??= [];
-$puedeOrganizar = $ordenaContenedor && !$confirmada && !$cancelada && $otrasSalidas !== [];
+$puedeOrganizar = $ordenaContenedor && !$sinDo && !$confirmada && !$cancelada && $otrasSalidas !== [];
 $opcionSalida = static fn (array $s): string => $s['etiqueta']
     . ($s['estado'] === 'confirmada' ? ' (confirmada)' : '')
     . ($s['contenedor'] ? ' · ' . $s['contenedor'] : '')
@@ -305,7 +303,7 @@ $opcionSalida = static fn (array $s): string => $s['etiqueta']
                                 <details class="mt-1 font-sans font-normal">
                                     <summary class="text-xs text-violet-700 cursor-pointer hover:underline">Sacar</summary>
                                     <div class="mt-2 p-3 rounded-lg border border-slate-200 bg-white space-y-2 w-80">
-                                        <?php if ($ordenaContenedor): ?>
+                                        <?php if ($ordenaContenedor && !$sinDo): ?>
                                         <form method="post" action="/salidas/<?= htmlspecialchars($orden->id()) ?>/mover-carga" class="flex gap-2 items-center">
                                             <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
                                             <input type="hidden" name="grupo" value="<?= htmlspecialchars($grupo['cargaId']) ?>">
