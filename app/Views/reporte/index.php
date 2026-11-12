@@ -1,7 +1,7 @@
 <?php
 /** @var \Courier\Reporte\Application\ObtenerReporteOperativo\ReporteOperativoView $reporte */
 $pageTitle = 'Reportes';
-$pageSubtitle = 'Operacion de bodega, despachos y facturacion por periodo';
+$pageSubtitle = 'Cargas en bodega, en salida y las que salieron, por cliente y aduanero';
 require __DIR__ . '/../partials/header.php';
 
 $serviceLabels = ['aereo' => 'Aereo', 'maritimo' => 'Maritimo', 'freight' => 'Freight', 'sin_especificar' => 'Sin especificar'];
@@ -26,123 +26,21 @@ $inventarioColores = [
 ];
 ?>
 
-<div class="bg-white rounded-xl shadow-sm p-6 mb-6">
-    <?= card_header('filter', 'Periodo y filtros', 'amber') ?>
-    <form method="get" action="/reportes" class="flex items-end gap-4 flex-wrap" id="reporte-filtros">
-        <input type="hidden" name="etapa" id="flujo-etapa-input" value="<?= htmlspecialchars($etapaActiva) ?>">
-        <input type="hidden" name="resumen" id="resumen-input" value="<?= htmlspecialchars($resumenActivo) ?>">
-        <input type="hidden" name="alerta" id="alerta-input" value="<?= htmlspecialchars($alertaActiva) ?>">
-        <div>
-            <label class="block text-sm font-medium text-zinc-700 mb-1">Desde</label>
-            <input type="date" name="desde" value="<?= htmlspecialchars($reporte->desde) ?>"
-                   class="rounded-lg border border-zinc-300 bg-white text-black px-3 py-2 text-sm">
-        </div>
-        <div>
-            <label class="block text-sm font-medium text-zinc-700 mb-1">Hasta</label>
-            <input type="date" name="hasta" value="<?= htmlspecialchars($reporte->hasta) ?>"
-                   class="rounded-lg border border-zinc-300 bg-white text-black px-3 py-2 text-sm">
-        </div>
-        <div>
-            <label class="block text-sm font-medium text-zinc-700 mb-1">Aduanero</label>
-            <select name="aduanero" class="rounded-lg border border-zinc-300 bg-white text-black px-3 py-2 text-sm">
-                <option value="">Todos</option>
-                <?php foreach ($aduaneros as $a): ?>
-                    <option value="<?= htmlspecialchars($a->identificador()) ?>" <?= $filtroAduanero === $a->identificador() ? 'selected' : '' ?>><?= htmlspecialchars($a->nombre()) ?></option>
-                <?php endforeach; ?>
-            </select>
-        </div>
-        <div>
-            <label class="block text-sm font-medium text-zinc-700 mb-1">Cliente</label>
-            <select name="cliente" class="max-w-[16rem] rounded-lg border border-zinc-300 bg-white text-black px-3 py-2 text-sm">
-                <option value="">Todos</option>
-                <?php foreach ($clientes as $cl): ?>
-                    <option value="<?= htmlspecialchars($cl->id()) ?>" <?= $filtroCliente === $cl->id() ? 'selected' : '' ?>><?= htmlspecialchars($cl->nombreCompleto()) ?></option>
-                <?php endforeach; ?>
-            </select>
-        </div>
-        <button type="submit" class="inline-flex items-center gap-2 bg-amber-500 text-black rounded-lg px-4 py-2 text-sm font-medium hover:bg-amber-400 transition">
-            <?= icon_small('filter') ?><span>Aplicar</span>
-        </button>
-    </form>
-    <p class="text-xs text-zinc-500 mt-2">El periodo aplica a "Salieron" y a los indicadores de abajo. Aduanero y cliente filtran el Flujo de cargas.</p>
-</div>
+<?php require __DIR__ . '/_consulta.php'; ?>
 
-<?php require __DIR__ . '/_flujo_cargas.php'; ?>
-<?php require __DIR__ . '/_resumenes.php'; ?>
-<?php require __DIR__ . '/_alertas.php'; ?>
+<details class="mb-6">
+    <summary class="cursor-pointer select-none bg-white rounded-xl shadow-sm px-6 py-4 font-semibold text-black flex items-center gap-2 hover:bg-slate-50">
+        <?= icon_small('clock', 'w-4 h-4 text-red-600') ?> Alertas
+        <span class="text-sm font-normal text-zinc-500">· antiguedad en bodega, OS sin DO, contenedores incompletos</span>
+    </summary>
+    <div class="mt-3">
+        <?php require __DIR__ . '/_alertas.php'; ?>
+    </div>
+</details>
 
 <script>
-// Flujo de cargas: las tarjetas cambian la lista visible; la etapa se recuerda en la URL
-// (para el Excel y al aplicar filtros) y se vuelve a aplicar cuando "En vivo" refresca la zona.
+// Alertas: pestanas (antiguedad / OS sin DO / contenedores incompletos) y su Excel con los filtros.
 (function () {
-    var etapa = document.getElementById('flujo-etapa-input').value;
-
-    function aplicar() {
-        document.querySelectorAll('[data-flujo-panel]').forEach(function (p) {
-            p.classList.toggle('hidden', p.getAttribute('data-flujo-panel') !== etapa);
-        });
-        document.querySelectorAll('[data-flujo-etapa]').forEach(function (t) {
-            var color = t.getAttribute('data-color');
-            var activa = t.getAttribute('data-flujo-etapa') === etapa;
-            t.classList.toggle('ring-2', activa);
-            t.classList.toggle('ring-' + color + '-400', activa);
-            t.classList.toggle('bg-' + color + '-50', activa);
-            t.classList.toggle('bg-white', !activa);
-        });
-        document.getElementById('flujo-etapa-input').value = etapa;
-        var params = new URLSearchParams(new FormData(document.getElementById('reporte-filtros')));
-        var excel = document.getElementById('flujo-excel');
-        if (excel) {
-            excel.href = '/reportes/flujo/excel?' + params.toString();
-        }
-        var url = new URL(window.location.href);
-        url.searchParams.set('etapa', etapa);
-        history.replaceState(null, '', url);
-    }
-
-    document.addEventListener('click', function (e) {
-        var tarjeta = e.target.closest('[data-flujo-etapa]');
-        if (tarjeta) {
-            etapa = tarjeta.getAttribute('data-flujo-etapa');
-            aplicar();
-        }
-    });
-    document.addEventListener('vivo:actualizado', aplicar);
-
-    // Resumen de salidas: pestanas (cliente / aduanero / contenedor) y su Excel con los mismos filtros.
-    function aplicarResumen() {
-        var activo = document.getElementById('resumen-input').value;
-        document.querySelectorAll('[data-resumen-panel]').forEach(function (p) {
-            p.classList.toggle('hidden', p.getAttribute('data-resumen-panel') !== activo);
-        });
-        document.querySelectorAll('[data-resumen-tab]').forEach(function (t) {
-            var esta = t.getAttribute('data-resumen-tab') === activo;
-            t.classList.toggle('bg-white', esta);
-            t.classList.toggle('shadow', esta);
-            t.classList.toggle('text-zinc-900', esta);
-            t.classList.toggle('text-zinc-500', !esta);
-        });
-        var params = new URLSearchParams(new FormData(document.getElementById('reporte-filtros')));
-        var excel = document.getElementById('resumen-excel');
-        if (excel) {
-            excel.href = '/reportes/resumen/excel?' + params.toString();
-        }
-        var url = new URL(window.location.href);
-        url.searchParams.set('resumen', activo);
-        history.replaceState(null, '', url);
-    }
-
-    document.addEventListener('click', function (e) {
-        var tab = e.target.closest('[data-resumen-tab]');
-        if (tab) {
-            document.getElementById('resumen-input').value = tab.getAttribute('data-resumen-tab');
-            aplicarResumen();
-        }
-    });
-    document.addEventListener('vivo:actualizado', aplicarResumen);
-    aplicarResumen();
-
-    // Alertas: pestanas (antiguedad / OS sin DO / contenedores incompletos) y su Excel.
     function aplicarAlerta() {
         var activa = document.getElementById('alerta-input').value;
         document.querySelectorAll('[data-alerta-panel]').forEach(function (p) {
@@ -160,9 +58,6 @@ $inventarioColores = [
         if (excel) {
             excel.href = '/reportes/alertas/excel?' + params.toString();
         }
-        var url = new URL(window.location.href);
-        url.searchParams.set('alerta', activa);
-        history.replaceState(null, '', url);
     }
 
     document.addEventListener('click', function (e) {
@@ -174,10 +69,15 @@ $inventarioColores = [
     });
     document.addEventListener('vivo:actualizado', aplicarAlerta);
     aplicarAlerta();
-    aplicar();
 })();
 </script>
 
+<details class="mb-6">
+    <summary class="cursor-pointer select-none bg-white rounded-xl shadow-sm px-6 py-4 font-semibold text-black flex items-center gap-2 hover:bg-slate-50">
+        <?= icon_small('chart', 'w-4 h-4 text-amber-600') ?> Indicadores de bodega y facturacion
+        <span class="text-sm font-normal text-zinc-500">· del periodo elegido</span>
+    </summary>
+    <div class="mt-3">
 <?php require __DIR__ . '/_operacion_bodega.php'; ?>
 
 <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
@@ -260,5 +160,8 @@ $inventarioColores = [
         </tbody>
     </table>
 </div>
+
+    </div>
+</details>
 
 <?php require __DIR__ . '/../partials/footer.php'; ?>

@@ -49,6 +49,8 @@ final class ObtenerFlujoCargasHandler implements QueryHandlerInterface
         // Alertas: antiguedad en bodega por cliente y OS que esperan DO.
         $antiguedad = [];
         $osSinDo = [];
+        // Consulta de Reportes: una fila por carga y estado (bodega, en salida por OS/DO, salieron).
+        $consulta = [];
 
         foreach ($this->repository->cargas($query->aduanero, $query->clienteId) as $c) {
             $id = (string) $c['id'];
@@ -57,7 +59,7 @@ final class ObtenerFlujoCargasHandler implements QueryHandlerInterface
             $confirmadas = array_values(array_filter($dos, static fn (array $d) => $d['estado'] === 'confirmada'));
             $despachados = (int) array_sum(array_column($confirmadas, 'bultos'));
 
-            $this->acumularResumenes($c, $dos, $despachados, in_array($c['estado'], $despachadas, true), $query, $porCliente, $porAduanero, $porContenedor, $antiguedad, $osSinDo, $ahora);
+            $this->acumularResumenes($c, $dos, $despachados, in_array($c['estado'], $despachadas, true), $query, $porCliente, $porAduanero, $porContenedor, $antiguedad, $osSinDo, $ahora, $consulta);
 
             $fila = [
                 'id' => $id,
@@ -164,6 +166,7 @@ final class ObtenerFlujoCargasHandler implements QueryHandlerInterface
             'etapas' => $resultado,
             'resumen' => ['cliente' => $porCliente, 'aduanero' => $porAduanero, 'contenedor' => $porContenedor],
             'alertas' => ['antiguedad' => $antiguedad, 'osSinDo' => $osSinDo, 'incompletos' => $incompletos],
+            'consulta' => $consulta,
         ];
     }
 
@@ -178,8 +181,9 @@ final class ObtenerFlujoCargasHandler implements QueryHandlerInterface
      * @param array{pendientes: array<string, array<string, mixed>>, salieron: array<string, array<string, mixed>>} $porContenedor
      * @param array<string, array<string, mixed>> $antiguedad bultos en bodega por cliente y rango de dias
      * @param array<string, array<string, mixed>> $osSinDo OS pendientes que aun no tienen DO
+     * @param array<int, array<string, mixed>> $consulta filas carga + estado para la consulta de Reportes
      */
-    private function acumularResumenes(array $c, array $dos, int $despachados, bool $despachada, ObtenerFlujoCargasQuery $query, array &$porCliente, array &$porAduanero, array &$porContenedor, array &$antiguedad, array &$osSinDo, DateTimeImmutable $ahora): void
+    private function acumularResumenes(array $c, array $dos, int $despachados, bool $despachada, ObtenerFlujoCargasQuery $query, array &$porCliente, array &$porAduanero, array &$porContenedor, array &$antiguedad, array &$osSinDo, DateTimeImmutable $ahora, array &$consulta): void
     {
         $cliente = trim((string) $c['cliente']) !== '' ? trim((string) $c['cliente']) : '—';
         $aduanero = (string) $c['aduanero'] !== '' ? (string) $c['aduanero'] : '—';
@@ -216,6 +220,29 @@ final class ObtenerFlujoCargasHandler implements QueryHandlerInterface
             } else {
                 continue;
             }
+
+            $contenedorFila = (string) ($d['numero_contenedor'] ?? '');
+            $consulta[] = [
+                'cargaId' => (string) $c['id'],
+                'tracking' => (string) $c['tracking_numero'],
+                'cliente' => $cliente,
+                'aduanero' => $aduanero,
+                'estado' => $d['estado'] === 'pendiente' ? 'salida' : 'salieron',
+                'ordenId' => (string) $d['id'],
+                'orden' => $etiqueta,
+                'esOs' => $d['do_numero'] === null,
+                'contenedor' => $contenedorFila !== '' ? substr($contenedorFila, 0, -1) . '-' . substr($contenedorFila, -1) : null,
+                'naviera' => $d['naviera'] ?? null,
+                'bultos' => $bultos,
+                'escaneados' => (int) $d['escaneados'],
+                'kg' => $p['kg'],
+                'p3' => $p['p3'],
+                'valor' => $p['valor'],
+                'ingreso' => $c['fecha_ingreso'] !== null ? substr((string) $c['fecha_ingreso'], 0, 10) : null,
+                // En salida: cuando se armo la orden; salieron: cuando se confirmo.
+                'fecha' => substr((string) ($d['estado'] === 'pendiente' ? $d['created_at'] : $d['confirmed_at']), 0, 10),
+                'dias' => null,
+            ];
 
             // Por contenedor: solo los que ya tienen DO (una OS aun no tiene contenedor).
             if ($d['do_numero'] === null) {
@@ -284,6 +311,27 @@ final class ObtenerFlujoCargasHandler implements QueryHandlerInterface
             $desde = new DateTimeImmutable((string) ($c['en_bodega_at'] ?? $c['fecha_ingreso'] ?? $c['created_at']));
             $dias = (int) $desde->diff($ahora)->days;
             $rango = $dias <= 15 ? 'r15' : ($dias <= 30 ? 'r30' : ($dias <= 60 ? 'r60m' : 'r60'));
+            $pb = $prorrateo($suma['bodega']);
+            $consulta[] = [
+                'cargaId' => (string) $c['id'],
+                'tracking' => (string) $c['tracking_numero'],
+                'cliente' => $cliente,
+                'aduanero' => $aduanero,
+                'estado' => 'bodega',
+                'ordenId' => null,
+                'orden' => null,
+                'esOs' => false,
+                'contenedor' => null,
+                'naviera' => null,
+                'bultos' => $suma['bodega'],
+                'escaneados' => null,
+                'kg' => $pb['kg'],
+                'p3' => $pb['p3'],
+                'valor' => $pb['valor'],
+                'ingreso' => $c['fecha_ingreso'] !== null ? substr((string) $c['fecha_ingreso'], 0, 10) : null,
+                'fecha' => $desde->format('Y-m-d'),
+                'dias' => $dias,
+            ];
             $a = &$antiguedad[$cliente];
             $a ??= ['nombre' => $cliente, 'cargas' => [], 'r15' => 0, 'r30' => 0, 'r60m' => 0, 'r60' => 0, 'total' => 0, 'diasMax' => 0, 'masVieja' => null];
             $a['cargas'][$c['id']] = true;
