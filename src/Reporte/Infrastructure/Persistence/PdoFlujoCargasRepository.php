@@ -41,13 +41,13 @@ final class PdoFlujoCargasRepository
         $sql = "SELECT c.id, c.tracking_numero, c.estado, c.fecha_ingreso, c.created_at, c.updated_at,
                        TRIM(CONCAT(COALESCE(cl.nombre, ''), ' ', COALESCE(cl.apellido, ''))) AS cliente,
                        COALESCE(a.nombre, '') AS aduanero,
-                       COALESCE(l.bultos, 0) AS bultos, COALESCE(l.peso, 0) AS peso, COALESCE(l.p3, 0) AS p3,
+                       COALESCE(l.bultos, 0) AS bultos, COALESCE(l.peso, 0) AS peso, COALESCE(l.p3, 0) AS p3, COALESCE(l.valor, 0) AS valor,
                        COALESCE(e.total, 0) AS etiquetas, COALESCE(e.por_escanear, 0) AS por_escanear,
                        h.en_bodega_at, h.en_transito_at
                 FROM cargas c
                 LEFT JOIN clientes cl ON cl.id = c.cliente_id
                 LEFT JOIN aduaneros a ON a.identificador = c.aduanero_identificador
-                LEFT JOIN (SELECT carga_id, SUM(cantidad) AS bultos, SUM(peso) AS peso,
+                LEFT JOIN (SELECT carga_id, SUM(cantidad) AS bultos, SUM(peso) AS peso, SUM(valor) AS valor,
                                   SUM(CASE WHEN cubicaje_p3 > 0 THEN cubicaje_p3
                                            ELSE COALESCE(ancho, 0) * COALESCE(alto, 0) * COALESCE(largo, 0) * cantidad / 28316.85 END) AS p3
                            FROM carga_lineas GROUP BY carga_id) l ON l.carga_id = c.id
@@ -75,6 +75,7 @@ final class PdoFlujoCargasRepository
     {
         $stmt = $this->connection->query(
             "SELECT x.carga_id, so.id, so.do_anio, so.do_numero, so.codigo, so.estado, so.numero_contenedor,
+                    so.numero_sello, so.nombre_barco, so.fecha_salida_etd, so.destino_final,
                     so.confirmed_at, so.created_at, n.nombre AS naviera,
                     COUNT(*) AS bultos, SUM(sl.escaneado) AS escaneados
              FROM (SELECT lp.carga_id, lp.id AS lpn_salida FROM lpns lp WHERE lp.carga_id IS NOT NULL
@@ -86,6 +87,7 @@ final class PdoFlujoCargasRepository
              JOIN salida_ordenes so ON so.id = sl.salida_orden_id AND so.estado IN ('pendiente', 'confirmada')
              LEFT JOIN navieras n ON n.id = so.naviera_id
              GROUP BY x.carga_id, so.id, so.do_anio, so.do_numero, so.codigo, so.estado, so.numero_contenedor,
+                      so.numero_sello, so.nombre_barco, so.fecha_salida_etd, so.destino_final,
                       so.confirmed_at, so.created_at, n.nombre
              ORDER BY so.created_at"
         );

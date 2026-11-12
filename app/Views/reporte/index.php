@@ -30,6 +30,7 @@ $inventarioColores = [
     <?= card_header('filter', 'Periodo y filtros', 'amber') ?>
     <form method="get" action="/reportes" class="flex items-end gap-4 flex-wrap" id="reporte-filtros">
         <input type="hidden" name="etapa" id="flujo-etapa-input" value="<?= htmlspecialchars($etapaActiva) ?>">
+        <input type="hidden" name="resumen" id="resumen-input" value="<?= htmlspecialchars($resumenActivo) ?>">
         <div>
             <label class="block text-sm font-medium text-zinc-700 mb-1">Desde</label>
             <input type="date" name="desde" value="<?= htmlspecialchars($reporte->desde) ?>"
@@ -66,6 +67,7 @@ $inventarioColores = [
 </div>
 
 <?php require __DIR__ . '/_flujo_cargas.php'; ?>
+<?php require __DIR__ . '/_resumenes.php'; ?>
 
 <script>
 // Flujo de cargas: las tarjetas cambian la lista visible; la etapa se recuerda en la URL
@@ -104,6 +106,39 @@ $inventarioColores = [
         }
     });
     document.addEventListener('vivo:actualizado', aplicar);
+
+    // Resumen de salidas: pestanas (cliente / aduanero / contenedor) y su Excel con los mismos filtros.
+    function aplicarResumen() {
+        var activo = document.getElementById('resumen-input').value;
+        document.querySelectorAll('[data-resumen-panel]').forEach(function (p) {
+            p.classList.toggle('hidden', p.getAttribute('data-resumen-panel') !== activo);
+        });
+        document.querySelectorAll('[data-resumen-tab]').forEach(function (t) {
+            var esta = t.getAttribute('data-resumen-tab') === activo;
+            t.classList.toggle('bg-white', esta);
+            t.classList.toggle('shadow', esta);
+            t.classList.toggle('text-zinc-900', esta);
+            t.classList.toggle('text-zinc-500', !esta);
+        });
+        var params = new URLSearchParams(new FormData(document.getElementById('reporte-filtros')));
+        var excel = document.getElementById('resumen-excel');
+        if (excel) {
+            excel.href = '/reportes/resumen/excel?' + params.toString();
+        }
+        var url = new URL(window.location.href);
+        url.searchParams.set('resumen', activo);
+        history.replaceState(null, '', url);
+    }
+
+    document.addEventListener('click', function (e) {
+        var tab = e.target.closest('[data-resumen-tab]');
+        if (tab) {
+            document.getElementById('resumen-input').value = tab.getAttribute('data-resumen-tab');
+            aplicarResumen();
+        }
+    });
+    document.addEventListener('vivo:actualizado', aplicarResumen);
+    aplicarResumen();
     aplicar();
 })();
 </script>

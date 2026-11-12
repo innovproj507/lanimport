@@ -43,12 +43,18 @@ final class ObtenerFlujoCargasHandler implements QueryHandlerInterface
         $ahora = new DateTimeImmutable();
         $etapas = array_fill_keys(array_keys(self::ETAPAS), []);
 
+        $porCliente = [];
+        $porAduanero = [];
+        $porContenedor = ['pendientes' => [], 'salieron' => []];
+
         foreach ($this->repository->cargas($query->aduanero, $query->clienteId) as $c) {
             $id = (string) $c['id'];
             $dos = $salidas[$id] ?? [];
             $pendientes = array_values(array_filter($dos, static fn (array $d) => $d['estado'] === 'pendiente'));
             $confirmadas = array_values(array_filter($dos, static fn (array $d) => $d['estado'] === 'confirmada'));
             $despachados = (int) array_sum(array_column($confirmadas, 'bultos'));
+
+            $this->acumularResumenes($c, $dos, $despachados, in_array($c['estado'], $despachadas, true), $query, $porCliente, $porAduanero, $porContenedor);
 
             $fila = [
                 'id' => $id,
@@ -124,7 +130,149 @@ final class ObtenerFlujoCargasHandler implements QueryHandlerInterface
             ];
         }
 
-        return ['etapas' => $resultado];
+        // Mas bultos en salida primero; los contenedores por numero de DO (o el ultimo confirmado primero).
+        $ordenar = static fn (array $a, array $b) => [$b['os'] + $b['do'], $b['bodega']] <=> [$a['os'] + $a['do'], $a['bodega']];
+        $porCliente = array_values(array_map([$this, 'cerrarGrupo'], $porCliente));
+        $porAduanero = array_values(array_map([$this, 'cerrarGrupo'], $porAduanero));
+        usort($porCliente, $ordenar);
+        usort($porAduanero, $ordenar);
+
+        foreach ($porContenedor as $tipo => $dos) {
+            $dos = array_values(array_map([$this, 'cerrarGrupo'], $dos));
+            usort($dos, $tipo === 'salieron'
+                ? static fn (array $a, array $b) => $b['confirmada'] <=> $a['confirmada']
+                : static fn (array $a, array $b) => $a['orden'] <=> $b['orden']);
+            $porContenedor[$tipo] = $dos;
+        }
+
+        return [
+            'etapas' => $resultado,
+            'resumen' => ['cliente' => $porCliente, 'aduanero' => $porAduanero, 'contenedor' => $porContenedor],
+        ];
+    }
+
+    /**
+     * Suma una carga en los resumenes por cliente, aduanero y contenedor (DO). Los kg, p3 y valor de
+     * lo que esta en salida se prorratean por los bultos de la carga que van en cada OS/DO.
+     *
+     * @param array<string, mixed> $c fila de la carga
+     * @param array<int, array<string, mixed>> $dos sus salidas (OS y DO, pendientes o confirmadas)
+     * @param array<string, array<string, mixed>> $porCliente
+     * @param array<string, array<string, mixed>> $porAduanero
+     * @param array{pendientes: array<string, array<string, mixed>>, salieron: array<string, array<string, mixed>>} $porContenedor
+     */
+    private function acumularResumenes(array $c, array $dos, int $despachados, bool $despachada, ObtenerFlujoCargasQuery $query, array &$porCliente, array &$porAduanero, array &$porContenedor): void
+    {
+        $cliente = trim((string) $c['cliente']) !== '' ? trim((string) $c['cliente']) : '—';
+        $aduanero = (string) $c['aduanero'] !== '' ? (string) $c['aduanero'] : '—';
+        $base = max(1, (int) $c['etiquetas'] > 0 ? (int) $c['etiquetas'] : (int) $c['bultos']);
+        $prorrateo = static fn (int $bultos): array => [
+            'kg' => (float) $c['peso'] * $bultos / $base,
+            'p3' => (float) $c['p3'] * $bultos / $base,
+            'valor' => (float) $c['valor'] * $bultos / $base,
+        ];
+
+        $suma = ['bodega' => 0, 'os' => 0, 'do' => 0, 'kg' => 0.0, 'p3' => 0.0, 'valor' => 0.0, 'salieron' => 0, 'dos' => []];
+        $enOrdenes = 0;
+
+        foreach ($dos as $d) {
+            $bultos = (int) $d['bultos'];
+            $p = $prorrateo($bultos);
+            $etiqueta = $d['do_numero'] !== null ? "DO.{$d['do_numero']} / {$d['do_anio']}" : (string) $d['codigo'];
+
+            if ($d['estado'] === 'pendiente') {
+                $enOrdenes += $bultos;
+                $suma[$d['do_numero'] === null ? 'os' : 'do'] += $bultos;
+                $suma['kg'] += $p['kg'];
+                $suma['p3'] += $p['p3'];
+                $suma['valor'] += $p['valor'];
+                $suma['dos'][$etiqueta] = (string) $d['id'];
+            } elseif ($d['estado'] === 'confirmada') {
+                $fecha = $d['confirmed_at'] !== null ? substr((string) $d['confirmed_at'], 0, 10) : null;
+
+                if ($fecha === null || $fecha < $query->desde || $fecha > $query->hasta) {
+                    continue;
+                }
+
+                $suma['salieron'] += $bultos;
+            } else {
+                continue;
+            }
+
+            // Por contenedor: solo los que ya tienen DO (una OS aun no tiene contenedor).
+            if ($d['do_numero'] === null) {
+                continue;
+            }
+
+            $tipo = $d['estado'] === 'pendiente' ? 'pendientes' : 'salieron';
+            $contenedor = (string) ($d['numero_contenedor'] ?? '');
+            $grupo = &$porContenedor[$tipo][(string) $d['id']];
+            $grupo ??= [
+                'id' => (string) $d['id'],
+                'etiqueta' => $etiqueta,
+                'orden' => (int) $d['do_anio'] * 1000000 + (int) $d['do_numero'],
+                'contenedor' => $contenedor !== '' ? substr($contenedor, 0, -1) . '-' . substr($contenedor, -1) : null,
+                'sello' => $d['numero_sello'] ?? null,
+                'naviera' => $d['naviera'] ?? null,
+                'barco' => $d['nombre_barco'] ?? null,
+                'etd' => $d['fecha_salida_etd'] !== null ? new DateTimeImmutable((string) $d['fecha_salida_etd']) : null,
+                'destino' => $d['destino_final'] ?? null,
+                'creada' => new DateTimeImmutable((string) $d['created_at']),
+                'confirmada' => $d['confirmed_at'] !== null ? new DateTimeImmutable((string) $d['confirmed_at']) : null,
+                'cargas' => [], 'clientes' => [], 'aduaneros' => [],
+                'bultos' => 0, 'escaneados' => 0, 'kg' => 0.0, 'p3' => 0.0, 'valor' => 0.0,
+            ];
+            $grupo['cargas'][$c['id']] = true;
+            $grupo['clientes'][$cliente] = true;
+            $grupo['aduaneros'][$aduanero] = true;
+            $grupo['bultos'] += $bultos;
+            $grupo['escaneados'] += (int) $d['escaneados'];
+            $grupo['kg'] += $p['kg'];
+            $grupo['p3'] += $p['p3'];
+            $grupo['valor'] += $p['valor'];
+            unset($grupo);
+        }
+
+        // En bodega: bultos de la carga que no estan en ninguna OS/DO ni salieron.
+        if (!$despachada) {
+            $suma['bodega'] = max(0, $base - $enOrdenes - $despachados);
+        }
+
+        if ($suma['bodega'] + $suma['os'] + $suma['do'] + $suma['salieron'] === 0) {
+            return;
+        }
+
+        foreach ([[&$porCliente, $cliente], [&$porAduanero, $aduanero]] as [&$destino, $nombre]) {
+            $g = &$destino[$nombre];
+            $g ??= ['nombre' => $nombre, 'cargas' => [], 'clientes' => [], 'bodega' => 0, 'os' => 0, 'do' => 0, 'kg' => 0.0, 'p3' => 0.0, 'valor' => 0.0, 'salieron' => 0, 'dos' => []];
+            $g['cargas'][$c['id']] = true;
+            $g['clientes'][$cliente] = true;
+
+            foreach (['bodega', 'os', 'do', 'kg', 'p3', 'valor', 'salieron'] as $k) {
+                $g[$k] += $suma[$k];
+            }
+
+            $g['dos'] += $suma['dos'];
+            unset($g);
+        }
+        unset($destino);
+    }
+
+    /** Conjuntos (cargas, clientes, aduaneros) a conteos y listas, para la vista y el Excel. */
+    private function cerrarGrupo(array $g): array
+    {
+        foreach (['cargas', 'clientes', 'aduaneros'] as $k) {
+            if (isset($g[$k])) {
+                $g[$k . 'Lista'] = array_keys($g[$k]);
+                $g[$k] = count($g[$k]);
+            }
+        }
+
+        if (isset($g['dos'])) {
+            ksort($g['dos'], SORT_NATURAL);
+        }
+
+        return $g;
     }
 
     /** @param array<string, mixed> $d */

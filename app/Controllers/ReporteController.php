@@ -28,17 +28,82 @@ final class ReporteController extends BaseController
         usort($clientes, static fn ($a, $b) => strcasecmp($a->nombreCompleto(), $b->nombreCompleto()));
 
         $etapa = (string) ($this->request->getGet('etapa') ?? '');
+        $resumen = (string) ($this->request->getGet('resumen') ?? '');
+        $flujo = $this->container()->get(ObtenerFlujoCargasHandler::class)
+            ->handle(new ObtenerFlujoCargasQuery($desde, $hasta, $aduanero, $clienteId));
 
         return view('reporte/index', [
             'reporte' => $reporte,
-            'flujo' => $this->container()->get(ObtenerFlujoCargasHandler::class)
-                ->handle(new ObtenerFlujoCargasQuery($desde, $hasta, $aduanero, $clienteId)),
+            'flujo' => $flujo,
+            // Resumen de salidas por cliente, aduanero y contenedor (mismos filtros que el flujo).
+            'resumen' => $flujo['resumen'],
+            'resumenActivo' => in_array($resumen, ['cliente', 'aduanero', 'contenedor'], true) ? $resumen : 'cliente',
             'etapaActiva' => isset(ObtenerFlujoCargasHandler::ETAPAS[$etapa]) ? $etapa : 'llegando',
             'aduaneros' => $this->container()->get(ListarAduanerosHandler::class)->handle(new ListarAduanerosQuery()),
             'clientes' => $clientes,
             'filtroAduanero' => $aduanero ?? '',
             'filtroCliente' => $clienteId ?? '',
         ]);
+    }
+
+    /** Excel del resumen de salidas (por cliente, aduanero o contenedor), con los filtros de la pantalla. */
+    public function resumenExcel(): ResponseInterface
+    {
+        [$desde, $hasta, $aduanero, $clienteId] = $this->filtros();
+        $tipo = (string) ($this->request->getGet('resumen') ?? 'cliente');
+        $tipo = in_array($tipo, ['cliente', 'aduanero', 'contenedor'], true) ? $tipo : 'cliente';
+        $resumen = $this->container()->get(ObtenerFlujoCargasHandler::class)
+            ->handle(new ObtenerFlujoCargasQuery($desde, $hasta, $aduanero, $clienteId))['resumen'];
+        $hojas = [];
+
+        if ($tipo === 'contenedor') {
+            foreach (['pendientes' => 'En salida', 'salieron' => 'Salieron'] as $clave => $nombre) {
+                $filas = [['DO', 'CONTENEDOR', 'SELLO', 'NAVIERA', 'BARCO', 'DESTINO', $clave === 'salieron' ? 'CONFIRMADA' : 'ETD', 'ADUANEROS', 'CLIENTES', 'CARGAS', 'BULTOS', 'ESCANEADOS', 'KG', 'P3', 'VALOR']];
+                $t = ['cargas' => 0, 'bultos' => 0, 'escaneados' => 0, 'kg' => 0.0, 'p3' => 0.0, 'valor' => 0.0];
+
+                foreach ($resumen['contenedor'][$clave] as $d) {
+                    $filas[] = [
+                        $d['etiqueta'], $d['contenedor'] ?? '', $d['sello'] ?? '', $d['naviera'] ?? '', $d['barco'] ?? '', $d['destino'] ?? '',
+                        ($clave === 'salieron' ? $d['confirmada']?->format('d/m/Y') : $d['etd']?->format('d/m/Y')) ?? '',
+                        implode(', ', $d['aduanerosLista']), implode(', ', $d['clientesLista']),
+                        $d['cargas'], $d['bultos'], $d['escaneados'], round($d['kg'], 2), round($d['p3'], 2), round($d['valor'], 2),
+                    ];
+
+                    foreach ($t as $k => $_) {
+                        $t[$k] += $d[$k];
+                    }
+                }
+
+                $filas[] = ['TOTALES', '', '', '', '', '', '', '', '', $t['cargas'], $t['bultos'], $t['escaneados'], round($t['kg'], 2), round($t['p3'], 2), round($t['valor'], 2)];
+                $hojas[$nombre] = ['filas' => $filas, 'anchos' => [14, 16, 16, 16, 18, 22, 12, 24, 40, 8, 9, 11, 12, 12, 14]];
+            }
+        } else {
+            $titulo = $tipo === 'cliente' ? 'CLIENTE' : 'ADUANERO';
+            $filas = [array_merge([$titulo], $tipo === 'aduanero' ? ['CLIENTES'] : [], ['CARGAS', 'EN BODEGA', 'EN OS', 'EN CONTENEDOR', 'KG EN SALIDA', 'P3 EN SALIDA', 'VALOR EN SALIDA', 'SALIERON', 'OS / DO'])];
+            $t = ['cargas' => 0, 'bodega' => 0, 'os' => 0, 'do' => 0, 'kg' => 0.0, 'p3' => 0.0, 'valor' => 0.0, 'salieron' => 0];
+
+            foreach ($resumen[$tipo] as $g) {
+                $filas[] = array_merge(
+                    [$g['nombre']],
+                    $tipo === 'aduanero' ? [$g['clientes']] : [],
+                    [$g['cargas'], $g['bodega'], $g['os'], $g['do'], round($g['kg'], 2), round($g['p3'], 2), round($g['valor'], 2), $g['salieron'], implode(', ', array_keys($g['dos']))],
+                );
+
+                foreach ($t as $k => $_) {
+                    $t[$k] += $g[$k];
+                }
+            }
+
+            $filas[] = array_merge(['TOTALES'], $tipo === 'aduanero' ? [''] : [], [$t['cargas'], $t['bodega'], $t['os'], $t['do'], round($t['kg'], 2), round($t['p3'], 2), round($t['valor'], 2), $t['salieron'], '']);
+            $hojas[$tipo === 'cliente' ? 'Por cliente' : 'Por aduanero'] = ['filas' => $filas, 'anchos' => array_merge([34], $tipo === 'aduanero' ? [9] : [], [8, 11, 9, 14, 13, 13, 15, 10, 40])];
+        }
+
+        $contenido = $this->container()->get(EscritorXlsx::class)->generar($hojas);
+
+        return $this->response
+            ->setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+            ->setHeader('Content-Disposition', 'attachment; filename="resumen-salidas-por-' . $tipo . '-' . date('Y-m-d') . '.xlsx"')
+            ->setBody($contenido);
     }
 
     /** Excel de una etapa del flujo de cargas, con los mismos filtros de la pantalla. */

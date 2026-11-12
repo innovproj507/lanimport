@@ -265,6 +265,8 @@ $routes->group('configuracion', ['filter' => ['auth', 'role:admin']], static fun
 $routes->get('reportes', 'ReporteController::index', ['filter' => ['auth', 'role:gerente,admin']]);
 // Flujo de cargas: Excel de una etapa (llegando, deposito, salida, salieron) con los filtros de la pantalla.
 $routes->get('reportes/flujo/excel', 'ReporteController::flujoExcel', ['filter' => ['auth', 'role:gerente,admin']]);
+// Resumen de salidas por cliente, aduanero o contenedor (resumen=cliente|aduanero|contenedor).
+$routes->get('reportes/resumen/excel', 'ReporteController::resumenExcel', ['filter' => ['auth', 'role:gerente,admin']]);
 
 // API (JWT, sin sesion de navegador) — igual que interfaces/Api/Router/ApiRoutes.php
 $routes->group('api/v1', static function ($routes) {
