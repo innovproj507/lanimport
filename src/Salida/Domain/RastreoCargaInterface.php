@@ -34,7 +34,7 @@ interface RastreoCargaInterface
     public function movimientos(string $cargaId): array;
 
     /**
-     * Carga eliminada con ese tracking (archivada antes de borrarla), o null.
+     * Carga eliminada con ese tracking (completo o sus 6 caracteres finales), archivada antes de borrarla, o null.
      *
      * @return array<string, mixed>|null
      */

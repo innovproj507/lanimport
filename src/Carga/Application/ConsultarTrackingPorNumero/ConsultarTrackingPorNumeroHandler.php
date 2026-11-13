@@ -27,7 +27,10 @@ final class ConsultarTrackingPorNumeroHandler implements QueryHandlerInterface
     {
         assert($query instanceof ConsultarTrackingPorNumeroQuery);
 
-        $carga = $this->cargas->findByTrackingNumero(new TrackingNumero($query->trackingNumero));
+        $sufijo = self::sufijo($query->trackingNumero);
+        $carga = $sufijo !== null
+            ? $this->cargas->findByTrackingSufijo($sufijo)
+            : $this->cargas->findByTrackingNumero(new TrackingNumero($query->trackingNumero));
 
         // Un cliente (o aduanero) solo ve sus cargas: las ajenas responden igual que si no existieran.
         $ajena = $carga !== null && (
@@ -40,6 +43,21 @@ final class ConsultarTrackingPorNumeroHandler implements QueryHandlerInterface
         }
 
         return self::toView($carga, $this->historialRepository, $this->lpns);
+    }
+
+    /**
+     * Tambien se busca por los 6 caracteres finales del tracking ("F323F1") o por el codigo de una
+     * de sus etiquetas ("LPN-F323F1-3"). Devuelve ese sufijo, o null si es un tracking completo.
+     */
+    public static function sufijo(string $texto): ?string
+    {
+        $texto = strtoupper(str_replace(["'", '?', '_', ' '], ['-', '-', '-', ''], trim($texto)));
+
+        if (preg_match('/^(?:LPN-)?([A-Z0-9]{6})(?:-\d+)?$/', $texto, $m)) {
+            return $m[1];
+        }
+
+        return null;
     }
 
     public static function toView(Carga $carga, PdoHistorialEstadoRepository $historialRepository, LpnRepositoryInterface $lpns): TrackingView

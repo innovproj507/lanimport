@@ -299,8 +299,9 @@ final class PdoRastreoCarga implements RastreoCargaInterface
     public function eliminada(string $trackingNumero): ?array
     {
         try {
-            $stmt = $this->connection->prepare('SELECT * FROM cargas_eliminadas WHERE tracking_numero = :t ORDER BY eliminada_at DESC LIMIT 1');
-            $stmt->execute([':t' => $trackingNumero]);
+            // Tracking completo, o solo sus 6 caracteres finales.
+            $stmt = $this->connection->prepare('SELECT * FROM cargas_eliminadas WHERE tracking_numero = :t OR tracking_numero LIKE :p ORDER BY eliminada_at DESC LIMIT 1');
+            $stmt->execute([':t' => $trackingNumero, ':p' => strlen($trackingNumero) === 6 ? '%-' . $trackingNumero : $trackingNumero]);
             $r = $stmt->fetch();
         } catch (PDOException) {
             return null; // migracion 065 aun no aplicada

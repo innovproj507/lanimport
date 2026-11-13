@@ -77,7 +77,7 @@ $lineaTiempo = static function (array $eventos) use ($h, $fecha, $colorMovimient
 
 <form method="post" action="/tracking/buscar" class="bg-white rounded-xl shadow p-6 max-w-xl flex gap-3 mb-6">
     <input type="hidden" name="_csrf" value="<?= $h(Csrf::token()) ?>">
-    <input type="text" name="tracking_numero" placeholder="Ej: LAN-2026-A1B2C3" required value="<?= $h($numero) ?>"
+    <input type="text" name="tracking_numero" placeholder="Ej: LAN-2026-A1B2C3, A1B2C3 o LPN-A1B2C3-1" required value="<?= $h($numero) ?>"
            class="flex-1 rounded-lg border border-zinc-300 bg-white text-black px-3 py-2 focus:ring-2 focus:ring-amber-400 focus:outline-none">
     <button type="submit" class="bg-amber-500 text-black rounded-lg px-6 py-2.5 font-medium hover:bg-amber-400 transition">
         Buscar

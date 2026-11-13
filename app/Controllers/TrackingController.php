@@ -53,12 +53,22 @@ final class TrackingController extends BaseController
                 return $this->render(null, null, $numero, $eliminada);
             }
 
-            return $this->render(null, $e->getMessage(), $numero);
+            $mensaje = $e instanceof ValidationException
+                ? "No se reconoce \"{$numero}\". Escriba el tracking completo (LAN-2026-XXXXXX), sus 6 caracteres finales (XXXXXX) o el codigo de una etiqueta (LPN-XXXXXX-1)."
+                : $e->getMessage();
+
+            return $this->render(null, $mensaje, $numero);
         }
     }
 
     private function normalizar(string $numero): string
     {
+        $sufijo = ConsultarTrackingPorNumeroHandler::sufijo($numero);
+
+        if ($sufijo !== null) {
+            return $sufijo;
+        }
+
         try {
             return (string) new TrackingNumero(TrackingNumero::normalizarBusqueda($numero));
         } catch (Throwable) {

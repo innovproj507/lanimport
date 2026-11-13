@@ -225,6 +225,17 @@ final class PdoCargaRepository implements CargaRepositoryInterface
         return $row ? $this->hydrate($row) : null;
     }
 
+    public function findByTrackingSufijo(string $sufijo): ?Carga
+    {
+        $stmt = $this->connection->prepare(
+            'SELECT * FROM cargas WHERE tracking_numero LIKE :patron ORDER BY created_at DESC LIMIT 1'
+        );
+        $stmt->execute([':patron' => '%-' . strtoupper($sufijo)]);
+        $row = $stmt->fetch();
+
+        return $row ? $this->hydrate($row) : null;
+    }
+
     public function findByContenedor(Contenedor $contenedor): array
     {
         $stmt = $this->connection->prepare('SELECT * FROM cargas WHERE numero_contenedor = :numero ORDER BY created_at DESC');

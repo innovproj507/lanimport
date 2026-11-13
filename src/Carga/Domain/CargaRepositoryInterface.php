@@ -18,6 +18,9 @@ interface CargaRepositoryInterface
 
     public function findByTrackingNumero(TrackingNumero $numero): ?Carga;
 
+    /** La carga mas reciente cuyo tracking termina en esos 6 caracteres (LAN-AAAA-XXXXXX). */
+    public function findByTrackingSufijo(string $sufijo): ?Carga;
+
     /** @return array<int, Carga> */
     public function findByContenedor(Contenedor $contenedor): array;
 
