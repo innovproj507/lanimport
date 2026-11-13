@@ -38,7 +38,9 @@ use Courier\Naviera\Application\ListarNavieras\ListarNavierasHandler;
 use Courier\Naviera\Application\RegistrarNaviera\RegistrarNavieraHandler;
 use Courier\Naviera\Domain\NavieraRepositoryInterface;
 use Courier\Salida\Domain\CargasParaSalidaInterface;
+use Courier\Salida\Domain\RastreoCargaInterface;
 use Courier\Salida\Infrastructure\Persistence\PdoCargasParaSalida;
+use Courier\Salida\Infrastructure\Persistence\PdoRastreoCarga;
 use Courier\Naviera\Infrastructure\Persistence\PdoNavieraRepository;
 use Courier\Proveedor\Application\ActualizarProveedor\ActualizarProveedorHandler;
 use Courier\Proveedor\Application\BuscarProveedores\BuscarProveedoresHandler;
@@ -311,6 +313,8 @@ $container->set(AgregarCargasSalidaHandler::class, fn (Container $c) => new Agre
 ));
 // Lectura para "Armar salida": cargas en bodega con el estado de sus bultos.
 $container->set(CargasParaSalidaInterface::class, fn (Container $c) => new PdoCargasParaSalida($c->get(PDO::class)));
+// Lectura para Rastreo: en que OS/DO va cada bulto de una carga.
+$container->set(RastreoCargaInterface::class, fn (Container $c) => new PdoRastreoCarga($c->get(PDO::class)));
 $container->set(RegistrarEscaneoSalidaHandler::class, fn (Container $c) => new RegistrarEscaneoSalidaHandler($c->get(SalidaOrdenRepositoryInterface::class)));
 $container->set(ConfirmarSalidaHandler::class, fn (Container $c) => new ConfirmarSalidaHandler(
     $c->get(SalidaOrdenRepositoryInterface::class),

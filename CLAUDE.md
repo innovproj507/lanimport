@@ -122,6 +122,14 @@ The paper delivery form (empresa de transporte, chofer, placa, entregado por, ce
   - current stock, bultos por escanear and cargas without LPNs;
   - inventory age, top clients, and receptions pending for more than 24 h.
 
+### Rastreo (`/tracking`)
+
+- `TrackingController`: POST `tracking/buscar` (also the header search) or `GET /tracking?numero=...`.
+- Cliente/aduanero see only estado, productos and historial.
+- Inventario/Trafico/Gerencia/Owner also see "Donde esta ahora": the carga's bultos grouped by the current OS/DO they are in (with link, state, container and n/total scanned), or in bodega without an order, or in reempaque.
+- They also see the carga data, every OS/DO the carga has been in (including cancelled ones, with container, naviera, dates and scan count) and each bulto (estado, ubicacion, reempaque box, OS/DO, scanned).
+- The data comes from `Salida\Domain\RastreoCargaInterface` (`PdoRastreoCarga`), which also follows bultos inside reempaque boxes through `lpn_genealogia`.
+
 ### Aduanero asignado al cliente
 
 `clientes.aduanero_identificador` (migration 056, FK to `aduaneros.identificador`) is the client's usual aduanero. It is edited in the client form, shown in the client list, and pre-selected in Ingreso de Carga when the client is picked (`alSeleccionar` in `app.js`), unless the user already chose another one.
