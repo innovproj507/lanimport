@@ -12,6 +12,9 @@ interface AduaneroRepositoryInterface
 
     public function findByIdentificador(string $identificador): ?Aduanero;
 
+    /** Aduanero vinculado a un usuario con rol aduanero (o null). */
+    public function findByUsuarioId(string $usuarioId): ?Aduanero;
+
     /** @return array<int, Aduanero> */
     public function findAllActivos(): array;
 

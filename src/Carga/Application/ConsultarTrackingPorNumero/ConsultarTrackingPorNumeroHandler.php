@@ -29,7 +29,13 @@ final class ConsultarTrackingPorNumeroHandler implements QueryHandlerInterface
 
         $carga = $this->cargas->findByTrackingNumero(new TrackingNumero($query->trackingNumero));
 
-        if ($carga === null) {
+        // Un cliente (o aduanero) solo ve sus cargas: las ajenas responden igual que si no existieran.
+        $ajena = $carga !== null && (
+            ($query->soloClienteId !== null && $carga->clienteId() !== $query->soloClienteId)
+            || ($query->soloAduanero !== null && $carga->aduanero()?->identificador() !== $query->soloAduanero)
+        );
+
+        if ($carga === null || $ajena) {
             throw new CargaNotFoundException("No se encontro una carga con tracking {$query->trackingNumero}");
         }
 

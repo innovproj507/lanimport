@@ -8,7 +8,8 @@ use CodeIgniter\HTTP\ResponseInterface;
 use Courier\Carga\Application\ConsultarTrackingPorContenedor\ConsultarTrackingPorContenedorHandler;
 use Courier\Carga\Application\ConsultarTrackingPorContenedor\ConsultarTrackingPorContenedorQuery;
 use Courier\Carga\Application\ConsultarTrackingPorNumero\ConsultarTrackingPorNumeroHandler;
-use Courier\Carga\Application\ConsultarTrackingPorNumero\ConsultarTrackingPorNumeroQuery;
+use App\Libraries\AlcanceRastreo;
+use Config\Services;
 use Throwable;
 
 final class TrackingApiController extends BaseApiController
@@ -17,7 +18,7 @@ final class TrackingApiController extends BaseApiController
     {
         try {
             $view = $this->container()->get(ConsultarTrackingPorNumeroHandler::class)
-                ->handle(new ConsultarTrackingPorNumeroQuery($numero));
+                ->handle(AlcanceRastreo::query($this->container(), $numero, Services::apiAuthContext()->rol, Services::apiAuthContext()->usuarioId));
 
             return $this->success($view);
         } catch (Throwable $e) {

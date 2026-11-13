@@ -84,6 +84,15 @@ final class PdoAduaneroRepository implements AduaneroRepositoryInterface
         return $row ? $this->hydrate($row) : null;
     }
 
+    public function findByUsuarioId(string $usuarioId): ?Aduanero
+    {
+        $stmt = $this->connection->prepare('SELECT * FROM aduaneros WHERE usuario_id = :usuario_id LIMIT 1');
+        $stmt->execute([':usuario_id' => $usuarioId]);
+        $row = $stmt->fetch();
+
+        return $row ? $this->hydrate($row) : null;
+    }
+
     public function findAllActivos(): array
     {
         $stmt = $this->connection->query('SELECT * FROM aduaneros WHERE activo = 1 ORDER BY nombre ASC');

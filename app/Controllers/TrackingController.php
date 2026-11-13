@@ -6,7 +6,7 @@ namespace App\Controllers;
 
 use App\Libraries\Csrf;
 use Courier\Carga\Application\ConsultarTrackingPorNumero\ConsultarTrackingPorNumeroHandler;
-use Courier\Carga\Application\ConsultarTrackingPorNumero\ConsultarTrackingPorNumeroQuery;
+use App\Libraries\AlcanceRastreo;
 use Courier\Carga\Domain\Exception\CargaNotFoundException;
 use Courier\Carga\Domain\ValueObject\TrackingNumero;
 use Courier\Salida\Domain\RastreoCargaInterface;
@@ -39,12 +39,15 @@ final class TrackingController extends BaseController
     {
         try {
             $view = $this->container()->get(ConsultarTrackingPorNumeroHandler::class)
-                ->handle(new ConsultarTrackingPorNumeroQuery($numero));
+                ->handle(AlcanceRastreo::query($this->container(), $numero, $_SESSION['usuario_rol'] ?? null, $_SESSION['usuario_id'] ?? null));
 
             return $this->render($view, null, $numero);
         } catch (ValidationException|CargaNotFoundException $e) {
-            // Una carga borrada no desaparece: queda archivada y aqui se explica que se elimino.
-            $eliminada = $this->container()->get(RastreoCargaInterface::class)->eliminada($this->normalizar($numero));
+            // Una carga borrada no desaparece: queda archivada y aqui se explica que se elimino
+            // (solo al personal interno: del archivo no se sabe si era de este cliente).
+            $eliminada = AlcanceRastreo::limitado($_SESSION['usuario_rol'] ?? null)
+                ? null
+                : $this->container()->get(RastreoCargaInterface::class)->eliminada($this->normalizar($numero));
 
             if ($eliminada !== null) {
                 return $this->render(null, null, $numero, $eliminada);
