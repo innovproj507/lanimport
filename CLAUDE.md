@@ -129,6 +129,16 @@ The paper delivery form (empresa de transporte, chofer, placa, entregado por, ce
 - Inventario/Trafico/Gerencia/Owner also see "Donde esta ahora": the carga's bultos grouped by the current OS/DO they are in (with link, state, container and n/total scanned), or in bodega without an order, or in reempaque.
 - They also see the carga data, every OS/DO the carga has been in (including cancelled ones, with container, naviera, dates and scan count) and each bulto (estado, ubicacion, reempaque box, OS/DO, scanned).
 - The data comes from `Salida\Domain\RastreoCargaInterface` (`PdoRastreoCarga`), which also follows bultos inside reempaque boxes through `lpn_genealogia`.
+- "Historial de movimientos" (internal roles, newest first, `RastreoCargaInterface::movimientos()`) merges:
+  - estado changes (`tracking_historial`);
+  - the bitacora `carga_movimientos` (migration 065, **no FK**, so it survives deleted cargas and orders);
+  - fotos, avisos al cliente, and (for data older than the bitacora) salida scans, confirmed salidas and generated labels derived from their tables.
+  - Reception and salida scans are grouped per day / order.
+- Handlers write the bitacora through `Carga\Domain\BitacoraCargaInterface` (`PdoBitacoraCarga`, optional last constructor arg, user from the session; failures are only logged):
+  - `registrarPorLpns()` writes one row per carga, opening reempaque boxes, with `{n}` = that carga's bultos.
+  - Logged: crear/agregar/ajustar/devolver/mover/unir OS-DO, DO generated or renumbered, contenedor, cancelar, confirmar, salida and reception scans, etiquetas generated/deleted, carga edited, reempaque iniciar/terminar/cancelar.
+  - **A new operation that moves bultos must log here too.**
+- Deleting a carga asks for a motivo (`prompt` in `carga/_tabla_filas.php`). `EliminarCargaHandler` first archives a copy (cliente, lineas, historial, motivo, who/when) into `cargas_eliminadas`. When the tracking is not found, Rastreo shows "Carga eliminada" with that data; clients only see "tracking anulado".
 
 ### Aduanero asignado al cliente
 

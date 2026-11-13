@@ -37,6 +37,8 @@ use Courier\Naviera\Application\BuscarNavieras\BuscarNavierasHandler;
 use Courier\Naviera\Application\ListarNavieras\ListarNavierasHandler;
 use Courier\Naviera\Application\RegistrarNaviera\RegistrarNavieraHandler;
 use Courier\Naviera\Domain\NavieraRepositoryInterface;
+use Courier\Carga\Domain\BitacoraCargaInterface;
+use Courier\Carga\Infrastructure\Persistence\PdoBitacoraCarga;
 use Courier\Salida\Domain\CargasParaSalidaInterface;
 use Courier\Salida\Domain\RastreoCargaInterface;
 use Courier\Salida\Infrastructure\Persistence\PdoCargasParaSalida;
@@ -236,6 +238,7 @@ $container->set(DesactivarUsuarioHandler::class, fn (Container $c) => new Desact
 $container->set(BuscarUsuariosHandler::class, fn (Container $c) => new BuscarUsuariosHandler($c->get(UsuarioRepositoryInterface::class)));
 
 // Carga
+$container->set(BitacoraCargaInterface::class, fn (Container $c) => new PdoBitacoraCarga($c->get(PDO::class), static fn (): ?string => isset($_SESSION['usuario_id']) ? (string) $_SESSION['usuario_id'] : null));
 $container->set(CargaRepositoryInterface::class, fn (Container $c) => new PdoCargaRepository($c->get(PDO::class)));
 $container->set(PdoHistorialEstadoRepository::class, fn (Container $c) => new PdoHistorialEstadoRepository($c->get(PDO::class)));
 $container->set(ConteoBultosCargaInterface::class, fn (Container $c) => new PdoConteoBultosCarga($c->get(PDO::class)));
@@ -248,6 +251,7 @@ $container->set(EliminarCargaHandler::class, fn (Container $c) => new EliminarCa
     $c->get(ConteoBultosCargaInterface::class),
     $c->get(BarcodeGeneratorInterface::class),
     $c->get(UnitOfWork::class),
+    $c->get(BitacoraCargaInterface::class),
 ));
 
 // Lpn
@@ -262,6 +266,7 @@ $container->set(GenerarLpnsParaCargaHandler::class, fn (Container $c) => new Gen
     $c->get(LpnBarcodeGeneratorInterface::class),
     $c->get(PdoEtiquetaRepository::class),
     $c->get(UnitOfWork::class),
+    $c->get(BitacoraCargaInterface::class),
 ));
 $container->set(GenerarImagenesEtiquetasLpnHandler::class, fn (Container $c) => new GenerarImagenesEtiquetasLpnHandler(
     $c->get(CargaRepositoryInterface::class),
@@ -277,11 +282,13 @@ $container->set(EliminarLpnsDeCargaHandler::class, fn (Container $c) => new Elim
     $c->get(LpnRepositoryInterface::class),
     $c->get(LpnBarcodeGeneratorInterface::class),
     $c->get(UnitOfWork::class),
+    $c->get(BitacoraCargaInterface::class),
 ));
 $container->set(ConfirmarRecepcionLpnHandler::class, fn (Container $c) => new ConfirmarRecepcionLpnHandler(
     $c->get(LpnRepositoryInterface::class),
     $c->get(UbicacionRepositoryInterface::class),
     $c->get(SincronizarEstadoCargaHandler::class),
+    $c->get(BitacoraCargaInterface::class),
 ));
 $container->set(ListarLpnsPorCargaHandler::class, fn (Container $c) => new ListarLpnsPorCargaHandler($c->get(LpnRepositoryInterface::class)));
 $container->set(BuscarInventarioHandler::class, fn (Container $c) => new BuscarInventarioHandler($c->get(LpnRepositoryInterface::class)));
@@ -298,6 +305,7 @@ $container->set(ActualizarEmbarqueSalidaHandler::class, fn (Container $c) => new
     $c->get(SalidaOrdenRepositoryInterface::class),
     $c->get(NavieraRepositoryInterface::class),
     $c->get(UnitOfWork::class),
+    $c->get(BitacoraCargaInterface::class),
 ));
 
 $container->set(CrearOrdenSalidaHandler::class, fn (Container $c) => new CrearOrdenSalidaHandler(
@@ -305,27 +313,31 @@ $container->set(CrearOrdenSalidaHandler::class, fn (Container $c) => new CrearOr
     $c->get(SalidaOrdenRepositoryInterface::class),
     $c->get(UnitOfWork::class),
     $c->get(NavieraRepositoryInterface::class),
+    $c->get(BitacoraCargaInterface::class),
 ));
 $container->set(AgregarCargasSalidaHandler::class, fn (Container $c) => new AgregarCargasSalidaHandler(
     $c->get(LpnRepositoryInterface::class),
     $c->get(SalidaOrdenRepositoryInterface::class),
     $c->get(UnitOfWork::class),
+    $c->get(BitacoraCargaInterface::class),
 ));
 // Lectura para "Armar salida": cargas en bodega con el estado de sus bultos.
 $container->set(CargasParaSalidaInterface::class, fn (Container $c) => new PdoCargasParaSalida($c->get(PDO::class)));
 // Lectura para Rastreo: en que OS/DO va cada bulto de una carga.
 $container->set(RastreoCargaInterface::class, fn (Container $c) => new PdoRastreoCarga($c->get(PDO::class)));
-$container->set(RegistrarEscaneoSalidaHandler::class, fn (Container $c) => new RegistrarEscaneoSalidaHandler($c->get(SalidaOrdenRepositoryInterface::class)));
+$container->set(RegistrarEscaneoSalidaHandler::class, fn (Container $c) => new RegistrarEscaneoSalidaHandler($c->get(SalidaOrdenRepositoryInterface::class), $c->get(BitacoraCargaInterface::class)));
 $container->set(ConfirmarSalidaHandler::class, fn (Container $c) => new ConfirmarSalidaHandler(
     $c->get(SalidaOrdenRepositoryInterface::class),
     $c->get(LpnRepositoryInterface::class),
     $c->get(UnitOfWork::class),
     $c->get(SincronizarEstadoCargaHandler::class),
+    $c->get(BitacoraCargaInterface::class),
 ));
 $container->set(CancelarOrdenSalidaHandler::class, fn (Container $c) => new CancelarOrdenSalidaHandler(
     $c->get(SalidaOrdenRepositoryInterface::class),
     $c->get(LpnRepositoryInterface::class),
     $c->get(UnitOfWork::class),
+    $c->get(BitacoraCargaInterface::class),
 ));
 // Unir DOs del mismo contenedor / sacar una carga de un DO (a otro DO, o de vuelta a bodega).
 $container->set(MoverCargasSalidaHandler::class, fn (Container $c) => new MoverCargasSalidaHandler(
@@ -333,16 +345,19 @@ $container->set(MoverCargasSalidaHandler::class, fn (Container $c) => new MoverC
     $c->get(LpnRepositoryInterface::class),
     $c->get(UnitOfWork::class),
     $c->get(SincronizarEstadoCargaHandler::class),
+    $c->get(BitacoraCargaInterface::class),
 ));
 $container->set(AjustarBultosCargaSalidaHandler::class, fn (Container $c) => new AjustarBultosCargaSalidaHandler(
     $c->get(SalidaOrdenRepositoryInterface::class),
     $c->get(LpnRepositoryInterface::class),
     $c->get(UnitOfWork::class),
+    $c->get(BitacoraCargaInterface::class),
 ));
 $container->set(DevolverCargaSalidaHandler::class, fn (Container $c) => new DevolverCargaSalidaHandler(
     $c->get(SalidaOrdenRepositoryInterface::class),
     $c->get(LpnRepositoryInterface::class),
     $c->get(UnitOfWork::class),
+    $c->get(BitacoraCargaInterface::class),
 ));
 $container->set(VerOrdenSalidaHandler::class, fn (Container $c) => new VerOrdenSalidaHandler($c->get(SalidaOrdenRepositoryInterface::class)));
 $container->set(ListarOrdenesSalidaHandler::class, fn (Container $c) => new ListarOrdenesSalidaHandler($c->get(SalidaOrdenRepositoryInterface::class)));
@@ -355,6 +370,7 @@ $container->set(IniciarReempaqueHandler::class, fn (Container $c) => new Iniciar
     $c->get(LpnRepositoryInterface::class),
     $c->get(ReempaqueOrdenRepositoryInterface::class),
     $c->get(UnitOfWork::class),
+    $c->get(BitacoraCargaInterface::class),
 ));
 // Bodega ejecuta la orden caja por caja (app de bodega).
 $container->set(AbrirCajaReempaqueHandler::class, fn (Container $c) => new AbrirCajaReempaqueHandler(
@@ -378,11 +394,13 @@ $container->set(TerminarReempaqueHandler::class, fn (Container $c) => new Termin
     $c->get(ReempaqueOrdenRepositoryInterface::class),
     $c->get(LpnRepositoryInterface::class),
     $c->get(UnitOfWork::class),
+    $c->get(BitacoraCargaInterface::class),
 ));
 $container->set(CancelarReempaqueHandler::class, fn (Container $c) => new CancelarReempaqueHandler(
     $c->get(ReempaqueOrdenRepositoryInterface::class),
     $c->get(LpnRepositoryInterface::class),
     $c->get(UnitOfWork::class),
+    $c->get(BitacoraCargaInterface::class),
 ));
 $container->set(VerReempaqueOrdenHandler::class, fn (Container $c) => new VerReempaqueOrdenHandler($c->get(ReempaqueOrdenRepositoryInterface::class)));
 $container->set(ListarReempaqueOrdenesHandler::class, fn (Container $c) => new ListarReempaqueOrdenesHandler($c->get(ReempaqueOrdenRepositoryInterface::class)));
@@ -559,6 +577,7 @@ $container->set(ActualizarDatosCargaHandler::class, fn (Container $c) => new Act
     $c->get(CargaRepositoryInterface::class),
     $c->get(ClienteBultosCargaInterface::class),
     $c->get(UnitOfWork::class),
+    $c->get(BitacoraCargaInterface::class),
 ));
 
 // Carga masiva (Excel/CSV)

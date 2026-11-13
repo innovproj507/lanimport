@@ -15,6 +15,7 @@ use Courier\Shared\Application\CommandInterface;
 use Courier\Shared\Domain\Exception\ValidationException;
 use Courier\Shared\Domain\ValueObject\Uuid;
 use Courier\Shared\Infrastructure\Persistence\UnitOfWork;
+use Courier\Carga\Domain\BitacoraCargaInterface;
 
 final class GenerarLpnsParaCargaHandler implements CommandHandlerInterface
 {
@@ -24,6 +25,7 @@ final class GenerarLpnsParaCargaHandler implements CommandHandlerInterface
         private readonly LpnBarcodeGeneratorInterface $barcodeGenerator,
         private readonly PdoEtiquetaRepository $etiquetas,
         private readonly UnitOfWork $unitOfWork,
+        private readonly ?BitacoraCargaInterface $bitacora = null,
     ) {
     }
 
@@ -89,6 +91,8 @@ final class GenerarLpnsParaCargaHandler implements CommandHandlerInterface
 
             return $generados;
         });
+
+        $this->bitacora?->registrar($carga->id(), 'etiquetas_generadas', count($resultado) . ' etiqueta(s) (LPN) generadas');
 
         return $resultado;
     }

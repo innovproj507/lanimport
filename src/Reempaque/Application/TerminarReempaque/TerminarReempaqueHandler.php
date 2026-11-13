@@ -10,6 +10,7 @@ use Courier\Reempaque\Domain\ReempaqueOrdenRepositoryInterface;
 use Courier\Shared\Application\CommandHandlerInterface;
 use Courier\Shared\Application\CommandInterface;
 use Courier\Shared\Infrastructure\Persistence\UnitOfWork;
+use Courier\Carga\Domain\BitacoraCargaInterface;
 
 /**
  * Todo quedo empacado: los bultos originales salen del inventario (consumidos) y las cajas
@@ -21,6 +22,7 @@ final class TerminarReempaqueHandler implements CommandHandlerInterface
         private readonly ReempaqueOrdenRepositoryInterface $ordenes,
         private readonly LpnRepositoryInterface $lpns,
         private readonly UnitOfWork $unitOfWork,
+        private readonly ?BitacoraCargaInterface $bitacora = null,
     ) {
     }
 
@@ -55,6 +57,8 @@ final class TerminarReempaqueHandler implements CommandHandlerInterface
 
             $this->ordenes->save($orden);
         });
+
+        $this->bitacora?->registrarPorLpns($orden->origenLpnIds(), 'reempaque', "{n} bulto(s) reempacados en caja(s): reempaque {$orden->codigo()} terminado");
 
         return null;
     }

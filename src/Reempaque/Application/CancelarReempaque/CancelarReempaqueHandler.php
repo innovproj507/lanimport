@@ -10,6 +10,7 @@ use Courier\Reempaque\Domain\ReempaqueOrdenRepositoryInterface;
 use Courier\Shared\Application\CommandHandlerInterface;
 use Courier\Shared\Application\CommandInterface;
 use Courier\Shared\Infrastructure\Persistence\UnitOfWork;
+use Courier\Carga\Domain\BitacoraCargaInterface;
 
 final class CancelarReempaqueHandler implements CommandHandlerInterface
 {
@@ -17,6 +18,7 @@ final class CancelarReempaqueHandler implements CommandHandlerInterface
         private readonly ReempaqueOrdenRepositoryInterface $ordenes,
         private readonly LpnRepositoryInterface $lpns,
         private readonly UnitOfWork $unitOfWork,
+        private readonly ?BitacoraCargaInterface $bitacora = null,
     ) {
     }
 
@@ -50,6 +52,8 @@ final class CancelarReempaqueHandler implements CommandHandlerInterface
                 $this->lpns->deleteById($cajaId);
             }
         });
+
+        $this->bitacora?->registrarPorLpns($orden->origenLpnIds(), 'reempaque', "{n} bulto(s) liberados: reempaque {$orden->codigo()} cancelado");
 
         return null;
     }

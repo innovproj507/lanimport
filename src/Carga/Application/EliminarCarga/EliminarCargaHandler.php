@@ -12,11 +12,13 @@ use Courier\Shared\Application\CommandInterface;
 use Courier\Shared\Domain\Exception\NotFoundException;
 use Courier\Shared\Domain\Exception\ValidationException;
 use Courier\Shared\Infrastructure\Persistence\UnitOfWork;
+use Courier\Carga\Domain\BitacoraCargaInterface;
 
 /**
  * Borra una carga ingresada por error. Solo si todavia no tiene etiquetas (LPN): con LPNs ya
  * hay bultos rotulados (y quiza escaneados o en una salida), y se borrarian sin aviso.
- * Sus lineas, detalle, historial y etiqueta de tracking se van con ella.
+ * Sus lineas, detalle, historial y etiqueta de tracking se van con ella, pero antes se archiva
+ * una copia en cargas_eliminadas (con el motivo y quien la borro) para Rastreo.
  */
 final class EliminarCargaHandler implements CommandHandlerInterface
 {
@@ -25,6 +27,7 @@ final class EliminarCargaHandler implements CommandHandlerInterface
         private readonly ConteoBultosCargaInterface $conteo,
         private readonly BarcodeGeneratorInterface $barcode,
         private readonly UnitOfWork $unitOfWork,
+        private readonly ?BitacoraCargaInterface $bitacora = null,
     ) {
     }
 
@@ -48,7 +51,11 @@ final class EliminarCargaHandler implements CommandHandlerInterface
             );
         }
 
-        $this->unitOfWork->run(fn () => $this->cargas->eliminar($carga->id()));
+        // No se pierde: queda archivada (con el motivo) y Rastreo explica que se elimino.
+        $this->unitOfWork->run(function () use ($carga, $command): void {
+            $this->bitacora?->archivarEliminada($carga->id(), $command->motivo);
+            $this->cargas->eliminar($carga->id());
+        });
         $this->barcode->eliminar($tracking);
 
         return (string) $tracking;

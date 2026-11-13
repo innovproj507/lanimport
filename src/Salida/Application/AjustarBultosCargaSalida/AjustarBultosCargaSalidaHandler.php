@@ -13,6 +13,7 @@ use Courier\Shared\Application\CommandInterface;
 use Courier\Shared\Domain\Exception\NotFoundException;
 use Courier\Shared\Domain\Exception\ValidationException;
 use Courier\Shared\Infrastructure\Persistence\UnitOfWork;
+use Courier\Carga\Domain\BitacoraCargaInterface;
 
 /**
  * Trafico decide que bultos de una carga van en un DO pendiente (p.ej. 20 de 143): los que deja
@@ -25,6 +26,7 @@ final class AjustarBultosCargaSalidaHandler implements CommandHandlerInterface
         private readonly SalidaOrdenRepositoryInterface $ordenes,
         private readonly LpnRepositoryInterface $lpns,
         private readonly UnitOfWork $unitOfWork,
+        private readonly ?BitacoraCargaInterface $bitacora = null,
     ) {
     }
 
@@ -94,6 +96,9 @@ final class AjustarBultosCargaSalidaHandler implements CommandHandlerInterface
                 $this->lpns->save($lpn);
             }
         });
+
+        $this->bitacora?->registrarPorLpns(array_map(static fn ($l) => $l->lpnId(), $sacadas), 'salida_ajuste', "{n} bulto(s) sacados de {$orden->etiquetaDo()} y devueltos a bodega (ajuste de bultos)", $orden->id());
+        $this->bitacora?->registrarPorLpns(array_map(static fn ($lpn) => $lpn->id(), $agregar), 'salida_ajuste', "{n} bulto(s) agregados a {$orden->etiquetaDo()} (ajuste de bultos)", $orden->id());
 
         return ['quedan' => count($elegidos), 'quitados' => count($sacadas), 'agregados' => count($agregar)];
     }

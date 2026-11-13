@@ -7,6 +7,8 @@ $pageSubtitle = 'Consulte el estado de una carga por su numero de tracking';
 $numero = $numero ?? '';
 $interno = $interno ?? false;
 $rastreo = $rastreo ?? null;
+$movimientos = $movimientos ?? null;
+$eliminada = $eliminada ?? null;
 require __DIR__ . '/../partials/header.php';
 
 $h = static fn ($v): string => htmlspecialchars((string) $v);
@@ -44,6 +46,33 @@ $ordenEstado = static function (string $estado, bool $esOs): array {
         default => ['Cancelada', 'bg-slate-500/10 text-slate-500'],
     };
 };
+/** Color del punto de cada movimiento en la linea de tiempo. */
+$colorMovimiento = static fn (string $tipo): string => match ($tipo) {
+    'estado' => 'bg-amber-400',
+    'salida_agregada', 'salida_movida', 'do_generado', 'contenedor', 'salida_ajuste' => 'bg-blue-500',
+    'escaneo_salida', 'recepcion_escaneo' => 'bg-cyan-500',
+    'salida_confirmada' => 'bg-emerald-500',
+    'devuelta_bodega', 'orden_cancelada', 'etiquetas_eliminadas', 'carga_eliminada' => 'bg-red-500',
+    'reempaque' => 'bg-indigo-500',
+    default => 'bg-slate-400',
+};
+$lineaTiempo = static function (array $eventos) use ($h, $fecha, $colorMovimiento): void {
+    if ($eventos === []) {
+        echo '<p class="text-sm text-zinc-500">Sin movimientos registrados.</p>';
+
+        return;
+    }
+    echo '<ol class="relative border-l border-slate-200 ml-1 space-y-4">';
+    foreach ($eventos as $e) {
+        echo '<li class="ml-4 relative">'
+            . '<span class="absolute -left-[21px] top-1.5 w-2.5 h-2.5 rounded-full ' . $colorMovimiento($e['tipo']) . '"></span>'
+            . '<p class="text-sm font-medium text-black">' . $h($e['titulo']) . '</p>'
+            . ($e['detalle'] !== null ? '<p class="text-sm text-zinc-700">' . $h($e['detalle']) . '</p>' : '')
+            . '<p class="text-xs text-zinc-500">' . $h($fecha($e['fecha'], true)) . ($e['usuario'] !== null ? ' · ' . $h($e['usuario']) : '') . '</p>'
+            . '</li>';
+    }
+    echo '</ol>';
+};
 ?>
 
 <form method="post" action="/tracking/buscar" class="bg-white rounded-xl shadow p-6 max-w-xl flex gap-3 mb-6">
@@ -59,6 +88,71 @@ $ordenEstado = static function (string $estado, bool $esOs): array {
     <div class="bg-red-500/10 text-red-600 text-sm rounded-lg px-4 py-3 mb-4 border border-red-500/30 max-w-xl">
         <?= $h($error) ?>
     </div>
+<?php endif; ?>
+
+<?php if ($eliminada !== null): ?>
+    <?php if (!$interno): ?>
+        <div class="bg-white rounded-xl shadow p-6 max-w-2xl">
+            <p class="text-lg font-bold text-black"><?= $h($eliminada['tracking']) ?></p>
+            <p class="mt-2 text-sm text-red-700">Este tracking fue anulado el <?= $h($fecha($eliminada['eliminadaAt'])) ?>. Consulte con LAN Import.</p>
+        </div>
+    <?php else: ?>
+        <div class="bg-white rounded-xl shadow p-6 max-w-6xl space-y-4">
+            <div class="flex items-center gap-3 flex-wrap">
+                <p class="text-2xl font-bold text-zinc-400 line-through"><?= $h($eliminada['tracking']) ?></p>
+                <span class="px-3 py-1 rounded-full bg-red-500/10 text-red-700 text-sm font-semibold">Carga eliminada</span>
+            </div>
+            <div class="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-black space-y-1">
+                <p><strong>Eliminada el</strong> <?= $h($fecha($eliminada['eliminadaAt'], true)) ?><?= $eliminada['eliminadaPor'] ? ' <strong>por</strong> ' . $h($eliminada['eliminadaPor']) : '' ?></p>
+                <p><strong>Motivo:</strong> <?= $h($eliminada['motivo'] ?: 'No se indico motivo.') ?></p>
+            </div>
+            <dl class="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-3 text-sm">
+                <?php foreach ([
+                    'Cliente' => $eliminada['cliente'],
+                    'Aduanero' => $eliminada['aduanero'],
+                    'Proveedor' => $eliminada['proveedor'],
+                    'Ingreso' => $fecha($eliminada['fechaIngreso'], true),
+                    'Registrado por' => $eliminada['registradoPor'],
+                ] as $k => $v): ?>
+                    <div>
+                        <dt class="text-xs text-zinc-500 uppercase"><?= $h($k) ?></dt>
+                        <dd class="text-black font-medium"><?= $h(($v ?? '') !== '' ? $v : '—') ?></dd>
+                    </div>
+                <?php endforeach; ?>
+                <?php if (!empty($eliminada['notas'])): ?>
+                    <div class="col-span-2"><dt class="text-xs text-zinc-500 uppercase">Notas</dt><dd class="text-black"><?= $h($eliminada['notas']) ?></dd></div>
+                <?php endif; ?>
+            </dl>
+            <?php if ($eliminada['lineas'] !== []): ?>
+                <h2 class="font-semibold text-black pt-4 border-t border-slate-200">Productos que tenia</h2>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead>
+                            <tr class="text-left text-xs text-zinc-500 uppercase border-b border-slate-200">
+                                <th class="py-2 pr-3">Descripcion</th><th class="py-2 pr-3">Marca</th>
+                                <th class="py-2 pr-3 text-right">Cantidad</th><th class="py-2 pr-3 text-right">Cub. p3</th>
+                                <th class="py-2 pr-3 text-right">Peso (kg)</th><th class="py-2 text-right">Valor</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($eliminada['lineas'] as $l): ?>
+                                <tr class="border-b border-slate-200">
+                                    <td class="py-2 pr-3 text-black"><?= $h($l['descripcion'] ?? '') ?></td>
+                                    <td class="py-2 pr-3"><?= $h($l['marca'] ?? '') ?></td>
+                                    <td class="py-2 pr-3 text-right"><?= $num($l['cantidad'] ?? 0, 0) ?></td>
+                                    <td class="py-2 pr-3 text-right"><?= $num($l['cubicaje_p3'] ?? 0) ?></td>
+                                    <td class="py-2 pr-3 text-right"><?= $num($l['peso'] ?? 0) ?></td>
+                                    <td class="py-2 text-right"><?= $num($l['valor'] ?? 0) ?></td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+            <?php endif; ?>
+            <h2 class="font-semibold text-black pt-4 border-t border-slate-200">Historial de movimientos</h2>
+            <?php $lineaTiempo($eliminada['movimientos']); ?>
+        </div>
+    <?php endif; ?>
 <?php endif; ?>
 
 <?php if ($view): ?>
@@ -318,6 +412,10 @@ $ordenEstado = static function (string $estado, bool $esOs): array {
             <?php endif; ?>
         <?php endif; ?>
 
+        <?php if ($movimientos !== null): ?>
+            <h2 class="font-semibold text-black pt-4 border-t border-slate-200">Historial de movimientos <span class="text-sm font-normal text-zinc-500">(del mas reciente al mas antiguo)</span></h2>
+            <?php $lineaTiempo($movimientos); ?>
+        <?php else: ?>
         <h2 class="font-semibold text-black pt-4 border-t border-slate-200">Historial</h2>
         <ol class="space-y-3">
             <?php foreach ($view->historial as $entry): ?>
@@ -333,6 +431,7 @@ $ordenEstado = static function (string $estado, bool $esOs): array {
                 </li>
             <?php endforeach; ?>
         </ol>
+        <?php endif; ?>
     </div>
 <?php endif; ?>
 

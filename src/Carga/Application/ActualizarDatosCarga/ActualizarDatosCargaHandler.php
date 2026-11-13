@@ -17,6 +17,7 @@ use Courier\Shared\Domain\Exception\ValidationException;
 use Courier\Shared\Infrastructure\Persistence\UnitOfWork;
 use DateTimeImmutable;
 use Exception;
+use Courier\Carga\Domain\BitacoraCargaInterface;
 
 final class ActualizarDatosCargaHandler implements CommandHandlerInterface
 {
@@ -24,6 +25,7 @@ final class ActualizarDatosCargaHandler implements CommandHandlerInterface
         private readonly CargaRepositoryInterface $cargas,
         private readonly ClienteBultosCargaInterface $clienteBultos,
         private readonly UnitOfWork $unitOfWork,
+        private readonly ?BitacoraCargaInterface $bitacora = null,
     ) {
     }
 
@@ -73,6 +75,9 @@ final class ActualizarDatosCargaHandler implements CommandHandlerInterface
             $this->cargas->save($carga);
             $this->clienteBultos->reasignar($carga->id(), $carga->clienteId());
         });
+
+        $bultos = (int) array_sum(array_map(static fn ($l) => $l->cantidad(), $carga->lineas()));
+        $this->bitacora?->registrar($carga->id(), 'carga_editada', "Datos de la carga editados ({$bultos} bulto(s) declarados)");
 
         return null;
     }

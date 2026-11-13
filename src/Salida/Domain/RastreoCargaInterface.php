@@ -23,4 +23,20 @@ interface RastreoCargaInterface
      * }
      */
     public function detalle(string $cargaId): array;
+
+    /**
+     * Todo lo que le ha pasado a la carga, del mas reciente al mas antiguo: cambios de estado,
+     * bitacora (OS/DO, reempaque, etiquetas, ediciones), escaneos de recepcion y de salida,
+     * salidas confirmadas, fotos y avisos al cliente.
+     *
+     * @return array<int, array{fecha: string, tipo: string, titulo: string, detalle: ?string, usuario: ?string}>
+     */
+    public function movimientos(string $cargaId): array;
+
+    /**
+     * Carga eliminada con ese tracking (archivada antes de borrarla), o null.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function eliminada(string $trackingNumero): ?array;
 }

@@ -605,8 +605,8 @@ final class CargaController extends BaseController
         }
 
         try {
-            $tracking = $this->container()->get(EliminarCargaHandler::class)->handle(new EliminarCargaCommand($id));
-            $_SESSION['carga_borrado'] = ['tipo' => 'ok', 'texto' => "Se borro la carga {$tracking}."];
+            $tracking = $this->container()->get(EliminarCargaHandler::class)->handle(new EliminarCargaCommand($id, trim((string) $this->request->getPost('motivo')) ?: null));
+            $_SESSION['carga_borrado'] = ['tipo' => 'ok', 'texto' => "Se borro la carga {$tracking}. Queda registrada en Rastreo con el motivo."];
         } catch (ValidationException|NotFoundException $e) {
             $_SESSION['carga_borrado'] = ['tipo' => 'error', 'texto' => $e->getMessage()];
         }

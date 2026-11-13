@@ -13,6 +13,7 @@ use Courier\Salida\Domain\SalidaOrdenRepositoryInterface;
 use Courier\Shared\Application\CommandHandlerInterface;
 use Courier\Shared\Application\CommandInterface;
 use Courier\Shared\Infrastructure\Persistence\UnitOfWork;
+use Courier\Carga\Domain\BitacoraCargaInterface;
 
 final class ConfirmarSalidaHandler implements CommandHandlerInterface
 {
@@ -21,6 +22,7 @@ final class ConfirmarSalidaHandler implements CommandHandlerInterface
         private readonly LpnRepositoryInterface $lpns,
         private readonly UnitOfWork $unitOfWork,
         private readonly SincronizarEstadoCargaHandler $sincronizarCarga,
+        private readonly ?BitacoraCargaInterface $bitacora = null,
     ) {
     }
 
@@ -58,6 +60,7 @@ final class ConfirmarSalidaHandler implements CommandHandlerInterface
 
         // Las cargas que salieron completas pasan a "En transito" y se avisa a cada cliente.
         [$detalle, $datosEmbarque] = $this->datosDespacho($orden);
+        $this->bitacora?->registrarPorLpns(array_map(static fn ($l) => $l->lpnId(), $orden->lineas()), 'salida_confirmada', "{n} bulto(s) salieron en {$detalle}", $orden->id());
 
         foreach (array_keys($cargaIds) as $cargaId) {
             $this->sincronizarCarga->handle(new SincronizarEstadoCargaCommand($cargaId, $command->usuarioId, $detalle, $datosEmbarque));

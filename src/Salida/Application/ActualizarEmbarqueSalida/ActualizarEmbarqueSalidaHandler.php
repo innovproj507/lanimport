@@ -12,6 +12,7 @@ use Courier\Shared\Application\CommandHandlerInterface;
 use Courier\Shared\Application\CommandInterface;
 use Courier\Shared\Domain\Exception\ValidationException;
 use Courier\Shared\Infrastructure\Persistence\UnitOfWork;
+use Courier\Carga\Domain\BitacoraCargaInterface;
 
 /**
  * Guarda o corrige los datos de embarque (contenedor, sello, naviera, barco, fechas, destino).
@@ -23,6 +24,7 @@ final class ActualizarEmbarqueSalidaHandler implements CommandHandlerInterface
         private readonly SalidaOrdenRepositoryInterface $ordenes,
         private readonly NavieraRepositoryInterface $navieras,
         private readonly UnitOfWork $unitOfWork,
+        private readonly ?BitacoraCargaInterface $bitacora = null,
     ) {
     }
 
@@ -49,6 +51,8 @@ final class ActualizarEmbarqueSalidaHandler implements CommandHandlerInterface
             $navieraNombre = $naviera->nombre();
         }
 
+        $etiquetaAntes = $orden->etiquetaDo();
+        $contenedorAntes = $orden->embarque()->contenedorFormateado();
         $numeroDo = preg_replace('/\D/', '', (string) $command->numeroDo);
         // Orden de salida de inventario sin DO: se genera abajo, dentro de la transaccion.
         $generarDo = !$orden->tieneDo();
@@ -89,6 +93,17 @@ final class ActualizarEmbarqueSalidaHandler implements CommandHandlerInterface
 
             $this->ordenes->save($orden);
         });
+
+        $lpnIds = array_map(static fn ($l) => $l->lpnId(), $orden->lineas());
+        $contenedor = $orden->embarque()->contenedorFormateado();
+
+        if ($etiquetaAntes !== $orden->etiquetaDo()) {
+            $this->bitacora?->registrarPorLpns($lpnIds, 'do_generado', ($generarDo ? "Se genero el DO: {$etiquetaAntes} paso a ser {$orden->etiquetaDo()}" : "Numero de DO cambiado: {$etiquetaAntes} ahora es {$orden->etiquetaDo()}") . ' ({n} bulto(s))', $orden->id());
+        }
+
+        if ($contenedor !== $contenedorAntes && $contenedor !== null) {
+            $this->bitacora?->registrarPorLpns($lpnIds, 'contenedor', "{$orden->etiquetaDo()}: contenedor {$contenedor}" . ($contenedorAntes !== null ? " (antes {$contenedorAntes})" : '') . ' ({n} bulto(s))', $orden->id());
+        }
 
         return null;
     }

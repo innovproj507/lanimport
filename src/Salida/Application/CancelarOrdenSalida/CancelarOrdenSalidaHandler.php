@@ -10,6 +10,7 @@ use Courier\Salida\Domain\SalidaOrdenRepositoryInterface;
 use Courier\Shared\Application\CommandHandlerInterface;
 use Courier\Shared\Application\CommandInterface;
 use Courier\Shared\Infrastructure\Persistence\UnitOfWork;
+use Courier\Carga\Domain\BitacoraCargaInterface;
 
 final class CancelarOrdenSalidaHandler implements CommandHandlerInterface
 {
@@ -17,6 +18,7 @@ final class CancelarOrdenSalidaHandler implements CommandHandlerInterface
         private readonly SalidaOrdenRepositoryInterface $ordenes,
         private readonly LpnRepositoryInterface $lpns,
         private readonly UnitOfWork $unitOfWork,
+        private readonly ?BitacoraCargaInterface $bitacora = null,
     ) {
     }
 
@@ -45,6 +47,13 @@ final class CancelarOrdenSalidaHandler implements CommandHandlerInterface
             // Cancelada no se guarda: se elimina para que no quede un DO vacio en el historial.
             $this->ordenes->eliminar($orden->id());
         });
+
+        $this->bitacora?->registrarPorLpns(
+            array_map(static fn ($l) => $l->lpnId(), $orden->lineas()),
+            'orden_cancelada',
+            "{$orden->etiquetaDo()} cancelada y eliminada: {n} bulto(s) regresan a bodega",
+            $orden->id(),
+        );
 
         return null;
     }

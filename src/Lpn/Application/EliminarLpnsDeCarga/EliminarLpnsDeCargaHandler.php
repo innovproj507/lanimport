@@ -13,6 +13,7 @@ use Courier\Shared\Application\CommandHandlerInterface;
 use Courier\Shared\Application\CommandInterface;
 use Courier\Shared\Domain\Exception\ValidationException;
 use Courier\Shared\Infrastructure\Persistence\UnitOfWork;
+use Courier\Carga\Domain\BitacoraCargaInterface;
 
 final class EliminarLpnsDeCargaHandler implements CommandHandlerInterface
 {
@@ -21,6 +22,7 @@ final class EliminarLpnsDeCargaHandler implements CommandHandlerInterface
         private readonly LpnRepositoryInterface $lpns,
         private readonly LpnBarcodeGeneratorInterface $barcodeGenerator,
         private readonly UnitOfWork $unitOfWork,
+        private readonly ?BitacoraCargaInterface $bitacora = null,
     ) {
     }
 
@@ -47,6 +49,8 @@ final class EliminarLpnsDeCargaHandler implements CommandHandlerInterface
                 );
             }
         }
+
+        $this->bitacora?->registrar($carga->id(), 'etiquetas_eliminadas', count($lpns) . ' etiqueta(s) (LPN) eliminadas');
 
         $this->unitOfWork->run(function () use ($carga, $lpns) {
             $this->lpns->deleteByCargaId($carga->id());

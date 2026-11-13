@@ -13,6 +13,7 @@ use Courier\Shared\Application\CommandInterface;
 use Courier\Shared\Domain\Exception\NotFoundException;
 use Courier\Shared\Domain\Exception\ValidationException;
 use Courier\Shared\Infrastructure\Persistence\UnitOfWork;
+use Courier\Carga\Domain\BitacoraCargaInterface;
 
 /**
  * Agrega cargas a una salida (DO) pendiente: mismo contenedor, mas bultos. Los LPNs nuevos
@@ -24,6 +25,7 @@ final class AgregarCargasSalidaHandler implements CommandHandlerInterface
         private readonly LpnRepositoryInterface $lpns,
         private readonly SalidaOrdenRepositoryInterface $ordenes,
         private readonly UnitOfWork $unitOfWork,
+        private readonly ?BitacoraCargaInterface $bitacora = null,
     ) {
     }
 
@@ -58,6 +60,8 @@ final class AgregarCargasSalidaHandler implements CommandHandlerInterface
                 $this->lpns->save($lpn);
             }
         });
+
+        $this->bitacora?->registrarPorLpns(array_map(static fn ($lpn) => $lpn->id(), $lpns), 'salida_agregada', "{n} bulto(s) agregados a {$orden->etiquetaDo()}", $orden->id());
 
         return count($lpns);
     }

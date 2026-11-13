@@ -14,6 +14,7 @@ use Courier\Shared\Application\CommandInterface;
 use Courier\Shared\Domain\Exception\ValidationException;
 use Courier\Shared\Domain\ValueObject\Uuid;
 use Courier\Shared\Infrastructure\Persistence\UnitOfWork;
+use Courier\Carga\Domain\BitacoraCargaInterface;
 
 final class IniciarReempaqueHandler implements CommandHandlerInterface
 {
@@ -21,6 +22,7 @@ final class IniciarReempaqueHandler implements CommandHandlerInterface
         private readonly LpnRepositoryInterface $lpns,
         private readonly ReempaqueOrdenRepositoryInterface $ordenes,
         private readonly UnitOfWork $unitOfWork,
+        private readonly ?BitacoraCargaInterface $bitacora = null,
     ) {
     }
 
@@ -57,7 +59,7 @@ final class IniciarReempaqueHandler implements CommandHandlerInterface
             $origenes[] = $lpn;
         }
 
-        return $this->unitOfWork->run(function () use ($command, $tipo, $origenes) {
+        $ordenId = $this->unitOfWork->run(function () use ($command, $tipo, $origenes) {
             $orden = ReempaqueOrden::iniciar(
                 Uuid::generate(),
                 $tipo,
@@ -76,5 +78,10 @@ final class IniciarReempaqueHandler implements CommandHandlerInterface
 
             return $orden->id();
         });
+
+        $codigo = $this->ordenes->findById($ordenId)?->codigo() ?? '';
+        $this->bitacora?->registrarPorLpns(array_map(static fn ($lpn) => $lpn->id(), $origenes), 'reempaque', "{n} bulto(s) enviados a reempaque {$codigo}");
+
+        return $ordenId;
     }
 }

@@ -14,6 +14,7 @@ use Courier\Shared\Application\CommandHandlerInterface;
 use Courier\Shared\Application\CommandInterface;
 use Courier\Shared\Domain\Exception\NotFoundException;
 use Courier\Shared\Domain\Exception\ValidationException;
+use Courier\Carga\Domain\BitacoraCargaInterface;
 
 /** Bodega escanea la etiqueta pegada al bulto: el LPN pasa de "En recepcion" a "Disponible". */
 final class ConfirmarRecepcionLpnHandler implements CommandHandlerInterface
@@ -22,6 +23,7 @@ final class ConfirmarRecepcionLpnHandler implements CommandHandlerInterface
         private readonly LpnRepositoryInterface $lpns,
         private readonly UbicacionRepositoryInterface $ubicaciones,
         private readonly SincronizarEstadoCargaHandler $sincronizarCarga,
+        private readonly ?BitacoraCargaInterface $bitacora = null,
     ) {
     }
 
@@ -55,6 +57,10 @@ final class ConfirmarRecepcionLpnHandler implements CommandHandlerInterface
 
         $lpn->confirmarRecepcion($command->ubicacionId);
         $this->lpns->save($lpn);
+
+        if ($lpn->cargaId() !== null) {
+            $this->bitacora?->registrar($lpn->cargaId(), 'recepcion_escaneo', "Recibido {$codigo}");
+        }
 
         // Con el ultimo bulto escaneado la carga pasa de "Ingresado" a "En bodega".
         if ($lpn->cargaId() !== null) {

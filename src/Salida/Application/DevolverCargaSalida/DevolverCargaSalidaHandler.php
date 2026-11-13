@@ -11,6 +11,7 @@ use Courier\Shared\Application\CommandInterface;
 use Courier\Shared\Domain\Exception\NotFoundException;
 use Courier\Shared\Domain\Exception\ValidationException;
 use Courier\Shared\Infrastructure\Persistence\UnitOfWork;
+use Courier\Carga\Domain\BitacoraCargaInterface;
 
 /**
  * Saca una carga de una salida pendiente y la devuelve a bodega: sus bultos vuelven a estar
@@ -22,6 +23,7 @@ final class DevolverCargaSalidaHandler implements CommandHandlerInterface
         private readonly SalidaOrdenRepositoryInterface $ordenes,
         private readonly LpnRepositoryInterface $lpns,
         private readonly UnitOfWork $unitOfWork,
+        private readonly ?BitacoraCargaInterface $bitacora = null,
     ) {
     }
 
@@ -70,6 +72,13 @@ final class DevolverCargaSalidaHandler implements CommandHandlerInterface
                 $this->ordenes->save($orden);
             }
         });
+
+        $this->bitacora?->registrarPorLpns(
+            array_map(static fn ($l) => $l->lpnId(), $sacadas),
+            'devuelta_bodega',
+            "{n} bulto(s) sacados de {$orden->etiquetaDo()} y devueltos a bodega" . ($orden->lineas() === [] ? " ({$orden->etiquetaDo()} quedo vacia y se elimino)" : ''),
+            $orden->id(),
+        );
 
         return count($sacadas);
     }

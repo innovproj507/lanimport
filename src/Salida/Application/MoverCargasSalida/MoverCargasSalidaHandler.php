@@ -16,6 +16,7 @@ use Courier\Shared\Domain\Exception\NotFoundException;
 use Courier\Shared\Domain\Exception\ValidationException;
 use Courier\Shared\Domain\ValueObject\Uuid;
 use Courier\Shared\Infrastructure\Persistence\UnitOfWork;
+use Courier\Carga\Domain\BitacoraCargaInterface;
 
 /**
  * Pasa cargas de una salida pendiente a otra (o a un DO nuevo), conservando lo que bodega ya
@@ -30,6 +31,7 @@ final class MoverCargasSalidaHandler implements CommandHandlerInterface
         private readonly LpnRepositoryInterface $lpns,
         private readonly UnitOfWork $unitOfWork,
         private readonly SincronizarEstadoCargaHandler $sincronizarCarga,
+        private readonly ?BitacoraCargaInterface $bitacora = null,
     ) {
     }
 
@@ -51,6 +53,7 @@ final class MoverCargasSalidaHandler implements CommandHandlerInterface
         }
 
         $lineas = $origen->sacarLineas($this->lpnIds($origen, $command->grupos));
+        $etiquetaOrigen = $origen->etiquetaDo();
         $clienteIds = [];
         $lpnsMovidos = [];
 
@@ -102,6 +105,16 @@ final class MoverCargasSalidaHandler implements CommandHandlerInterface
         });
 
         $destino = $this->ordenes->findById($destino->id());
+
+        if ($destino !== null) {
+            $this->bitacora?->registrarPorLpns(
+                array_map(static fn ($l) => $l->lpnId(), $lineas),
+                'salida_movida',
+                "{n} bulto(s) movidos de {$etiquetaOrigen} a {$destino->etiquetaDo()}, con su escaneo"
+                    . ($origen->lineas() === [] ? " ({$etiquetaOrigen} quedo vacia y se elimino)" : ''),
+                $destino->id(),
+            );
+        }
 
         // Unidas a una salida ya despachada: sus cargas completas pasan a "En transito" (y se avisa al cliente).
         if ($despachar && $destino !== null) {

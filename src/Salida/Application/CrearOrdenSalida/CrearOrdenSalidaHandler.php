@@ -16,6 +16,7 @@ use Courier\Shared\Application\CommandInterface;
 use Courier\Shared\Domain\Exception\ValidationException;
 use Courier\Shared\Domain\ValueObject\Uuid;
 use Courier\Shared\Infrastructure\Persistence\UnitOfWork;
+use Courier\Carga\Domain\BitacoraCargaInterface;
 
 /**
  * Crea la salida (DO) con sus LPNs y, si vienen, los datos del contenedor. Los LPNs quedan
@@ -29,6 +30,7 @@ final class CrearOrdenSalidaHandler implements CommandHandlerInterface
         private readonly SalidaOrdenRepositoryInterface $ordenes,
         private readonly UnitOfWork $unitOfWork,
         private readonly NavieraRepositoryInterface $navieras,
+        private readonly ?BitacoraCargaInterface $bitacora = null,
     ) {
     }
 
@@ -67,7 +69,7 @@ final class CrearOrdenSalidaHandler implements CommandHandlerInterface
 
         $clienteId = $command->clienteId ?? (count($clientes) === 1 ? (string) array_key_first($clientes) : null);
 
-        return $this->unitOfWork->run(function () use ($command, $lpnsSeleccionados, $clienteId, $embarque) {
+        $ordenId = $this->unitOfWork->run(function () use ($command, $lpnsSeleccionados, $clienteId, $embarque) {
             $lineas = array_map(
                 fn ($lpn) => new SalidaLinea($lpn->id(), (string) $lpn->codigo()),
                 $lpnsSeleccionados,
@@ -99,6 +101,11 @@ final class CrearOrdenSalidaHandler implements CommandHandlerInterface
 
             return $orden->id();
         });
+
+        $etiqueta = $this->ordenes->findById($ordenId)?->etiquetaDo() ?? '';
+        $this->bitacora?->registrarPorLpns(array_map(static fn ($lpn) => $lpn->id(), $lpnsSeleccionados), 'salida_agregada', "{n} bulto(s) puestos en la orden de salida {$etiqueta}", $ordenId);
+
+        return $ordenId;
     }
 
     /** @param array<string, string|null> $datos */

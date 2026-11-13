@@ -53,8 +53,10 @@ if (empty($cargas)):
             <?php if (in_array($_SESSION['usuario_rol'] ?? null, ['inventario', 'operaciones', 'gerente', 'admin'], true)): ?>
                 <?php // Solo se borra si no tiene etiquetas (LPN); si las tiene, el servidor explica por que no. ?>
                 <form method="post" action="/cargas/<?= htmlspecialchars($carga->id()) ?>/eliminar" class="inline"
-                      onsubmit="return confirm('¿Borrar la carga <?= htmlspecialchars((string) $carga->trackingNumero()) ?>? Esta accion no se puede deshacer.');">
+                      onsubmit="var m = prompt('¿Por que se borra la carga <?= htmlspecialchars((string) $carga->trackingNumero()) ?>?
+El motivo queda registrado y se ve en Rastreo.'); if (m === null) { return false; } if (m.trim() === '') { alert('Escriba el motivo para borrar la carga.'); return false; } this.motivo.value = m.trim(); return true;">
                     <input type="hidden" name="_csrf" value="<?= htmlspecialchars(\App\Libraries\Csrf::token()) ?>">
+                    <input type="hidden" name="motivo" value="">
                     <input type="hidden" name="volver" value="<?= in_array('/cargas/historial', [parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH), parse_url($_SERVER['HTTP_REFERER'] ?? '', PHP_URL_PATH)], true) ? '/cargas/historial' : '/cargas/ingreso' ?>">
                     <?= icon_submit_button('trash', 'Borrar carga', 'red') ?>
                 </form>
