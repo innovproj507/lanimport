@@ -12,6 +12,9 @@ require __DIR__ . '/../partials/header.php';
     </div>
 <?php endif; ?>
 
+<?php if (hay_varias_bodegas()): ?>
+    <p class="text-sm text-zinc-700 mb-3 max-w-xl">Se crea en <strong><?= htmlspecialchars(bodega_nombre(bodega_fija() ?? bodega_activa() ?? \Courier\Bodega\Domain\Bodega::PRINCIPAL)) ?></strong><?= bodega_fija() === null ? ' (cambie la bodega arriba, junto a la fecha)' : '' ?>.</p>
+<?php endif; ?>
 <form method="post" action="/ubicaciones" class="bg-white rounded-xl shadow p-6 max-w-xl space-y-4">
     <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
     <?= card_header('box', 'Datos de la ubicacion', 'amber') ?>

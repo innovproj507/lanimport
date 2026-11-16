@@ -10,12 +10,15 @@ use Courier\Lpn\Domain\Lpn;
 use Courier\Lpn\Domain\LpnRepositoryInterface;
 use Courier\Shared\Domain\ValueObject\Uuid;
 use DateTimeImmutable;
+use Courier\Shared\Domain\BodegaActivaInterface;
 use PDO;
 
 final class PdoLpnRepository implements LpnRepositoryInterface
 {
-    public function __construct(private readonly PDO $connection)
-    {
+    public function __construct(
+        private readonly PDO $connection,
+        private readonly ?BodegaActivaInterface $bodegaActiva = null,
+    ) {
     }
 
     public function save(Lpn $lpn): void
@@ -33,14 +36,15 @@ final class PdoLpnRepository implements LpnRepositoryInterface
     {
         if ($lpn->codigo() !== null) {
             $stmt = $this->connection->prepare(
-                'INSERT INTO lpns (id, carga_id, cliente_id, marca, descripcion, orden_en_carga, codigo, estado, ubicacion_id, created_at, updated_at)
-                 VALUES (:id, :carga_id, :cliente_id, :marca, :descripcion, :orden_en_carga, :codigo, :estado, :ubicacion_id, :created_at, :updated_at)'
+                'INSERT INTO lpns (id, carga_id, cliente_id, bodega_id, marca, descripcion, orden_en_carga, codigo, estado, ubicacion_id, created_at, updated_at)
+                 VALUES (:id, :carga_id, :cliente_id, :bodega_id, :marca, :descripcion, :orden_en_carga, :codigo, :estado, :ubicacion_id, :created_at, :updated_at)'
             );
 
             $stmt->execute([
                 ':id' => $lpn->id(),
                 ':carga_id' => $lpn->cargaId(),
                 ':cliente_id' => $lpn->clienteId(),
+                ':bodega_id' => $lpn->bodegaId(),
                 ':marca' => $lpn->marca(),
                 ':descripcion' => $lpn->descripcion(),
                 ':orden_en_carga' => $lpn->ordenEnCarga(),
@@ -55,14 +59,15 @@ final class PdoLpnRepository implements LpnRepositoryInterface
         }
 
         $stmt = $this->connection->prepare(
-            'INSERT INTO lpns (id, carga_id, cliente_id, marca, descripcion, orden_en_carga, estado, ubicacion_id, created_at, updated_at)
-             VALUES (:id, :carga_id, :cliente_id, :marca, :descripcion, :orden_en_carga, :estado, :ubicacion_id, :created_at, :updated_at)'
+            'INSERT INTO lpns (id, carga_id, cliente_id, bodega_id, marca, descripcion, orden_en_carga, estado, ubicacion_id, created_at, updated_at)
+             VALUES (:id, :carga_id, :cliente_id, :bodega_id, :marca, :descripcion, :orden_en_carga, :estado, :ubicacion_id, :created_at, :updated_at)'
         );
 
         $stmt->execute([
             ':id' => $lpn->id(),
             ':carga_id' => $lpn->cargaId(),
             ':cliente_id' => $lpn->clienteId(),
+            ':bodega_id' => $lpn->bodegaId(),
             ':marca' => $lpn->marca(),
             ':descripcion' => $lpn->descripcion(),
             ':orden_en_carga' => $lpn->ordenEnCarga(),
@@ -82,13 +87,14 @@ final class PdoLpnRepository implements LpnRepositoryInterface
     private function update(Lpn $lpn): void
     {
         $stmt = $this->connection->prepare(
-            'UPDATE lpns SET estado = :estado, ubicacion_id = :ubicacion_id, updated_at = :updated_at WHERE id = :id'
+            'UPDATE lpns SET estado = :estado, ubicacion_id = :ubicacion_id, bodega_id = :bodega_id, updated_at = :updated_at WHERE id = :id'
         );
 
         $stmt->execute([
             ':id' => $lpn->id(),
             ':estado' => $lpn->estado()->value,
             ':ubicacion_id' => $lpn->ubicacionId(),
+            ':bodega_id' => $lpn->bodegaId(),
             ':updated_at' => $lpn->updatedAt()->format('Y-m-d H:i:s'),
         ]);
     }
@@ -131,6 +137,31 @@ final class PdoLpnRepository implements LpnRepositoryInterface
     {
         $stmt = $this->connection->prepare('DELETE FROM lpns WHERE carga_id = :carga_id');
         $stmt->execute([':carga_id' => $cargaId]);
+    }
+
+    public function usoEnMovimientos(string $cargaId): ?string
+    {
+        $consultas = [
+            'un bulto ya estuvo en una orden de salida (OS/DO)' => 'SELECT 1 FROM salida_lineas x JOIN lpns l ON l.id = x.lpn_id WHERE l.carga_id = :c LIMIT 1',
+            'un bulto ya estuvo en un reempaque' => 'SELECT 1 FROM reempaque_lpns x JOIN lpns l ON l.id = x.lpn_id WHERE l.carga_id = :c LIMIT 1',
+            'un bulto ya fue reempacado en una caja' => 'SELECT 1 FROM lpn_genealogia x JOIN lpns l ON l.id = x.lpn_origen_id WHERE l.carga_id = :c LIMIT 1',
+            'un bulto ya estuvo en un traslado entre bodegas' => 'SELECT 1 FROM traslado_lineas x JOIN lpns l ON l.id = x.lpn_id WHERE l.carga_id = :c LIMIT 1',
+        ];
+
+        foreach ($consultas as $razon => $sql) {
+            try {
+                $stmt = $this->connection->prepare($sql);
+                $stmt->execute([':c' => $cargaId]);
+            } catch (\PDOException) {
+                continue; // tabla que aun no existe (migracion pendiente)
+            }
+
+            if ($stmt->fetchColumn() !== false) {
+                return $razon;
+            }
+        }
+
+        return null;
     }
 
     public function deleteById(string $id): void
@@ -200,6 +231,12 @@ final class PdoLpnRepository implements LpnRepositoryInterface
             $params[':aduanero_identificador'] = $filtros['aduaneroIdentificador'];
         }
 
+        // Inventario: solo los bultos que estan en la bodega activa.
+        if (($bodega = $this->bodegaActiva?->id()) !== null) {
+            $where[] = 'l.bodega_id = :bodega_activa';
+            $params[':bodega_activa'] = $bodega;
+        }
+
         $sql = 'SELECT l.* FROM lpns l LEFT JOIN cargas c ON c.id = l.carga_id';
 
         if ($where !== []) {
@@ -251,13 +288,15 @@ final class PdoLpnRepository implements LpnRepositoryInterface
                 FROM lpns l
                 JOIN cargas c ON c.id = l.carga_id
                 LEFT JOIN clientes cl ON cl.id = c.cliente_id"
-            . ($cargaId !== null ? ' WHERE c.id = :carga_id' : '')
+            . ($cargaId !== null ? ' WHERE c.id = :carga_id' : ' WHERE 1=1')
+            // Recepcion: solo los bultos que llegan a la bodega activa.
+            . (($bodega = $this->bodegaActiva?->id()) !== null ? ' AND l.bodega_id = :bodega_activa' : '')
             . " GROUP BY c.id, c.tracking_numero, c.fecha_ingreso, cl.nombre, cl.apellido"
             . ($cargaId !== null ? '' : " HAVING SUM(l.estado = 'receiving') > 0")
             . ' ORDER BY c.fecha_ingreso ASC, c.tracking_numero ASC';
 
         $stmt = $this->connection->prepare($sql);
-        $stmt->execute($cargaId !== null ? [':carga_id' => $cargaId] : []);
+        $stmt->execute(($cargaId !== null ? [':carga_id' => $cargaId] : []) + ($bodega !== null ? [':bodega_activa' => $bodega] : []));
 
         return array_map(static fn (array $row) => [
             'cargaId' => (string) $row['id'],
@@ -273,7 +312,7 @@ final class PdoLpnRepository implements LpnRepositoryInterface
     /** @param array<string, mixed> $row */
     private function hydrate(array $row): Lpn
     {
-        return new Lpn(
+        $lpn = new Lpn(
             new Uuid((string) $row['id']),
             $row['carga_id'] !== null ? (string) $row['carga_id'] : null,
             (string) $row['cliente_id'],
@@ -287,5 +326,8 @@ final class PdoLpnRepository implements LpnRepositoryInterface
             $row['descripcion'] !== null ? (string) $row['descripcion'] : null,
             $row['orden_en_carga'] !== null ? (int) $row['orden_en_carga'] : null,
         );
+        $lpn->asignarBodega((string) ($row['bodega_id'] ?? '00000000-0000-0000-0000-000000000001'));
+
+        return $lpn;
     }
 }

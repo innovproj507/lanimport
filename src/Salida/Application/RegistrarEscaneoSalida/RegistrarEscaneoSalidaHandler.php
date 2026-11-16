@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace Courier\Salida\Application\RegistrarEscaneoSalida;
 
 use Courier\Carga\Domain\BitacoraCargaInterface;
+use Courier\Lpn\Domain\LpnRepositoryInterface;
+use Courier\Shared\Domain\BodegaActivaInterface;
+use Courier\Shared\Domain\Exception\ValidationException;
 use Courier\Salida\Domain\Exception\OrdenSalidaNotFoundException;
 use Courier\Salida\Domain\SalidaOrdenRepositoryInterface;
 use Courier\Shared\Application\CommandHandlerInterface;
@@ -15,6 +18,8 @@ final class RegistrarEscaneoSalidaHandler implements CommandHandlerInterface
     public function __construct(
         private readonly SalidaOrdenRepositoryInterface $ordenes,
         private readonly ?BitacoraCargaInterface $bitacora = null,
+        private readonly ?BodegaActivaInterface $bodegaActiva = null,
+        private readonly ?LpnRepositoryInterface $lpns = null,
     ) {
     }
 
@@ -27,6 +32,15 @@ final class RegistrarEscaneoSalidaHandler implements CommandHandlerInterface
 
         if ($orden === null) {
             throw new OrdenSalidaNotFoundException("No se encontro la orden de salida con id {$command->salidaOrdenId}.");
+        }
+
+        // El personal de una bodega solo carga lo que esta en su bodega.
+        $fija = $this->bodegaActiva?->fija();
+        if ($fija !== null && $this->lpns !== null) {
+            $lpn = $this->lpns->findByCodigo(trim($command->codigoEscaneado));
+            if ($lpn !== null && $lpn->bodegaId() !== $fija) {
+                throw new ValidationException("El bulto {$lpn->codigo()} esta en otra bodega: lo escanea esa bodega.");
+            }
         }
 
         $antes = $orden->progreso()['escaneadas'];

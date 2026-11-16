@@ -85,6 +85,7 @@ final class RegistrarCargaHandler implements CommandHandlerInterface
 
         // Queda "Ingresado" hasta que bodega escanee todos sus bultos (SincronizarEstadoCarga).
         $carga->asignarDatosEntrega(DatosEntrega::desdeArreglo($command->datosEntrega ?? []));
+        $carga->asignarBodega($command->bodegaId ?? Carga::BODEGA_PRINCIPAL);
 
         $etiquetaUrl = $this->unitOfWork->run(function () use ($carga) {
             $this->cargas->save($carga);

@@ -94,9 +94,11 @@ require __DIR__ . '/../partials/header.php';
                 <?php if ($lpnsGenerados): ?>
                     <?= header_button('/cargas/' . $view->cargaId . '/recepcion', 'eye', 'Ver recepcion de LPNs', 'amber') ?>
                     <?php if ($esAdminOGerente): ?>
+                        <?php // Tambien con bultos ya escaneados, mientras ninguno haya entrado en OS/DO, reempaque o traslado. Pide el motivo. ?>
                         <form method="post" action="/cargas/<?= htmlspecialchars($view->cargaId) ?>/lpns/eliminar"
-                              onsubmit="return confirm('Esto borrara todos los LPNs generados para esta carga (solo funciona si ninguno fue recibido aun). Podras volver a generarlos despues. ¿Continuar?');">
+                              onsubmit="var m = prompt('Se borraran TODAS las etiquetas (LPN) de esta carga, aunque ya esten escaneadas. Luego se generan de nuevo, se imprimen y bodega las vuelve a escanear.\n\n¿Por que se borran? (queda en el historial)'); if (m === null) { return false; } if (m.trim() === '') { alert('Escriba el motivo.'); return false; } this.motivo.value = m.trim(); return true;">
                             <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
+                            <input type="hidden" name="motivo" value="">
                             <button type="submit" class="inline-flex items-center gap-2 bg-white border border-red-300 text-red-600 rounded-lg px-4 py-2 text-sm font-medium hover:bg-red-50 transition">
                                 <?= icon_small('trash') ?><span>Borrar LPNs y regenerar</span>
                             </button>

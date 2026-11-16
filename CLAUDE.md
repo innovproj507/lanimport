@@ -122,6 +122,42 @@ The paper delivery form (empresa de transporte, chofer, placa, entregado por, ce
   - current stock, bultos por escanear and cargas without LPNs;
   - inventory age, top clients, and receptions pending for more than 24 h.
 
+### Varias bodegas y traslados (migrations 066, 067)
+
+- **Catalog and ownership:**
+  - Catalog: `bodegas` (Configuracion > Bodegas, `BodegaController`, Owner only).
+  - `Bodega::PRINCIPAL` (`00000000-0000-0000-0000-000000000001`) is the original bodega. It is also the column DEFAULT, so any INSERT that does not send a bodega lands there.
+  - Columns:
+    - `cargas.bodega_id` = bodega de ingreso;
+    - `lpns.bodega_id` = where the bulto **is now** (changes with a traslado);
+    - `ubicaciones.bodega_id` (code unique per bodega);
+    - `salida_ordenes.bodega_id` = where the OS was armed;
+    - `reempaque_ordenes.bodega_id`;
+    - `usuarios.bodega_id` (NULL = sees all).
+  - Entities expose `bodegaId()` / `asignarBodega()`.
+- **Bodega activa** (`Shared\Domain\BodegaActivaInterface`, `BodegaActivaSesion`):
+  - `fija()` is the user's bodega, read from the DB on every request; `id()` is the fixed one or the one chosen in the header selector (`POST bodega-activa`, `$_SESSION['bodega_activa']`).
+  - Read repositories receive it as an optional last constructor arg and filter only when it is set: cargas search, inventario/recepcion (`PdoLpnRepository`), `PdoCargasParaSalida`, salidas search, reempaques, ubicaciones, traslados.
+  - Dashboard and reportes use the trait `Shared\Infrastructure\Persistence\FiltraPorBodega`. It rewrites `FROM/JOIN cargas|lpns` into their bodega's subset. `salida_ordenes` is not rewritten: a DO can mix bodegas.
+  - View helpers: `bodegas_activas()`, `bodega_fija()`, `bodega_activa()`, `bodega_nombre()`, `hay_varias_bodegas()`. Bodega selectors and columns only show with more than one active bodega.
+  - `BaseController::bodegaParaOperar()` decides where new things are created (carga, ubicacion, carga masiva).
+- **Rules:**
+  - LPNs are born in their carga's bodega.
+  - Recepcion only accepts LPNs of the active bodega, and an ubicacion of the bulto's bodega.
+  - Creating an OS requires a chosen bodega (`SalidaController::exigirBodegaElegida()`) and takes only that bodega's bultos.
+  - A DO can merge OS of different bodegas:
+    - the scan screens show each carga's bodega;
+    - staff of a bodega only see/scan their own bultos (`avancePorCarga()` filters by `fija()`, `RegistrarEscaneoSalidaHandler` rejects others);
+    - PDA progress counts only their bultos.
+  - Staff of a bodega get 404 on cargas/OS of another bodega (`cargaDeMiBodega()`, `salidaDeMiBodega()`).
+- **Traslados** (`src/Traslado`, `TrasladoController`, menu "Traslados" only with several bodegas, also a tile in the PDA):
+  - Inventario/Trafico arm one from the active bodega (cargas with available bultos, quantity per carga like Crear OS). The bultos become `in_transfer` ("En traslado"): they cannot go in an OS or reempaque.
+  - The origin bodega scans when loading and "Despachar": unscanned bultos stay, available, in origin.
+  - The destination scans on arrival: each bulto moves to the destination bodega at once (`Lpn::recibirDeTraslado()`, available, no ubicacion). With all arrived, the traslado is `recibido`.
+  - Cancel only while `pendiente`.
+  - Everything goes to the bitacora (`traslado`, `traslado_llegada`). Rastreo shows each bulto's bodega and splits "Donde esta ahora" by bodega.
+  - Recepcion warns about traslados `en_camino` to the active bodega.
+
 ### Rastreo (`/tracking`)
 
 - `TrackingController`: POST `tracking/buscar` (also the header search) or `GET /tracking?numero=...`. Accepts the full tracking (`LAN-`/`CRX-`), only its 6-character suffix, or an LPN code (`LPN-XXXXXX-N`); see `ConsultarTrackingPorNumeroHandler::sufijo()` and `CargaRepositoryInterface::findByTrackingSufijo()`, which picks the most recent carga.

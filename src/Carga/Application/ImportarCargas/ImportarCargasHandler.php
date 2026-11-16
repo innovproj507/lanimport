@@ -83,6 +83,8 @@ final class ImportarCargasHandler implements CommandHandlerInterface
                     null,
                     null,
                     $command->notificarClientes,
+                    null,
+                    $command->bodegaId,
                 ));
 
                 $creadas[] = [

@@ -38,12 +38,13 @@ final class PdoRastreoCarga implements RastreoCargaInterface
             "SELECT TRIM(CONCAT(COALESCE(cl.nombre, ''), ' ', COALESCE(cl.apellido, ''))) AS cliente,
                     COALESCE(a.nombre, c.aduanero_nombre, c.aduanero_identificador, '') AS aduanero,
                     COALESCE(p.nombre, c.proveedor, '') AS proveedor,
-                    u.nombre AS registrado_por, c.fecha_ingreso, c.numero_contenedor, c.notas
+                    u.nombre AS registrado_por, c.fecha_ingreso, c.numero_contenedor, c.notas, bo.nombre AS bodega
              FROM cargas c
              LEFT JOIN clientes cl ON cl.id = c.cliente_id
              LEFT JOIN aduaneros a ON a.identificador = c.aduanero_identificador
              LEFT JOIN proveedores p ON p.identificador = c.proveedor_identificador
              LEFT JOIN usuarios u ON u.id = c.registrado_por_usuario_id
+             LEFT JOIN bodegas bo ON bo.id = c.bodega_id
              WHERE c.id = :id"
         );
         $stmt->execute([':id' => $cargaId]);
@@ -57,6 +58,7 @@ final class PdoRastreoCarga implements RastreoCargaInterface
             'fechaIngreso' => $r['fecha_ingreso'] ?? null,
             'contenedor' => ($r['numero_contenedor'] ?? '') !== '' ? $r['numero_contenedor'] : null,
             'notas' => ($r['notas'] ?? '') !== '' ? $r['notas'] : null,
+            'bodega' => $r['bodega'] ?? null,
         ];
     }
 
@@ -117,11 +119,12 @@ final class PdoRastreoCarga implements RastreoCargaInterface
         }
 
         $stmt = $this->connection->prepare(
-            "SELECT l.id, l.codigo, l.estado, u.codigo AS ubicacion,
+            "SELECT l.id, l.codigo, l.estado, u.codigo AS ubicacion, bl.nombre AS bodega,
                     (SELECT d.codigo FROM lpn_genealogia g JOIN lpns d ON d.id = g.lpn_destino_id
                      WHERE g.lpn_origen_id = l.id ORDER BY g.created_at DESC LIMIT 1) AS caja
              FROM lpns l
              LEFT JOIN ubicaciones u ON u.id = l.ubicacion_id
+             LEFT JOIN bodegas bl ON bl.id = l.bodega_id
              WHERE l.carga_id = :c
              ORDER BY l.orden_en_carga, l.codigo"
         );
@@ -134,6 +137,7 @@ final class PdoRastreoCarga implements RastreoCargaInterface
                 'codigo' => (string) $r['codigo'],
                 'estado' => (string) $r['estado'],
                 'ubicacion' => $r['ubicacion'] ?: null,
+                'bodega' => $r['bodega'] ?? null,
                 'caja' => $r['caja'] ?: null,
                 'ordenId' => $o !== null ? (string) $o['id'] : null,
                 'orden' => $o !== null ? self::etiqueta($o) : null,
@@ -158,6 +162,8 @@ final class PdoRastreoCarga implements RastreoCargaInterface
         'carga_editada' => 'Carga editada',
         'reempaque' => 'Reempaque',
         'carga_eliminada' => 'Carga eliminada',
+        'traslado' => 'Traslado entre bodegas',
+        'traslado_llegada' => 'Llegada de traslado',
     ];
 
     public function movimientos(string $cargaId): array
@@ -178,6 +184,7 @@ final class PdoRastreoCarga implements RastreoCargaInterface
         $registrados = [];
         $recepcion = [];
         $escaneosSalida = [];
+        $llegadas = [];
         try {
             $stmt = $this->connection->prepare(
                 'SELECT m.tipo, m.detalle, m.salida_orden_id, m.created_at, u.nombre AS usuario FROM carga_movimientos m
@@ -190,6 +197,16 @@ final class PdoRastreoCarga implements RastreoCargaInterface
         }
         foreach ($filas as $r) {
             $registrados[$r['tipo'] . '|' . ($r['salida_orden_id'] ?? '')] = true;
+
+            // Llegadas de un traslado: una por bulto en la bitacora, agrupadas por traslado y dia.
+            if ($r['tipo'] === 'traslado_llegada') {
+                $clave = $r['detalle'] . '|' . substr((string) $r['created_at'], 0, 10);
+                $llegadas[$clave] ??= ['n' => 0, 'detalle' => (string) $r['detalle'], 'desde' => (string) $r['created_at'], 'hasta' => (string) $r['created_at'], 'usuarios' => []];
+                $llegadas[$clave]['n']++;
+                $llegadas[$clave]['hasta'] = (string) $r['created_at'];
+                $llegadas[$clave]['usuarios'][(string) $r['usuario']] = true;
+                continue;
+            }
 
             if ($r['tipo'] === 'recepcion_escaneo') {
                 $dia = substr((string) $r['created_at'], 0, 10);
@@ -214,6 +231,12 @@ final class PdoRastreoCarga implements RastreoCargaInterface
         foreach ($recepcion as $g) {
             $eventos[] = $this->evento($g['desde'], 'recepcion_escaneo', self::TITULOS['recepcion_escaneo'],
                 "{$g['n']} bulto(s) escaneados en recepcion" . self::rango($g['desde'], $g['hasta']),
+                implode(', ', array_filter(array_keys($g['usuarios']))));
+        }
+
+        foreach ($llegadas as $g) {
+            $eventos[] = $this->evento($g['desde'], 'traslado', self::TITULOS['traslado_llegada'],
+                "{$g['n']} bulto(s): {$g['detalle']}" . self::rango($g['desde'], $g['hasta']),
                 implode(', ', array_filter(array_keys($g['usuarios']))));
         }
 

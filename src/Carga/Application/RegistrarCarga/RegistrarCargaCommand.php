@@ -33,6 +33,8 @@ final class RegistrarCargaCommand implements CommandInterface
         public readonly bool $notificarCliente = true,
         // Formulario de entrega: ver DatosEntrega::desdeArreglo() (claves empresaTransporte, chofer...).
         public readonly ?array $datosEntrega = null,
+        // Bodega donde ingresa (null = Bodega Principal). El controlador valida que el usuario pueda usarla.
+        public readonly ?string $bodegaId = null,
     ) {
     }
 }

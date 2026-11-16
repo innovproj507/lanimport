@@ -7,6 +7,7 @@ require __DIR__ . '/../partials/header.php';
 
 $secciones = [
     ['/usuarios', 'users', 'violet', 'Usuarios', 'Cuentas de acceso, roles y activacion de usuarios.'],
+    ['/bodegas', 'building', 'indigo', 'Bodegas', 'Bodegas de la empresa: cargas, bultos, ubicaciones y salidas de cada una.'],
     ['/paises', 'globe', 'sky', 'Paises', 'Paises de destino y si muestran serie en la etiqueta LPN.'],
     ['/impresoras', 'printer', 'slate', 'Impresoras', 'Impresora de etiquetas de este equipo (se configura en cada estacion).'],
     ['/configuracion/correo', 'mail', 'amber', 'Correo (SMTP)', $smtpGuardado

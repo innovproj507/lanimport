@@ -10,6 +10,7 @@ use Courier\Reempaque\Domain\ReempaqueOrdenRepositoryInterface;
 use Courier\Reempaque\Domain\TipoReempaque;
 use Courier\Shared\Domain\ValueObject\Uuid;
 use DateTimeImmutable;
+use Courier\Shared\Domain\BodegaActivaInterface;
 use PDO;
 
 /**
@@ -18,14 +19,21 @@ use PDO;
  */
 final class PdoReempaqueOrdenRepository implements ReempaqueOrdenRepositoryInterface
 {
-    public function __construct(private readonly PDO $connection)
-    {
+    public function __construct(
+        private readonly PDO $connection,
+        private readonly ?BodegaActivaInterface $bodegaActiva = null,
+    ) {
     }
 
     public function save(ReempaqueOrden $orden): void
     {
         if ($this->findHeader($orden->id()) === null) {
             $this->insert($orden);
+            // Se ejecuta en la bodega de sus bultos.
+            $this->connection->prepare(
+                "UPDATE reempaque_ordenes SET bodega_id = COALESCE((SELECT l.bodega_id FROM reempaque_lpns rl JOIN lpns l ON l.id = rl.lpn_id
+                     WHERE rl.reempaque_orden_id = :orden1 AND rl.rol = 'origen' LIMIT 1), bodega_id) WHERE id = :orden2"
+            )->execute([':orden1' => $orden->id(), ':orden2' => $orden->id()]);
         } else {
             $this->update($orden);
         }
@@ -154,6 +162,11 @@ final class PdoReempaqueOrdenRepository implements ReempaqueOrdenRepositoryInter
         if (!empty($filtros['clienteId'])) {
             $where[] = 'cliente_id = :cliente_id';
             $params[':cliente_id'] = $filtros['clienteId'];
+        }
+
+        if (($bodega = $this->bodegaActiva?->id()) !== null) {
+            $where[] = 'bodega_id = :bodega_activa';
+            $params[':bodega_activa'] = $bodega;
         }
 
         $sql = 'SELECT * FROM reempaque_ordenes';

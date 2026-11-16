@@ -2,6 +2,11 @@
 
 declare(strict_types=1);
 
+use Courier\Bodega\Application\GuardarBodega\GuardarBodegaHandler;
+use Courier\Bodega\Domain\BodegaRepositoryInterface;
+use Courier\Bodega\Infrastructure\Persistence\PdoBodegaRepository;
+use Courier\Shared\Domain\BodegaActivaInterface;
+use Courier\Shared\Infrastructure\Security\BodegaActivaSesion;
 use Courier\Evidencia\Application\EliminarFotoEvidencia\EliminarFotoEvidenciaHandler;
 use Courier\Evidencia\Application\SubirFotoEvidencia\SubirFotoEvidenciaHandler;
 use Courier\Evidencia\Domain\AlmacenFotosInterface;
@@ -239,7 +244,7 @@ $container->set(BuscarUsuariosHandler::class, fn (Container $c) => new BuscarUsu
 
 // Carga
 $container->set(BitacoraCargaInterface::class, fn (Container $c) => new PdoBitacoraCarga($c->get(PDO::class), static fn (): ?string => isset($_SESSION['usuario_id']) ? (string) $_SESSION['usuario_id'] : null));
-$container->set(CargaRepositoryInterface::class, fn (Container $c) => new PdoCargaRepository($c->get(PDO::class)));
+$container->set(CargaRepositoryInterface::class, fn (Container $c) => new PdoCargaRepository($c->get(PDO::class), $c->get(BodegaActivaInterface::class)));
 $container->set(PdoHistorialEstadoRepository::class, fn (Container $c) => new PdoHistorialEstadoRepository($c->get(PDO::class)));
 $container->set(ConteoBultosCargaInterface::class, fn (Container $c) => new PdoConteoBultosCarga($c->get(PDO::class)));
 $container->set(PdoEtiquetaRepository::class, fn (Container $c) => new PdoEtiquetaRepository($c->get(PDO::class)));
@@ -255,8 +260,8 @@ $container->set(EliminarCargaHandler::class, fn (Container $c) => new EliminarCa
 ));
 
 // Lpn
-$container->set(LpnRepositoryInterface::class, fn (Container $c) => new PdoLpnRepository($c->get(PDO::class)));
-$container->set(UbicacionRepositoryInterface::class, fn (Container $c) => new PdoUbicacionRepository($c->get(PDO::class)));
+$container->set(LpnRepositoryInterface::class, fn (Container $c) => new PdoLpnRepository($c->get(PDO::class), $c->get(BodegaActivaInterface::class)));
+$container->set(UbicacionRepositoryInterface::class, fn (Container $c) => new PdoUbicacionRepository($c->get(PDO::class), $c->get(BodegaActivaInterface::class)));
 $container->set(LpnBarcodeGeneratorInterface::class, fn () => new LpnBarcodeGeneratorService(dirname(__DIR__) . '/public'));
 $container->set(EtiquetaLpnConfigRepositoryInterface::class, fn (Container $c) => new PdoEtiquetaLpnConfigRepository($c->get(PDO::class)));
 
@@ -283,12 +288,14 @@ $container->set(EliminarLpnsDeCargaHandler::class, fn (Container $c) => new Elim
     $c->get(LpnBarcodeGeneratorInterface::class),
     $c->get(UnitOfWork::class),
     $c->get(BitacoraCargaInterface::class),
+    $c->get(PdoHistorialEstadoRepository::class),
 ));
 $container->set(ConfirmarRecepcionLpnHandler::class, fn (Container $c) => new ConfirmarRecepcionLpnHandler(
     $c->get(LpnRepositoryInterface::class),
     $c->get(UbicacionRepositoryInterface::class),
     $c->get(SincronizarEstadoCargaHandler::class),
     $c->get(BitacoraCargaInterface::class),
+    $c->get(BodegaActivaInterface::class),
 ));
 $container->set(ListarLpnsPorCargaHandler::class, fn (Container $c) => new ListarLpnsPorCargaHandler($c->get(LpnRepositoryInterface::class)));
 $container->set(BuscarInventarioHandler::class, fn (Container $c) => new BuscarInventarioHandler($c->get(LpnRepositoryInterface::class)));
@@ -300,7 +307,7 @@ $container->set(DesactivarUbicacionHandler::class, fn (Container $c) => new Desa
 $container->set(BuscarUbicacionesHandler::class, fn (Container $c) => new BuscarUbicacionesHandler($c->get(UbicacionRepositoryInterface::class)));
 
 // Salida
-$container->set(SalidaOrdenRepositoryInterface::class, fn (Container $c) => new PdoSalidaOrdenRepository($c->get(PDO::class)));
+$container->set(SalidaOrdenRepositoryInterface::class, fn (Container $c) => new PdoSalidaOrdenRepository($c->get(PDO::class), $c->get(BodegaActivaInterface::class)));
 $container->set(ActualizarEmbarqueSalidaHandler::class, fn (Container $c) => new ActualizarEmbarqueSalidaHandler(
     $c->get(SalidaOrdenRepositoryInterface::class),
     $c->get(NavieraRepositoryInterface::class),
@@ -322,10 +329,10 @@ $container->set(AgregarCargasSalidaHandler::class, fn (Container $c) => new Agre
     $c->get(BitacoraCargaInterface::class),
 ));
 // Lectura para "Armar salida": cargas en bodega con el estado de sus bultos.
-$container->set(CargasParaSalidaInterface::class, fn (Container $c) => new PdoCargasParaSalida($c->get(PDO::class)));
+$container->set(CargasParaSalidaInterface::class, fn (Container $c) => new PdoCargasParaSalida($c->get(PDO::class), $c->get(BodegaActivaInterface::class)));
 // Lectura para Rastreo: en que OS/DO va cada bulto de una carga.
 $container->set(RastreoCargaInterface::class, fn (Container $c) => new PdoRastreoCarga($c->get(PDO::class)));
-$container->set(RegistrarEscaneoSalidaHandler::class, fn (Container $c) => new RegistrarEscaneoSalidaHandler($c->get(SalidaOrdenRepositoryInterface::class), $c->get(BitacoraCargaInterface::class)));
+$container->set(RegistrarEscaneoSalidaHandler::class, fn (Container $c) => new RegistrarEscaneoSalidaHandler($c->get(SalidaOrdenRepositoryInterface::class), $c->get(BitacoraCargaInterface::class), $c->get(BodegaActivaInterface::class), $c->get(LpnRepositoryInterface::class)));
 $container->set(ConfirmarSalidaHandler::class, fn (Container $c) => new ConfirmarSalidaHandler(
     $c->get(SalidaOrdenRepositoryInterface::class),
     $c->get(LpnRepositoryInterface::class),
@@ -363,7 +370,7 @@ $container->set(VerOrdenSalidaHandler::class, fn (Container $c) => new VerOrdenS
 $container->set(ListarOrdenesSalidaHandler::class, fn (Container $c) => new ListarOrdenesSalidaHandler($c->get(SalidaOrdenRepositoryInterface::class)));
 
 // Reempaque
-$container->set(ReempaqueOrdenRepositoryInterface::class, fn (Container $c) => new PdoReempaqueOrdenRepository($c->get(PDO::class)));
+$container->set(ReempaqueOrdenRepositoryInterface::class, fn (Container $c) => new PdoReempaqueOrdenRepository($c->get(PDO::class), $c->get(BodegaActivaInterface::class)));
 $container->set(GenealogiaLpnRepositoryInterface::class, fn (Container $c) => new PdoGenealogiaLpnRepository($c->get(PDO::class)));
 
 $container->set(IniciarReempaqueHandler::class, fn (Container $c) => new IniciarReempaqueHandler(
@@ -481,6 +488,29 @@ $container->set(EliminarFotoEvidenciaHandler::class, fn (Container $c) => new El
     $c->get(FotoEvidenciaRepositoryInterface::class),
     $c->get(AlmacenFotosInterface::class),
 ));
+
+// Traslados de bultos entre bodegas
+$container->set(\Courier\Traslado\Domain\TrasladoRepositoryInterface::class, fn (Container $c) => new \Courier\Traslado\Infrastructure\Persistence\PdoTrasladoRepository($c->get(PDO::class), $c->get(BodegaActivaInterface::class)));
+$container->set(\Courier\Traslado\Application\CrearTraslado\CrearTrasladoHandler::class, fn (Container $c) => new \Courier\Traslado\Application\CrearTraslado\CrearTrasladoHandler(
+    $c->get(\Courier\Traslado\Domain\TrasladoRepositoryInterface::class),
+    $c->get(LpnRepositoryInterface::class),
+    $c->get(BodegaRepositoryInterface::class),
+    $c->get(UnitOfWork::class),
+    $c->get(BitacoraCargaInterface::class),
+));
+$container->set(\Courier\Traslado\Application\MoverTraslado\MoverTrasladoHandler::class, fn (Container $c) => new \Courier\Traslado\Application\MoverTraslado\MoverTrasladoHandler(
+    $c->get(\Courier\Traslado\Domain\TrasladoRepositoryInterface::class),
+    $c->get(LpnRepositoryInterface::class),
+    $c->get(BodegaRepositoryInterface::class),
+    $c->get(UnitOfWork::class),
+    $c->get(BodegaActivaInterface::class),
+    $c->get(BitacoraCargaInterface::class),
+));
+
+// Bodega (varias bodegas: catalogo y bodega activa del usuario, que filtra los listados)
+$container->set(BodegaRepositoryInterface::class, fn (Container $c) => new PdoBodegaRepository($c->get(PDO::class)));
+$container->set(BodegaActivaInterface::class, fn (Container $c) => new BodegaActivaSesion($c->get(BodegaRepositoryInterface::class)));
+$container->set(GuardarBodegaHandler::class, fn (Container $c) => new GuardarBodegaHandler($c->get(BodegaRepositoryInterface::class)));
 
 // Pais
 $container->set(PaisRepositoryInterface::class, fn (Container $c) => new PdoPaisRepository($c->get(PDO::class)));
@@ -614,15 +644,15 @@ $container->set(VerFacturaHandler::class, fn (Container $c) => new VerFacturaHan
 $container->set(ListarFacturasHandler::class, fn (Container $c) => new ListarFacturasHandler($c->get(FacturaRepositoryInterface::class)));
 
 // Reporte
-$container->set(PdoResumenDashboardRepository::class, fn (Container $c) => new PdoResumenDashboardRepository($c->get(PDO::class)));
+$container->set(PdoResumenDashboardRepository::class, fn (Container $c) => new PdoResumenDashboardRepository($c->get(PDO::class), $c->get(BodegaActivaInterface::class)));
 $container->set(ObtenerResumenDashboardHandler::class, fn (Container $c) => new ObtenerResumenDashboardHandler(
     $c->get(PdoResumenDashboardRepository::class),
 ));
-$container->set(PdoReporteOperativoRepository::class, fn (Container $c) => new PdoReporteOperativoRepository($c->get(PDO::class)));
+$container->set(PdoReporteOperativoRepository::class, fn (Container $c) => new PdoReporteOperativoRepository($c->get(PDO::class), $c->get(BodegaActivaInterface::class)));
 $container->set(ObtenerReporteOperativoHandler::class, fn (Container $c) => new ObtenerReporteOperativoHandler(
     $c->get(PdoReporteOperativoRepository::class),
 ));
-$container->set(PdoFlujoCargasRepository::class, fn (Container $c) => new PdoFlujoCargasRepository($c->get(PDO::class)));
+$container->set(PdoFlujoCargasRepository::class, fn (Container $c) => new PdoFlujoCargasRepository($c->get(PDO::class), $c->get(BodegaActivaInterface::class)));
 $container->set(ObtenerFlujoCargasHandler::class, fn (Container $c) => new ObtenerFlujoCargasHandler(
     $c->get(PdoFlujoCargasRepository::class),
 ));

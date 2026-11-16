@@ -20,6 +20,19 @@ final class Ubicacion
     ) {
     }
 
+    /** Cada bodega tiene sus ubicaciones (el codigo se puede repetir en otra bodega). */
+    private string $bodegaId = '00000000-0000-0000-0000-000000000001';
+
+    public function bodegaId(): string
+    {
+        return $this->bodegaId;
+    }
+
+    public function asignarBodega(string $bodegaId): void
+    {
+        $this->bodegaId = $bodegaId;
+    }
+
     public static function registrar(
         Uuid $id,
         string $codigo,

@@ -7,6 +7,7 @@ if (empty($ubicaciones)):
     <tr><td colspan="6" class="py-4 text-sm text-zinc-500">No se encontraron ubicaciones.</td></tr>
 <?php else: foreach ($ubicaciones as $ubicacion): ?>
     <tr class="border-b border-slate-200">
+        <?php if (hay_varias_bodegas()): ?><td class="py-2 pr-4 text-zinc-700"><?= htmlspecialchars(bodega_nombre($ubicacion->bodegaId())) ?></td><?php endif; ?>
         <td class="py-2 pr-4 font-mono text-black"><?= htmlspecialchars($ubicacion->codigo()) ?></td>
         <td class="py-2 pr-4 text-zinc-700"><?= htmlspecialchars($ubicacion->zona() ?? '—') ?></td>
         <td class="py-2 pr-4 text-zinc-700"><?= htmlspecialchars($ubicacion->pasillo() ?? '—') ?></td>

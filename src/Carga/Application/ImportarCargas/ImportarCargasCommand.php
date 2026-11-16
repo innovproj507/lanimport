@@ -17,6 +17,8 @@ final class ImportarCargasCommand implements CommandInterface
         public readonly bool $notificarClientes,
         public readonly string $nombreArchivo,
         public readonly string $usuarioId,
+        // Bodega donde ingresan todas las cargas del archivo.
+        public readonly ?string $bodegaId = null,
     ) {
     }
 }

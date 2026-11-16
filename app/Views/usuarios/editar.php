@@ -37,6 +37,19 @@ require __DIR__ . '/../partials/header.php';
             <?php endforeach; ?>
         </select>
     </div>
+    <?php $bodegaUsuario = \Config\Services::courierContainer()->get(\Courier\Bodega\Domain\BodegaRepositoryInterface::class)->bodegaDeUsuario($usuario->id()); ?>
+    <?php if (count(bodegas_activas()) > 1 || ($bodegaUsuario ?? null) !== null): ?>
+    <div>
+        <label class="block text-sm font-medium text-zinc-700 mb-1">Bodega</label>
+        <select name="bodega_id" class="w-full rounded-lg border border-zinc-300 bg-white text-black px-3 py-2 focus:ring-2 focus:ring-amber-400 focus:outline-none">
+            <option value="">Todas las bodegas (Trafico, Gerencia, Owner)</option>
+            <?php foreach (bodegas_activas() as $b): ?>
+                <option value="<?= htmlspecialchars($b->id()) ?>" <?= ($bodegaUsuario ?? null) === $b->id() ? 'selected' : '' ?>><?= htmlspecialchars($b->nombre()) ?></option>
+            <?php endforeach; ?>
+        </select>
+        <p class="text-xs text-zinc-500 mt-1">El personal de una bodega (Bodega, Inventario) solo ve y opera lo de su bodega.</p>
+    </div>
+    <?php endif; ?>
     <div>
         <label class="block text-sm font-medium text-zinc-700 mb-1">Nueva contrasena (opcional)</label>
         <input type="password" name="password" minlength="8" placeholder="Dejar en blanco para no cambiar"

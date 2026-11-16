@@ -55,6 +55,66 @@ abstract class BaseController extends Controller
     }
 
     /**
+     * El personal de una bodega solo abre lo que es de su bodega (por enlace directo tambien).
+     * Una OS/DO es "suya" si se armo ahi o lleva algun bulto de ahi.
+     */
+    protected function salidaDeMiBodega(\Courier\Salida\Domain\SalidaOrden $orden): bool
+    {
+        $fija = $this->container()->get(\Courier\Shared\Domain\BodegaActivaInterface::class)->fija();
+
+        return $fija === null
+            || $orden->bodegaId() === $fija
+            // avancePorCarga() ya viene filtrado a los bultos de la bodega fija.
+            || $this->container()->get(\Courier\Salida\Domain\SalidaOrdenRepositoryInterface::class)->avancePorCarga($orden->id()) !== [];
+    }
+
+    /** Una carga es "suya" si ingreso en su bodega o tiene algun bulto ahi. */
+    protected function cargaDeMiBodega(\Courier\Carga\Domain\Carga $carga): bool
+    {
+        $fija = $this->container()->get(\Courier\Shared\Domain\BodegaActivaInterface::class)->fija();
+
+        if ($fija === null || $carga->bodegaId() === $fija) {
+            return true;
+        }
+
+        foreach ($this->container()->get(\Courier\Lpn\Domain\LpnRepositoryInterface::class)->findByCargaId($carga->id()) as $lpn) {
+            if ($lpn->bodegaId() === $fija) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Bodega en la que se registra algo nuevo (carga, ubicacion...): la fija del usuario; si no
+     * tiene, la elegida en el formulario (debe existir y estar activa), la activa del header, o la
+     * Bodega Principal.
+     */
+    protected function bodegaParaOperar(?string $pedida = null): string
+    {
+        $activa = $this->container()->get(\Courier\Shared\Domain\BodegaActivaInterface::class);
+
+        if ($activa->fija() !== null) {
+            return $activa->fija();
+        }
+
+        $pedida = trim((string) $pedida);
+
+        if ($pedida !== '') {
+            $bodega = $this->container()->get(\Courier\Bodega\Domain\BodegaRepositoryInterface::class)->findById($pedida);
+
+            if ($bodega === null || !$bodega->activo()) {
+                throw new \Courier\Shared\Domain\Exception\ValidationException('Seleccione una bodega valida.');
+            }
+
+            return $bodega->id();
+        }
+
+        return $activa->id() ?? \Courier\Bodega\Domain\Bodega::PRINCIPAL;
+    }
+
+    /**
      * Mensaje de un solo uso para la siguiente pagina (patron POST/redirect/GET),
      * guardado en la sesion nativa. Se muestra con partials/_flash.php.
      */

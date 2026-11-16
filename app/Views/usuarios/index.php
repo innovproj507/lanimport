@@ -35,6 +35,7 @@ require __DIR__ . '/../partials/header.php';
                 <th class="py-2 pr-4">Nombre</th>
                 <th class="py-2 pr-4">Correo</th>
                 <th class="py-2 pr-4">Rol</th>
+                <th class="py-2 pr-4">Bodega</th>
                 <th class="py-2 pr-4">Estado</th>
                 <th class="py-2 text-right">Acciones</th>
             </tr>

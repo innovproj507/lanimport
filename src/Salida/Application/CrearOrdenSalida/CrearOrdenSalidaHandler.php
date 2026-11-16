@@ -83,6 +83,8 @@ final class CrearOrdenSalidaHandler implements CommandHandlerInterface
                 $command->usuarioId,
             );
 
+            $orden->asignarBodega($lpnsSeleccionados[0]->bodegaId());
+
             if ($command->generarDo) {
                 $anio = (int) date('Y');
                 $orden->asignarDo($anio, $this->ordenes->siguienteNumeroDo($anio));

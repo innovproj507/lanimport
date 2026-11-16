@@ -82,6 +82,9 @@ require_once __DIR__ . '/view_helpers.php';
                         <?= nav_item('/bodega', 'scan', 'App movil de bodega', $currentPath, false, 'text-lime-300') ?>
                         <?= nav_item('/inventario', 'box', 'Inventario', $currentPath, false, 'text-emerald-400') ?>
                         <?= nav_item('/salidas/ordenes', 'receipt', 'Orden de Salida', $currentPath, false, 'text-sky-400') ?>
+                        <?php if (hay_varias_bodegas()): ?>
+                            <?= nav_item('/traslados', 'truck', 'Traslados', $currentPath, false, 'text-indigo-300') ?>
+                        <?php endif; ?>
                         <?= nav_item('/salidas/historial', 'truck', 'Contenedor', $currentPath, false, 'text-orange-400') ?>
                         <?= nav_item(!$esTrafico ? '/reempaques/historial' : '/reempaques', 'box', 'Reempaque', $currentPath, false, 'text-violet-400') ?>
                     <?php endif; ?>
@@ -152,6 +155,26 @@ require_once __DIR__ . '/view_helpers.php';
             <?php endif; ?>
 
             <div class="ml-auto flex items-center gap-1.5 sm:gap-2">
+                <?php // Bodega con la que se trabaja: fija (personal de bodega) o elegible (Trafico/Gerencia/Owner). ?>
+                <?php if (count(bodegas_activas()) > 1 || bodega_fija() !== null): ?>
+                    <?php if (bodega_fija() !== null): ?>
+                        <span class="inline-flex items-center gap-1.5 bg-indigo-500/90 text-white text-sm rounded-lg px-3 py-1.5 shadow-sm" title="Su bodega">
+                            <?= icon_small('building', 'w-4 h-4') ?><?= htmlspecialchars(bodega_nombre(bodega_fija())) ?>
+                        </span>
+                    <?php else: ?>
+                        <form method="post" action="/bodega-activa" class="inline-flex">
+                            <input type="hidden" name="_csrf" value="<?= htmlspecialchars(\App\Libraries\Csrf::token()) ?>">
+                            <input type="hidden" name="volver" value="<?= htmlspecialchars($_SERVER['REQUEST_URI'] ?? '/') ?>">
+                            <select name="bodega_id" onchange="this.form.submit()" title="Bodega con la que trabaja"
+                                    class="rounded-lg border-0 bg-white text-zinc-700 text-sm px-2 py-1.5 shadow-sm max-w-[11rem] focus:ring-2 focus:ring-amber-400">
+                                <option value="">Todas las bodegas</option>
+                                <?php foreach (bodegas_activas() as $b): ?>
+                                    <option value="<?= htmlspecialchars($b->id()) ?>" <?= bodega_activa() === $b->id() ? 'selected' : '' ?>><?= htmlspecialchars($b->nombre()) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </form>
+                    <?php endif; ?>
+                <?php endif; ?>
                 <span class="hidden sm:inline-flex items-center gap-2 bg-white text-zinc-700 text-sm rounded-lg px-3 py-1.5 shadow-sm">
                     <?= icon_small('clock', 'w-4 h-4 text-zinc-500') ?><?= htmlspecialchars($fechaHoy) ?>
                 </span>

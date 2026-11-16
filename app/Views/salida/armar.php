@@ -48,6 +48,13 @@ $listas = count(array_filter($cargas, static fn (array $c) => $c['listos'] > 0))
     <div class="bg-red-500/10 text-red-600 text-sm rounded-lg px-4 py-3 mb-4 border border-red-500/30"><?= htmlspecialchars($error) ?></div>
 <?php endif; ?>
 
+<?php if (hay_varias_bodegas() && bodega_activa() === null): ?>
+    <div class="bg-amber-500/10 text-amber-800 text-sm rounded-lg px-4 py-3 mb-4 border border-amber-500/30">
+        Esta viendo <strong>todas las bodegas</strong>. Una OS sale de una sola bodega: elija arriba, junto a la fecha, la bodega de donde sale.
+    </div>
+<?php elseif (hay_varias_bodegas()): ?>
+    <p class="text-sm text-zinc-600 mb-3">Bultos de <strong><?= htmlspecialchars(bodega_nombre(bodega_activa())) ?></strong>.</p>
+<?php endif; ?>
 <form method="post" action="<?= $ordenDestino !== null ? '/salidas/' . htmlspecialchars($ordenDestino->id()) . '/agregar' : '/salidas' ?>" id="form-armar-salida">
     <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
 

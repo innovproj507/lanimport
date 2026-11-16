@@ -29,6 +29,12 @@ final class Carga extends AggregateRoot
     /** Formulario de entrega (transporte, chofer, quien entrega); opcional. */
     private ?DatosEntrega $datosEntrega = null;
 
+    /** Bodega donde ingreso (la de cada bulto esta en su LPN y cambia con un traslado). */
+    private string $bodegaId = self::BODEGA_PRINCIPAL;
+
+    /** Bodega que existia antes de manejar varias (migracion 066). */
+    public const BODEGA_PRINCIPAL = '00000000-0000-0000-0000-000000000001';
+
     private function __construct(
         private readonly Uuid $id,
         private readonly TrackingNumero $trackingNumero,
@@ -213,6 +219,21 @@ final class Carga extends AggregateRoot
     }
 
     /**
+     * Se borraron sus etiquetas para rehacerlas: vuelve a "Ingresado" (hay que escanear las nuevas).
+     * Solo antes de que salga algo: Ingresado o En bodega.
+     */
+    public function reiniciarRecepcion(string $usuarioId, string $comentario): void
+    {
+        if (!in_array($this->estado, [CargaStatus::INGRESADO, CargaStatus::EN_BODEGA], true)) {
+            throw new ValidationException("La carga esta {$this->estado->label()}: ya no se pueden rehacer sus etiquetas.");
+        }
+
+        $this->estado = CargaStatus::INGRESADO;
+        $this->updatedAt = new DateTimeImmutable();
+        $this->historial[] = HistorialEstado::registrar(CargaStatus::INGRESADO, $usuarioId, mb_substr($comentario, 0, 255));
+    }
+
+    /**
      * El estado sigue a los bultos fisicos (LPNs):
      *  - Ingresado -> En bodega cuando bodega escaneo todos los bultos.
      *  - En bodega -> En transito cuando todos los bultos salieron en salidas confirmadas.
@@ -266,6 +287,16 @@ final class Carga extends AggregateRoot
                 "El detalle de servicio no corresponde al tipo '{$tipo->value}'."
             );
         }
+    }
+
+    public function bodegaId(): string
+    {
+        return $this->bodegaId;
+    }
+
+    public function asignarBodega(string $bodegaId): void
+    {
+        $this->bodegaId = $bodegaId;
     }
 
     public function id(): string

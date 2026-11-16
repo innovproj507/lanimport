@@ -134,6 +134,7 @@ final class CargaMasivaController extends BaseController
             (bool) $datos['notificar'],
             $datos['archivo'],
             (string) $this->container()->get(SessionManager::class)->currentUsuarioId(),
+            $this->bodegaParaOperar(),
         ));
 
         return view('carga/masiva/resultado', [

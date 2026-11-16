@@ -54,6 +54,11 @@ final class AbrirCajaReempaqueHandler implements CommandHandlerInterface
         }
 
         $caja = Lpn::abrirCajaReempaque(Uuid::generate(), $orden->clienteId(), $prefijo . $numero, array_key_first($marcas));
+        // La caja queda en la bodega de sus bultos.
+        $primero = $orden->origenLpnIds() !== [] ? $this->lpns->findById($orden->origenLpnIds()[0]) : null;
+        if ($primero !== null) {
+            $caja->asignarBodega($primero->bodegaId());
+        }
 
         $this->unitOfWork->run(function () use ($orden, $caja) {
             $this->lpns->save($caja);

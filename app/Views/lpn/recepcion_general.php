@@ -7,6 +7,16 @@ $pageSubtitle = 'Escanee las etiquetas pegadas a los bultos para dejarlos dispon
 // Varias PDA escanean a la vez: la lista se actualiza sola cada 10 s si hubo cambios (vivo.js).
 $vivoSegundos = 10;
 require __DIR__ . '/../partials/header.php';
+
+// Traslados que vienen a esta bodega: se reciben escaneando en el traslado.
+$trasladosEnCamino = bodega_activa() !== null
+    ? \Config\Services::courierContainer()->get(\Courier\Traslado\Domain\TrasladoRepositoryInterface::class)->enCaminoHacia(bodega_activa())
+    : 0;
+if ($trasladosEnCamino > 0): ?>
+    <a href="/traslados?estado=en_camino" class="block bg-indigo-500/10 text-indigo-800 text-sm rounded-lg px-4 py-3 mb-4 border border-indigo-500/30 hover:bg-indigo-500/20">
+        <?= $trasladosEnCamino ?> traslado(s) vienen en camino a <?= htmlspecialchars(bodega_nombre(bodega_activa())) ?>: abra el traslado y escanee los bultos al llegar.
+    </a>
+<?php endif;
 $porRecibir = array_sum(array_map(static fn (array $p) => $p['total'] - $p['recibidos'], $pendientes));
 ?>
 

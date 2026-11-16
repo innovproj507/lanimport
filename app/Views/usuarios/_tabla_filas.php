@@ -6,12 +6,14 @@ $usuarioActualId = $_SESSION['usuario_id'] ?? null;
 
 if (empty($usuarios)):
 ?>
-    <tr><td colspan="5" class="py-4 text-sm text-zinc-500">No se encontraron usuarios.</td></tr>
+    <tr><td colspan="6" class="py-4 text-sm text-zinc-500">No se encontraron usuarios.</td></tr>
 <?php else: foreach ($usuarios as $usuario): ?>
     <tr class="border-b border-slate-200">
         <td class="py-2 pr-4 font-medium text-black"><?= htmlspecialchars($usuario->nombre()) ?></td>
         <td class="py-2 pr-4 text-zinc-700"><?= htmlspecialchars((string) $usuario->email()) ?></td>
         <td class="py-2 pr-4 text-zinc-700"><?= htmlspecialchars($usuario->rol()->label()) ?></td>
+        <?php $bodegasUsuarios ??= \Config\Services::courierContainer()->get(\Courier\Bodega\Domain\BodegaRepositoryInterface::class)->bodegasDeUsuarios(); ?>
+        <td class="py-2 pr-4 text-zinc-700"><?= htmlspecialchars(isset($bodegasUsuarios[$usuario->id()]) ? bodega_nombre($bodegasUsuarios[$usuario->id()]) : 'Todas') ?></td>
         <td class="py-2 pr-4"><?= $usuario->activo() ? badge('Activo', 'emerald') : badge('Inactivo', 'red') ?></td>
         <td class="py-2 text-right space-x-1 whitespace-nowrap">
             <?= icon_button('/usuarios/' . $usuario->id() . '/editar', 'pencil', 'Editar', 'violet') ?>

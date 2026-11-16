@@ -31,6 +31,7 @@ require __DIR__ . '/../partials/header.php';
     <table class="w-full text-sm">
         <thead>
             <tr class="text-left text-xs text-zinc-500 uppercase border-b border-slate-200">
+                <?php if (hay_varias_bodegas()): ?><th class="py-2 pr-4">Bodega</th><?php endif; ?>
                 <th class="py-2 pr-4">Codigo</th>
                 <th class="py-2 pr-4">Zona</th>
                 <th class="py-2 pr-4">Pasillo</th>

@@ -192,7 +192,7 @@ final class BodegaApiController extends BaseApiController
         try {
             $orden = $this->container()->get(VerOrdenSalidaHandler::class)->handle(new VerOrdenSalidaQuery($id));
 
-            if ($orden === null) {
+            if ($orden === null || !$this->salidaDeMiBodega($orden)) {
                 throw new NotFoundException('Orden de salida no encontrada.');
             }
 
@@ -209,6 +209,12 @@ final class BodegaApiController extends BaseApiController
                 $this->container()->get(SalidaOrdenRepositoryInterface::class)->avancePorCarga($orden->id()),
             );
 
+            // Un DO puede juntar dos bodegas: cada bodega ve y escanea solo lo suyo.
+            if ($this->container()->get(\Courier\Shared\Domain\BodegaActivaInterface::class)->fija() !== null) {
+                $suyos = array_merge(...array_map(static fn (array $c) => $c['codigos'], $datos['cargas'] ?: [['codigos' => []]]));
+                $datos['lineas'] = array_values(array_filter($datos['lineas'], static fn (array $l) => in_array($l['codigo'], $suyos, true)));
+            }
+
             return $this->success($datos);
         } catch (Throwable $e) {
             return $this->fromException($e);
@@ -220,6 +226,8 @@ final class BodegaApiController extends BaseApiController
         try {
             $codigo = ConfirmarRecepcionLpnHandler::normalizarCodigo((string) ($this->cuerpo()['codigo'] ?? ''));
             $progreso = $this->container()->get(RegistrarEscaneoSalidaHandler::class)->handle(new RegistrarEscaneoSalidaCommand($id, $codigo));
+            $orden = $this->container()->get(SalidaOrdenRepositoryInterface::class)->findById($id);
+            $progreso = $orden !== null ? $this->progresoDeMiBodega($orden) : $progreso;
 
             return $this->success(['codigo' => $codigo, 'progreso' => $progreso]);
         } catch (Throwable $e) {
@@ -251,8 +259,28 @@ final class BodegaApiController extends BaseApiController
             'cliente' => implode(', ', $clientes),
             'contenedor' => $orden->embarque()->contenedorFormateado(),
             'estado' => $orden->estado()->value,
-            'progreso' => $orden->progreso(),
+            'progreso' => $this->progresoDeMiBodega($orden),
             'creada' => $orden->createdAt()->format('Y-m-d'),
+        ];
+    }
+
+    /**
+     * Avance del escaneo: el personal de una bodega ve el de sus bultos (un DO puede juntar dos
+     * bodegas y cada una carga lo suyo); los demas, el de toda la orden.
+     *
+     * @return array{escaneadas: int, total: int}
+     */
+    private function progresoDeMiBodega(SalidaOrden $orden): array
+    {
+        if ($this->container()->get(\Courier\Shared\Domain\BodegaActivaInterface::class)->fija() === null) {
+            return $orden->progreso();
+        }
+
+        $grupos = $this->container()->get(SalidaOrdenRepositoryInterface::class)->avancePorCarga($orden->id());
+
+        return [
+            'escaneadas' => array_sum(array_column($grupos, 'escaneadas')),
+            'total' => array_sum(array_column($grupos, 'total')),
         ];
     }
 

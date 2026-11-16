@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Courier\Reporte\Infrastructure\Persistence;
 
+use Courier\Shared\Domain\BodegaActivaInterface;
+use Courier\Shared\Infrastructure\Persistence\FiltraPorBodega;
 use PDO;
 
 /**
@@ -12,8 +14,12 @@ use PDO;
  */
 final class PdoFlujoCargasRepository
 {
-    public function __construct(private readonly PDO $connection)
-    {
+    use FiltraPorBodega;
+
+    public function __construct(
+        private readonly PDO $connection,
+        private readonly ?BodegaActivaInterface $bodegaActiva = null,
+    ) {
     }
 
     /**
@@ -59,7 +65,7 @@ final class PdoFlujoCargasRepository
                            FROM tracking_historial GROUP BY carga_id) h ON h.carga_id = c.id"
             . ($where !== [] ? ' WHERE ' . implode(' AND ', $where) : '');
 
-        $stmt = $this->connection->prepare($sql);
+        $stmt = $this->prepare($sql);
         $stmt->execute($params);
 
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -73,7 +79,7 @@ final class PdoFlujoCargasRepository
      */
     public function salidasPorCarga(): array
     {
-        $stmt = $this->connection->query(
+        $stmt = $this->query(
             "SELECT x.carga_id, so.id, so.do_anio, so.do_numero, so.codigo, so.estado, so.numero_contenedor,
                     so.numero_sello, so.nombre_barco, so.fecha_cargue, so.fecha_salida_etd, so.destino_final,
                     so.confirmed_at, so.created_at, n.nombre AS naviera,

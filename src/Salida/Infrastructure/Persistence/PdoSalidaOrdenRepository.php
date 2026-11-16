@@ -11,12 +11,15 @@ use Courier\Salida\Domain\SalidaOrdenRepositoryInterface;
 use Courier\Salida\Domain\ValueObject\DatosEmbarque;
 use Courier\Shared\Domain\ValueObject\Uuid;
 use DateTimeImmutable;
+use Courier\Shared\Domain\BodegaActivaInterface;
 use PDO;
 
 final class PdoSalidaOrdenRepository implements SalidaOrdenRepositoryInterface
 {
-    public function __construct(private readonly PDO $connection)
-    {
+    public function __construct(
+        private readonly PDO $connection,
+        private readonly ?BodegaActivaInterface $bodegaActiva = null,
+    ) {
     }
 
     public function save(SalidaOrden $orden): void
@@ -36,16 +39,17 @@ final class PdoSalidaOrdenRepository implements SalidaOrdenRepositoryInterface
         // una orden de salida de inventario se guarda sin DO (do_anio/do_numero NULL).
         $stmt = $this->connection->prepare(
             'INSERT INTO salida_ordenes (
-                id, do_anio, do_numero, cliente_id, aduanero_identificador, estado, creado_por_usuario_id, created_at, confirmed_at,
+                id, bodega_id, do_anio, do_numero, cliente_id, aduanero_identificador, estado, creado_por_usuario_id, created_at, confirmed_at,
                 numero_contenedor, numero_sello, naviera_id, nombre_barco, fecha_cargue, fecha_salida_etd, destino_final
             ) VALUES (
-                :id, :do_anio, :do_numero, :cliente_id, :aduanero_identificador, :estado, :creado_por_usuario_id, :created_at, :confirmed_at,
+                :id, :bodega_id, :do_anio, :do_numero, :cliente_id, :aduanero_identificador, :estado, :creado_por_usuario_id, :created_at, :confirmed_at,
                 :numero_contenedor, :numero_sello, :naviera_id, :nombre_barco, :fecha_cargue, :fecha_salida_etd, :destino_final
             )'
         );
 
         $stmt->execute([
             ':id' => $orden->id(),
+            ':bodega_id' => $orden->bodegaId(),
             ':do_anio' => $orden->doAnio(),
             ':do_numero' => $orden->doNumero(),
             ':cliente_id' => $orden->clienteId(),
@@ -237,16 +241,17 @@ final class PdoSalidaOrdenRepository implements SalidaOrdenRepositoryInterface
     {
         $stmt = $this->connection->prepare(
             "SELECT ca.id AS carga_id, ca.tracking_numero, TRIM(CONCAT(c.nombre, ' ', COALESCE(c.apellido, ''))) AS cliente,
-                    l.id AS lpn_id, l.marca, l.codigo, sl.escaneado,
+                    l.id AS lpn_id, l.marca, l.codigo, sl.escaneado, l.bodega_id, b.nombre AS bodega,
                     ca.factura_proveedor_ruta, ca.factura_proveedor_nombre
              FROM salida_lineas sl
              JOIN lpns l ON l.id = sl.lpn_id
+             LEFT JOIN bodegas b ON b.id = l.bodega_id
              LEFT JOIN cargas ca ON ca.id = l.carga_id
              LEFT JOIN clientes c ON c.id = l.cliente_id
-             WHERE sl.salida_orden_id = :orden
+             WHERE sl.salida_orden_id = :orden" . (($fija = $this->bodegaActiva?->fija()) !== null ? ' AND l.bodega_id = :fija' : '') . "
              ORDER BY ca.tracking_numero, l.orden_en_carga, l.codigo"
         );
-        $stmt->execute([':orden' => $ordenId]);
+        $stmt->execute([':orden' => $ordenId] + ($fija !== null ? [':fija' => $fija] : []));
 
         $porCarga = [];
         foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $fila) {
@@ -257,6 +262,8 @@ final class PdoSalidaOrdenRepository implements SalidaOrdenRepositoryInterface
                 'tracking' => $fila['tracking_numero'] !== null ? (string) $fila['tracking_numero'] : 'Caja reempacada',
                 'cliente' => (string) ($fila['cliente'] ?? ''),
                 'marca' => $fila['marca'] !== null ? (string) $fila['marca'] : null,
+                'bodegaId' => (string) $fila['bodega_id'],
+                'bodega' => (string) ($fila['bodega'] ?? ''),
                 // Factura del proveedor que se subio con la carga (PDF o imagen).
                 'factura' => $fila['factura_proveedor_ruta'] !== null
                     ? ['ruta' => (string) $fila['factura_proveedor_ruta'], 'nombre' => (string) ($fila['factura_proveedor_nombre'] ?? 'Factura')]
@@ -404,6 +411,13 @@ final class PdoSalidaOrdenRepository implements SalidaOrdenRepositoryInterface
             $params[':cliente_id'] = $filtros['clienteId'];
         }
 
+        // Bodega activa: OS/DO armadas ahi o que llevan algun bulto de ahi (un DO puede juntar dos bodegas).
+        if (($bodega = $this->bodegaActiva?->id()) !== null) {
+            $where[] = '(s.bodega_id = :bodega1 OR EXISTS (SELECT 1 FROM salida_lineas bl JOIN lpns bp ON bp.id = bl.lpn_id WHERE bl.salida_orden_id = s.id AND bp.bodega_id = :bodega2))';
+            $params[':bodega1'] = $bodega;
+            $params[':bodega2'] = $bodega;
+        }
+
         $sql = 'SELECT s.*, n.nombre AS naviera_nombre FROM salida_ordenes s LEFT JOIN navieras n ON n.id = s.naviera_id';
 
         if ($where !== []) {
@@ -532,7 +546,7 @@ final class PdoSalidaOrdenRepository implements SalidaOrdenRepositoryInterface
      */
     private function hydrate(array $row, array $lineas): SalidaOrden
     {
-        return new SalidaOrden(
+        $orden = new SalidaOrden(
             new Uuid((string) $row['id']),
             $row['cliente_id'] !== null ? (string) $row['cliente_id'] : null,
             $row['aduanero_identificador'] !== null ? (string) $row['aduanero_identificador'] : null,
@@ -557,5 +571,8 @@ final class PdoSalidaOrdenRepository implements SalidaOrdenRepositoryInterface
             ]),
             isset($row['nota']) && $row['nota'] !== null ? (string) $row['nota'] : null,
         );
+        $orden->asignarBodega((string) ($row['bodega_id'] ?? '00000000-0000-0000-0000-000000000001'));
+
+        return $orden;
     }
 }

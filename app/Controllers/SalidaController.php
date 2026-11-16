@@ -214,6 +214,16 @@ final class SalidaController extends BaseController
         }
     }
 
+    /** Con varias bodegas, armar una OS exige trabajar en una (selector del header). */
+    private function exigirBodegaElegida(): void
+    {
+        $varias = count($this->container()->get(\Courier\Bodega\Domain\BodegaRepositoryInterface::class)->findAllActivas()) > 1;
+
+        if ($varias && $this->container()->get(\Courier\Shared\Domain\BodegaActivaInterface::class)->id() === null) {
+            throw new ValidationException('Elija arriba la bodega de donde sale esta OS (ahora esta en "Todas las bodegas").');
+        }
+    }
+
     public function store(): RedirectResponse|string
     {
         $cargaIds = $this->request->getPost('carga_ids') ?? [];
@@ -235,6 +245,9 @@ final class SalidaController extends BaseController
         $sessionManager = $this->container()->get(SessionManager::class);
 
         try {
+            // Una OS sale de una sola bodega: con "Todas las bodegas" hay que elegir una arriba.
+            $this->exigirBodegaElegida();
+
             // Por cada carga marcada entran sus bultos escaneados y libres (o solo los N que indico
             // trafico); el resto queda en bodega.
             $lpnIds = array_merge($this->lpnsDeCargasMarcadas($cargaIds), $cajaIds);
@@ -262,7 +275,7 @@ final class SalidaController extends BaseController
     {
         $orden = $this->container()->get(VerOrdenSalidaHandler::class)->handle(new VerOrdenSalidaQuery($id));
 
-        if ($orden === null) {
+        if ($orden === null || !$this->salidaDeMiBodega($orden)) {
             $this->response->setStatusCode(404);
 
             return 'Orden de salida no encontrada.';

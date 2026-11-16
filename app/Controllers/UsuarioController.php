@@ -71,6 +71,19 @@ final class UsuarioController extends BaseController
         return view('usuarios/nuevo', ['error' => null]);
     }
 
+    /** Bodega fija del usuario (personal de una bodega) o vacio = ve todas. */
+    private function asignarBodega(string $usuarioId): void
+    {
+        $bodegaId = trim((string) $this->request->getPost('bodega_id'));
+        $bodegas = $this->container()->get(\Courier\Bodega\Domain\BodegaRepositoryInterface::class);
+
+        if ($bodegaId !== '' && $bodegas->findById($bodegaId) === null) {
+            $bodegaId = '';
+        }
+
+        $bodegas->asignarAUsuario($usuarioId, $bodegaId !== '' ? $bodegaId : null);
+    }
+
     public function store(): RedirectResponse|string
     {
         if (!Csrf::verify($this->request->getPost('_csrf'))) {
@@ -85,7 +98,8 @@ final class UsuarioController extends BaseController
                 (string) $this->request->getPost('rol'),
             );
 
-            $this->container()->get(RegistrarUsuarioHandler::class)->handle($command);
+            $usuarioId = (string) $this->container()->get(RegistrarUsuarioHandler::class)->handle($command);
+            $this->asignarBodega($usuarioId);
 
             return redirect()->to('/usuarios');
         } catch (ValidationException $e) {
@@ -121,6 +135,7 @@ final class UsuarioController extends BaseController
             );
 
             $this->container()->get(ActualizarUsuarioHandler::class)->handle($command);
+            $this->asignarBodega($id);
 
             return redirect()->to('/usuarios');
         } catch (NotFoundException $e) {

@@ -14,17 +14,20 @@ enum EstadoLpn: string
     case RESERVED = 'reserved';
     case QUARANTINE = 'quarantine';
     case CONSUMED = 'consumed';
+    /** Va de una bodega a otra (traslado): no se puede despachar ni reempacar. */
+    case IN_TRANSFER = 'in_transfer';
 
     /** @return array<int, self> */
     private static function transitions(self $estado): array
     {
         return match ($estado) {
             self::RECEIVING => [self::AVAILABLE, self::QUARANTINE],
-            self::AVAILABLE => [self::IN_REPACK, self::RESERVED, self::QUARANTINE, self::CONSUMED],
+            self::AVAILABLE => [self::IN_REPACK, self::RESERVED, self::QUARANTINE, self::CONSUMED, self::IN_TRANSFER],
             self::IN_REPACK => [self::CONSUMED, self::AVAILABLE],
             self::RESERVED => [self::CONSUMED, self::AVAILABLE],
             self::QUARANTINE => [self::AVAILABLE, self::CONSUMED],
             self::CONSUMED => [],
+            self::IN_TRANSFER => [self::AVAILABLE],
         };
     }
 
@@ -51,6 +54,7 @@ enum EstadoLpn: string
             self::RESERVED => 'Reservado',
             self::QUARANTINE => 'En cuarentena',
             self::CONSUMED => 'Consumido',
+            self::IN_TRANSFER => 'En traslado',
         };
     }
 }

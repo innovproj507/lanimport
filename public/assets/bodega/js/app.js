@@ -213,6 +213,10 @@
             + '  <a class="menu-item menu-consulta" href="#/consulta"><span class="menu-icono">🔍</span><span class="menu-titulo">Consultar LPN</span><span class="menu-detalle">Ver estado y ubicacion de un bulto</span></a>'
             + '  <a class="menu-item menu-salidas" href="#/salidas"><span class="menu-icono">⬆</span><span class="menu-titulo">Salidas</span><span class="menu-detalle" id="cuenta-salidas">Despachar ordenes</span></a>'
             + '  <a class="menu-item menu-reempaque" href="#/reempaques"><span class="menu-icono">📦</span><span class="menu-titulo">Reempaque</span><span class="menu-detalle" id="cuenta-reempaques">Ordenes de trafico</span></a>'
+            // Con varias bodegas: traslados entre bodegas (pantalla web, se escanea igual).
+            + ((window.BLAN_CONFIG || {}).bodega !== null && (window.BLAN_CONFIG || {}).bodega !== undefined
+                ? '  <a class="menu-item menu-reempaque" href="/traslados"><span class="menu-icono">🚚</span><span class="menu-titulo">Traslados</span><span class="menu-detalle">Cargar o recibir bultos de otra bodega</span></a>'
+                : '')
             + '</nav>'
             + (tipoEquipo() !== '' ? selectorEquipo() : '')
             + '<p class="pie"><a href="/recepcion">Ir a la version completa del sistema</a></p>'

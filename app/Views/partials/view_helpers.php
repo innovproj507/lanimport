@@ -81,6 +81,51 @@ function badge(string $texto, string $color = 'slate'): string
  * URL de un archivo de public/ con su fecha de modificacion (?v=): si la imagen se regenera con el
  * mismo nombre (p.ej. una etiqueta), el navegador y el agente de impresion bajan la nueva, no la de cache.
  */
+/** @return array<int, \Courier\Bodega\Domain\Bodega> bodegas activas (para selectores) */
+function bodegas_activas(): array
+{
+    static $bodegas = null;
+
+    return $bodegas ??= \Config\Services::courierContainer()->get(\Courier\Bodega\Domain\BodegaRepositoryInterface::class)->findAllActivas();
+}
+
+/** Bodega fija del usuario (personal de una bodega), o null si ve todas. */
+function bodega_fija(): ?string
+{
+    return \Config\Services::courierContainer()->get(\Courier\Shared\Domain\BodegaActivaInterface::class)->fija();
+}
+
+/** Bodega con la que trabaja el usuario (filtra los listados), o null = todas. */
+function bodega_activa(): ?string
+{
+    return \Config\Services::courierContainer()->get(\Courier\Shared\Domain\BodegaActivaInterface::class)->id();
+}
+
+/** Nombre de una bodega por id (tambien las inactivas). */
+function bodega_nombre(?string $id): string
+{
+    static $nombres = null;
+
+    if ($id === null || $id === '') {
+        return 'Todas las bodegas';
+    }
+
+    if ($nombres === null) {
+        $nombres = [];
+        foreach (\Config\Services::courierContainer()->get(\Courier\Bodega\Domain\BodegaRepositoryInterface::class)->findAll() as $b) {
+            $nombres[$b->id()] = $b->nombre();
+        }
+    }
+
+    return $nombres[$id] ?? 'Bodega';
+}
+
+/** Hay mas de una bodega activa: solo entonces se muestran selectores y columnas de bodega. */
+function hay_varias_bodegas(): bool
+{
+    return count(bodegas_activas()) > 1;
+}
+
 /** Imprimir (etiquetas, comprobantes, manifiestos, reportes) es de trafico, gerencia y owner; bodega no imprime. */
 function puede_imprimir(): bool
 {

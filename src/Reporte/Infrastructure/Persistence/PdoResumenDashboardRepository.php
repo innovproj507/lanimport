@@ -6,31 +6,37 @@ namespace Courier\Reporte\Infrastructure\Persistence;
 
 use Courier\Carga\Domain\CargaStatus;
 use Courier\Lpn\Domain\EstadoLpn;
+use Courier\Shared\Domain\BodegaActivaInterface;
+use Courier\Shared\Infrastructure\Persistence\FiltraPorBodega;
 use PDO;
 
 final class PdoResumenDashboardRepository
 {
-    public function __construct(private readonly PDO $connection)
-    {
+    use FiltraPorBodega;
+
+    public function __construct(
+        private readonly PDO $connection,
+        private readonly ?BodegaActivaInterface $bodegaActiva = null,
+    ) {
     }
 
     public function cargasHoy(): int
     {
-        return (int) $this->connection->query(
+        return (int) $this->query(
             'SELECT COUNT(*) FROM cargas WHERE DATE(created_at) = CURDATE()'
         )->fetchColumn();
     }
 
     public function cargasEsteMes(): int
     {
-        return (int) $this->connection->query(
+        return (int) $this->query(
             'SELECT COUNT(*) FROM cargas WHERE YEAR(created_at) = YEAR(CURDATE()) AND MONTH(created_at) = MONTH(CURDATE())'
         )->fetchColumn();
     }
 
     public function cargasMesAnterior(): int
     {
-        return (int) $this->connection->query(
+        return (int) $this->query(
             'SELECT COUNT(*) FROM cargas
              WHERE YEAR(created_at) = YEAR(CURDATE() - INTERVAL 1 MONTH)
                AND MONTH(created_at) = MONTH(CURDATE() - INTERVAL 1 MONTH)'
@@ -47,7 +53,7 @@ final class PdoResumenDashboardRepository
         ];
 
         $placeholders = implode(',', array_fill(0, count($pendientesEstados), '?'));
-        $stmt = $this->connection->prepare("SELECT COUNT(*) FROM cargas WHERE estado IN ({$placeholders})");
+        $stmt = $this->prepare("SELECT COUNT(*) FROM cargas WHERE estado IN ({$placeholders})");
         $stmt->execute($pendientesEstados);
 
         return (int) $stmt->fetchColumn();
@@ -55,20 +61,20 @@ final class PdoResumenDashboardRepository
 
     public function clientesActivos(): int
     {
-        return (int) $this->connection->query(
+        return (int) $this->query(
             'SELECT COUNT(DISTINCT cliente_id) FROM cargas'
         )->fetchColumn();
     }
 
     public function totalHistorico(): int
     {
-        return (int) $this->connection->query('SELECT COUNT(*) FROM cargas')->fetchColumn();
+        return (int) $this->query('SELECT COUNT(*) FROM cargas')->fetchColumn();
     }
 
     /** @return array<int, array{nombre: string, totalCargas: int}> */
     public function topClientes(int $limite = 5): array
     {
-        $stmt = $this->connection->prepare(
+        $stmt = $this->prepare(
             'SELECT c.nombre AS nombre, COUNT(*) AS total
              FROM cargas ca
              JOIN clientes c ON c.id = ca.cliente_id
@@ -87,7 +93,7 @@ final class PdoResumenDashboardRepository
     /** @return array<string, int> */
     public function porServicioEsteMes(): array
     {
-        $stmt = $this->connection->query(
+        $stmt = $this->query(
             "SELECT COALESCE(tipo_servicio, 'sin_especificar') AS tipo_servicio, COUNT(*) AS total FROM cargas
              WHERE YEAR(created_at) = YEAR(CURDATE()) AND MONTH(created_at) = MONTH(CURDATE())
              GROUP BY tipo_servicio"
@@ -117,7 +123,7 @@ final class PdoResumenDashboardRepository
     /** @return array<int, int> */
     private function porDiaEsteMes(string $tabla): array
     {
-        $stmt = $this->connection->query(
+        $stmt = $this->query(
             "SELECT DAY(created_at) AS dia, COUNT(*) AS total FROM {$tabla}
              WHERE YEAR(created_at) = YEAR(CURDATE()) AND MONTH(created_at) = MONTH(CURDATE())
              GROUP BY DAY(created_at)"
@@ -135,7 +141,7 @@ final class PdoResumenDashboardRepository
     /** @return array<string, int> 'YYYY-MM' => cargas, ultimos 12 meses incluido el actual */
     public function cargasPorMes(): array
     {
-        $stmt = $this->connection->query(
+        $stmt = $this->query(
             "SELECT DATE_FORMAT(created_at, '%Y-%m') AS mes, COUNT(*) AS total FROM cargas
              WHERE created_at >= DATE_FORMAT(CURDATE() - INTERVAL 11 MONTH, '%Y-%m-01')
              GROUP BY mes"
@@ -160,7 +166,7 @@ final class PdoResumenDashboardRepository
     /** @return array<string, array{label: string, total: int}> estado => cargas, solo estados con cargas */
     public function cargasPorEstado(): array
     {
-        $stmt = $this->connection->query('SELECT estado, COUNT(*) AS total FROM cargas GROUP BY estado ORDER BY total DESC');
+        $stmt = $this->query('SELECT estado, COUNT(*) AS total FROM cargas GROUP BY estado ORDER BY total DESC');
 
         $resultado = [];
 
@@ -183,7 +189,7 @@ final class PdoResumenDashboardRepository
             $resultado[$estado->value] = ['label' => $estado->label(), 'total' => 0];
         }
 
-        foreach ($this->connection->query('SELECT estado, COUNT(*) AS total FROM lpns GROUP BY estado')->fetchAll() as $row) {
+        foreach ($this->query('SELECT estado, COUNT(*) AS total FROM lpns GROUP BY estado')->fetchAll() as $row) {
             $resultado[(string) $row['estado']]['total'] = (int) $row['total'];
         }
 
@@ -193,7 +199,7 @@ final class PdoResumenDashboardRepository
     /** @return array{confirmadasEsteMes: int, pendientes: int} */
     public function salidas(): array
     {
-        $row = $this->connection->query(
+        $row = $this->query(
             "SELECT
                 SUM(estado = 'confirmada' AND YEAR(confirmed_at) = YEAR(CURDATE()) AND MONTH(confirmed_at) = MONTH(CURDATE())) AS confirmadas,
                 SUM(estado = 'pendiente') AS pendientes
@@ -208,13 +214,13 @@ final class PdoResumenDashboardRepository
 
     public function clientesPorAprobar(): int
     {
-        return (int) $this->connection->query("SELECT COUNT(*) FROM clientes WHERE estado = 'pendiente'")->fetchColumn();
+        return (int) $this->query("SELECT COUNT(*) FROM clientes WHERE estado = 'pendiente'")->fetchColumn();
     }
 
     /** @return array<int, array{nombre: string, total: int}> bultos en bodega por ubicacion (los sin ubicar aparte) */
     public function bultosPorUbicacion(int $limite = 5): array
     {
-        $stmt = $this->connection->query(
+        $stmt = $this->query(
             "SELECT COALESCE(u.codigo, 'Sin ubicacion') AS nombre, COUNT(*) AS total
              FROM lpns l
              LEFT JOIN ubicaciones u ON u.id = l.ubicacion_id
@@ -238,8 +244,8 @@ final class PdoResumenDashboardRepository
                   JOIN clientes c ON c.id = ca.cliente_id
                   WHERE ca.estado IN ('ingresado', 'en_bodega')";
 
-        $total = (int) $this->connection->query("SELECT COUNT(*) {$desde}")->fetchColumn();
-        $stmt = $this->connection->query(
+        $total = (int) $this->query("SELECT COUNT(*) {$desde}")->fetchColumn();
+        $stmt = $this->query(
             "SELECT ca.id, ca.tracking_numero, c.nombre AS cliente_nombre, ca.fecha_ingreso {$desde}
              ORDER BY ca.fecha_ingreso ASC LIMIT " . max(1, $limite)
         );
@@ -261,7 +267,7 @@ final class PdoResumenDashboardRepository
     /** @return array<int, array<string, mixed>> */
     public function cargasRecientes(int $limite = 8): array
     {
-        $stmt = $this->connection->prepare(
+        $stmt = $this->prepare(
             "SELECT ca.id, ca.tracking_numero, c.nombre AS cliente_nombre,
                     COALESCE(ca.tipo_servicio, 'sin_especificar') AS tipo_servicio, ca.estado, ca.created_at
              FROM cargas ca

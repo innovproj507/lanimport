@@ -10,6 +10,8 @@ final class EliminarLpnsDeCargaCommand implements CommandInterface
 {
     public function __construct(
         public readonly string $cargaId,
+        public readonly ?string $motivo = null,
+        public readonly string $usuarioId = '',
     ) {
     }
 }

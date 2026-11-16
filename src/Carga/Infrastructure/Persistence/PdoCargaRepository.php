@@ -19,33 +19,36 @@ use Courier\Carga\Domain\ValueObject\LineaCarga;
 use Courier\Carga\Domain\ValueObject\TrackingNumero;
 use Courier\Shared\Domain\ValueObject\Uuid;
 use DateTimeImmutable;
+use Courier\Shared\Domain\BodegaActivaInterface;
 use PDO;
 use RuntimeException;
 
 final class PdoCargaRepository implements CargaRepositoryInterface
 {
-    public function __construct(private readonly PDO $connection)
-    {
+    public function __construct(
+        private readonly PDO $connection,
+        private readonly ?BodegaActivaInterface $bodegaActiva = null,
+    ) {
     }
 
     public function save(Carga $carga): void
     {
         $stmt = $this->connection->prepare(
             'INSERT INTO cargas (
-                id, tracking_numero, cliente_id, proveedor, proveedor_identificador,
+                id, tracking_numero, cliente_id, bodega_id, proveedor, proveedor_identificador,
                 aduanero_identificador, aduanero_nombre, numero_contenedor, notas,
                 factura_proveedor_nombre, factura_proveedor_ruta, tipo_servicio,
                 estado, registrado_por_usuario_id, fecha_ingreso, created_at, updated_at,
                 entrega_empresa_transporte, entrega_chofer, entrega_placa, entrega_por, entrega_cedula, entrega_tipos_mercancia
             ) VALUES (
-                :id, :tracking_numero, :cliente_id, :proveedor, :proveedor_identificador,
+                :id, :tracking_numero, :cliente_id, :bodega_id, :proveedor, :proveedor_identificador,
                 :aduanero_identificador, :aduanero_nombre, :numero_contenedor, :notas,
                 :factura_proveedor_nombre, :factura_proveedor_ruta, :tipo_servicio,
                 :estado, :registrado_por_usuario_id, :fecha_ingreso, :created_at, :updated_at,
                 :entrega_empresa_transporte, :entrega_chofer, :entrega_placa, :entrega_por, :entrega_cedula, :entrega_tipos_mercancia
             )
             ON DUPLICATE KEY UPDATE
-                cliente_id = VALUES(cliente_id), proveedor = VALUES(proveedor), proveedor_identificador = VALUES(proveedor_identificador),
+                cliente_id = VALUES(cliente_id), bodega_id = VALUES(bodega_id), proveedor = VALUES(proveedor), proveedor_identificador = VALUES(proveedor_identificador),
                 aduanero_identificador = VALUES(aduanero_identificador), aduanero_nombre = VALUES(aduanero_nombre),
                 numero_contenedor = VALUES(numero_contenedor), notas = VALUES(notas),
                 factura_proveedor_nombre = VALUES(factura_proveedor_nombre), factura_proveedor_ruta = VALUES(factura_proveedor_ruta),
@@ -61,6 +64,7 @@ final class PdoCargaRepository implements CargaRepositoryInterface
             ':id' => $carga->id(),
             ':tracking_numero' => (string) $carga->trackingNumero(),
             ':cliente_id' => $carga->clienteId(),
+            ':bodega_id' => $carga->bodegaId(),
             ':proveedor' => $carga->proveedor(),
             ':proveedor_identificador' => $carga->proveedorIdentificador(),
             ':aduanero_identificador' => $carga->aduanero()?->identificador(),
@@ -329,6 +333,13 @@ final class PdoCargaRepository implements CargaRepositoryInterface
             $params[':aduanero'] = $aduaneroIdentificador;
         }
 
+        // Bodega activa: cargas que ingresaron ahi o que tienen algun bulto ahi (traslados).
+        if (($bodega = $this->bodegaActiva?->id()) !== null) {
+            $where .= ' AND (ca.bodega_id = :bodega1 OR EXISTS (SELECT 1 FROM lpns lb WHERE lb.carga_id = ca.id AND lb.bodega_id = :bodega2))';
+            $params[':bodega1'] = $bodega;
+            $params[':bodega2'] = $bodega;
+        }
+
         $countStmt = $this->connection->prepare(
             "SELECT COUNT(*) FROM cargas ca JOIN clientes c ON c.id = ca.cliente_id WHERE {$where}"
         );
@@ -394,6 +405,7 @@ final class PdoCargaRepository implements CargaRepositoryInterface
             $row['factura_proveedor_ruta'] !== null ? (string) $row['factura_proveedor_ruta'] : null,
         );
 
+        $carga->asignarBodega((string) ($row['bodega_id'] ?? Carga::BODEGA_PRINCIPAL));
         $carga->asignarDatosEntrega(DatosEntrega::desdeArreglo([
             'empresaTransporte' => $row['entrega_empresa_transporte'] ?? null,
             'chofer' => $row['entrega_chofer'] ?? null,

@@ -70,6 +70,7 @@ final class MoverCargasSalidaHandler implements CommandHandlerInterface
 
         if ($destino === null) {
             $destino = SalidaOrden::crear(Uuid::generate(), count($clienteIds) === 1 ? $clienteIds[0] : null, null, $lineas, $command->usuarioId);
+            $destino->asignarBodega($origen->bodegaId());
         } else {
             $destino->recibirLineas($lineas, $clienteIds);
         }

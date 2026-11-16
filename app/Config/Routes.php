@@ -31,6 +31,15 @@ $rastreoFilter = ['auth', 'role:cliente,aduanero,inventario,operaciones,gerente,
 $routes->get('/tracking', 'TrackingController::showLookupForm', ['filter' => $rastreoFilter]);
 $routes->post('/tracking/buscar', 'TrackingController::lookup', ['filter' => $rastreoFilter]);
 
+// Bodegas — solo Owner: catalogo de bodegas (Configuracion > Bodegas).
+$routes->group('bodegas', ['filter' => ['auth', 'role:admin']], static function ($routes) {
+    $routes->get('/', 'BodegaController::index');
+    $routes->post('/', 'BodegaController::guardar');
+    $routes->get('(:segment)/editar', 'BodegaController::editar/$1');
+});
+// Bodega activa (selector del header): Trafico/Gerencia/Owner eligen con que bodega trabajar.
+$routes->post('bodega-activa', 'BodegaController::cambiarActiva', ['filter' => ['auth']]);
+
 // Paises — solo Owner (rol admin): es parte de Configuracion
 $routes->group('paises', ['filter' => ['auth', 'role:admin']], static function ($routes) {
     $routes->get('/', 'PaisController::index');
@@ -187,6 +196,14 @@ $routes->get('inventario', 'InventarioController::index', ['filter' => $bodegaFi
 $armaSalida = ['auth', 'role:inventario,operaciones,gerente,admin'];
 $confirmaSalida = ['auth', 'role:inventario,gerente,admin'];
 $planificaSalida = ['auth', 'role:operaciones,gerente,admin'];
+
+// Traslados entre bodegas: Inventario/Trafico los arman y cancelan; bodega escanea, despacha y recibe.
+$routes->get('traslados', 'TrasladoController::index', ['filter' => $bodegaFilter]);
+$routes->get('traslados/nuevo', 'TrasladoController::nuevo', ['filter' => $armaSalida]);
+$routes->post('traslados', 'TrasladoController::store', ['filter' => $armaSalida]);
+$routes->get('traslados/(:segment)', 'TrasladoController::show/$1', ['filter' => $bodegaFilter]);
+$routes->post('traslados/(:segment)/(escanear|despachar)', 'TrasladoController::accion/$1/$2', ['filter' => $bodegaFilter]);
+$routes->post('traslados/(:segment)/(cancelar)', 'TrasladoController::accion/$1/$2', ['filter' => $armaSalida]);
 $routes->get('salidas/historial', 'SalidaController::historial', ['filter' => $bodegaFilter]);
 // Orden de Salida: OS de inventario que aun no tienen DO (va antes de salidas/(:segment)).
 $routes->get('salidas/ordenes', 'SalidaController::ordenes', ['filter' => $bodegaFilter]);

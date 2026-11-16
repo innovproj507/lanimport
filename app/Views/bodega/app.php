@@ -49,6 +49,10 @@ $v = static fn (string $archivo): string => '/assets/bodega/' . $archivo . '?v='
             'apiBase' => '/bodega/api',
             'csrf' => Csrf::token(),
             'nombre' => $nombre,
+            // Con varias bodegas: la de este usuario y el acceso a Traslados.
+            'bodega' => count(\Config\Services::courierContainer()->get(\Courier\Bodega\Domain\BodegaRepositoryInterface::class)->findAllActivas()) > 1
+                ? (\Config\Services::courierContainer()->get(\Courier\Shared\Domain\BodegaActivaInterface::class)->fija() ?? '')
+                : null,
         ], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP) ?>;
     </script>
     <script src="/assets/js/lector-codigos.js?v=<?= @filemtime(FCPATH . 'assets/js/lector-codigos.js') ?>"></script>

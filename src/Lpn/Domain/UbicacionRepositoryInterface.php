@@ -18,5 +18,6 @@ interface UbicacionRepositoryInterface
     /** @return array{items: array<int, Ubicacion>, total: int} */
     public function searchPaginado(string $term, int $page, int $perPage): array;
 
-    public function existsCodigo(string $codigo): bool;
+    /** En la bodega dada (o la activa; si no hay, en cualquiera). */
+    public function existsCodigo(string $codigo, ?string $bodegaId = null): bool;
 }

@@ -13,6 +13,7 @@ final class RegistrarUbicacionCommand implements CommandInterface
         public readonly ?string $zona,
         public readonly ?string $pasillo,
         public readonly ?string $nivel,
+        public readonly ?string $bodegaId = null,
     ) {
     }
 }

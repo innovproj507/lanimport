@@ -19,6 +19,12 @@ interface LpnRepositoryInterface
 
     public function deleteByCargaId(string $cargaId): void;
 
+    /**
+     * Si algun bulto de la carga ya estuvo en una OS/DO, reempaque o traslado (sus etiquetas no se
+     * pueden borrar), la razon; si no, null.
+     */
+    public function usoEnMovimientos(string $cargaId): ?string;
+
     /** Borra un LPN que nunca existio fisicamente (caja de reempaque descartada o cancelada). */
     public function deleteById(string $id): void;
 

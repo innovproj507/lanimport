@@ -82,6 +82,7 @@ final class UbicacionController extends BaseController
                 $this->request->getPost('zona') !== '' ? (string) $this->request->getPost('zona') : null,
                 $this->request->getPost('pasillo') !== '' ? (string) $this->request->getPost('pasillo') : null,
                 $this->request->getPost('nivel') !== '' ? (string) $this->request->getPost('nivel') : null,
+                $this->bodegaParaOperar($this->request->getPost('bodega_id')),
             );
 
             $this->container()->get(RegistrarUbicacionHandler::class)->handle($command);

@@ -319,6 +319,19 @@ final class SalidaOrden extends AggregateRoot
         return ['escaneadas' => $escaneadas, 'total' => $total];
     }
 
+    /** Bodega donde se armo la OS (sus bultos pueden venir de otra si se unio una OS de alla). */
+    private string $bodegaId = '00000000-0000-0000-0000-000000000001';
+
+    public function bodegaId(): string
+    {
+        return $this->bodegaId;
+    }
+
+    public function asignarBodega(string $bodegaId): void
+    {
+        $this->bodegaId = $bodegaId;
+    }
+
     public function id(): string
     {
         return (string) $this->id;

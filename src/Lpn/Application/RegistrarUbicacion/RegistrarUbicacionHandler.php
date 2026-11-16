@@ -21,8 +21,8 @@ final class RegistrarUbicacionHandler implements CommandHandlerInterface
     {
         assert($command instanceof RegistrarUbicacionCommand);
 
-        if ($this->ubicaciones->existsCodigo($command->codigo)) {
-            throw new UbicacionDuplicadaException("Ya existe una ubicacion con el codigo {$command->codigo}.");
+        if ($this->ubicaciones->existsCodigo($command->codigo, $command->bodegaId)) {
+            throw new UbicacionDuplicadaException("Ya existe una ubicacion con el codigo {$command->codigo} en esta bodega.");
         }
 
         $ubicacion = Ubicacion::registrar(
@@ -32,6 +32,10 @@ final class RegistrarUbicacionHandler implements CommandHandlerInterface
             $command->pasillo,
             $command->nivel,
         );
+
+        if ($command->bodegaId !== null) {
+            $ubicacion->asignarBodega($command->bodegaId);
+        }
 
         $this->ubicaciones->save($ubicacion);
 

@@ -15,6 +15,7 @@ use Courier\Shared\Application\CommandInterface;
 use Courier\Shared\Domain\Exception\NotFoundException;
 use Courier\Shared\Domain\Exception\ValidationException;
 use Courier\Carga\Domain\BitacoraCargaInterface;
+use Courier\Shared\Domain\BodegaActivaInterface;
 
 /** Bodega escanea la etiqueta pegada al bulto: el LPN pasa de "En recepcion" a "Disponible". */
 final class ConfirmarRecepcionLpnHandler implements CommandHandlerInterface
@@ -24,6 +25,7 @@ final class ConfirmarRecepcionLpnHandler implements CommandHandlerInterface
         private readonly UbicacionRepositoryInterface $ubicaciones,
         private readonly SincronizarEstadoCargaHandler $sincronizarCarga,
         private readonly ?BitacoraCargaInterface $bitacora = null,
+        private readonly ?BodegaActivaInterface $bodegaActiva = null,
     ) {
     }
 
@@ -47,12 +49,18 @@ final class ConfirmarRecepcionLpnHandler implements CommandHandlerInterface
             throw new ValidationException("El LPN {$codigo} no es de esta carga. Use Recepcion (escaneo general) para recibirlo.");
         }
 
+        $bodegaActiva = $this->bodegaActiva?->id();
+        if ($bodegaActiva !== null && $lpn->bodegaId() !== $bodegaActiva) {
+            throw new ValidationException("El LPN {$codigo} es de otra bodega: se recibe en esa bodega.");
+        }
+
         if ($lpn->estado() !== EstadoLpn::RECEIVING) {
             throw new ValidationException("El LPN {$codigo} ya fue recibido (estado: {$lpn->estado()->label()}).");
         }
 
-        if ($command->ubicacionId !== null && $this->ubicaciones->findById($command->ubicacionId) === null) {
-            throw new ValidationException('Seleccione una ubicacion valida.');
+        $ubicacion = $command->ubicacionId !== null ? $this->ubicaciones->findById($command->ubicacionId) : null;
+        if ($command->ubicacionId !== null && ($ubicacion === null || $ubicacion->bodegaId() !== $lpn->bodegaId())) {
+            throw new ValidationException('Seleccione una ubicacion valida de la bodega del bulto.');
         }
 
         $lpn->confirmarRecepcion($command->ubicacionId);

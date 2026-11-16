@@ -66,6 +66,21 @@ require __DIR__ . '/../partials/header.php';
     <form method="post" action="/cargas" id="form-ingreso-carga" enctype="multipart/form-data" class="max-w-5xl space-y-5">
         <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
 
+        <?php if (hay_varias_bodegas() && bodega_fija() === null): ?>
+            <div class="bg-white rounded-xl shadow-sm p-4 flex flex-wrap items-center gap-3">
+                <label for="bodega_id" class="text-sm font-medium text-zinc-700">Bodega donde ingresa</label>
+                <select name="bodega_id" id="bodega_id" required
+                        class="rounded-lg border border-zinc-300 bg-white text-black px-3 py-2 focus:ring-2 focus:ring-amber-400 focus:outline-none">
+                    <?php $bodegaElegida = (string) ($_POST['bodega_id'] ?? bodega_activa() ?? \Courier\Bodega\Domain\Bodega::PRINCIPAL); ?>
+                    <?php foreach (bodegas_activas() as $b): ?>
+                        <option value="<?= htmlspecialchars($b->id()) ?>" <?= $bodegaElegida === $b->id() ? 'selected' : '' ?>><?= htmlspecialchars($b->nombre()) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+        <?php elseif (hay_varias_bodegas()): ?>
+            <p class="text-sm text-zinc-600">Ingresa en <strong><?= htmlspecialchars(bodega_nombre(bodega_fija())) ?></strong>.</p>
+        <?php endif; ?>
+
         <div class="bg-white rounded-xl shadow-sm p-6">
             <?= card_header('users', 'Datos del cliente y proveedor', 'amber') ?>
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">

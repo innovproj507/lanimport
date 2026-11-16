@@ -119,6 +119,7 @@ final class CargaController extends BaseController
                 $facturaProveedor['ruta_archivo'] ?? null,
                 true,
                 $this->datosEntregaDesdeFormulario(),
+                $this->bodegaParaOperar($this->request->getPost('bodega_id')),
             );
 
             $result = $this->container()->get(RegistrarCargaHandler::class)->handle($command);
@@ -380,7 +381,7 @@ final class CargaController extends BaseController
         $cargas = $this->container()->get(CargaRepositoryInterface::class);
         $carga = $cargas->findById($id);
 
-        if ($carga === null) {
+        if ($carga === null || !$this->cargaDeMiBodega($carga)) {
             $this->response->setStatusCode(404);
 
             return 'Carga no encontrada.';
@@ -777,7 +778,11 @@ final class CargaController extends BaseController
         }
 
         try {
-            $command = new EliminarLpnsDeCargaCommand($id);
+            $command = new EliminarLpnsDeCargaCommand(
+                $id,
+                (string) $this->request->getPost('motivo'),
+                (string) ($_SESSION['usuario_id'] ?? ''),
+            );
             $this->container()->get(EliminarLpnsDeCargaHandler::class)->handle($command);
 
             return redirect()->to('/cargas/' . $id);

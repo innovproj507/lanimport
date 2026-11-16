@@ -80,6 +80,7 @@ final class GenerarLpnsParaCargaHandler implements CommandHandlerInterface
                         $linea->descripcion(),
                         $ordenEnCarga,
                     );
+                    $lpn->asignarBodega($carga->bodegaId());
                     $this->lpns->save($lpn);
 
                     $etiquetaUrl = $this->barcodeGenerator->ruta($codigo);

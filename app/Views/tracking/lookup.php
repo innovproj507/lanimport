@@ -29,6 +29,7 @@ $bultoEstadoClases = [
     'reserved' => 'bg-blue-500/10 text-blue-600',
     'quarantine' => 'bg-red-500/10 text-red-600',
     'consumed' => 'bg-slate-500/10 text-slate-600',
+    'in_transfer' => 'bg-indigo-500/10 text-indigo-700',
 ];
 $bultoEstadoLabel = [
     'receiving' => 'Por recibir',
@@ -37,6 +38,7 @@ $bultoEstadoLabel = [
     'reserved' => 'En orden de salida',
     'quarantine' => 'En cuarentena',
     'consumed' => 'Despachado / consumido',
+    'in_transfer' => 'En traslado a otra bodega',
 ];
 /** Estado de una OS/DO para mostrar. */
 $ordenEstado = static function (string $estado, bool $esOs): array {
@@ -53,7 +55,7 @@ $colorMovimiento = static fn (string $tipo): string => match ($tipo) {
     'escaneo_salida', 'recepcion_escaneo' => 'bg-cyan-500',
     'salida_confirmada' => 'bg-emerald-500',
     'devuelta_bodega', 'orden_cancelada', 'etiquetas_eliminadas', 'carga_eliminada' => 'bg-red-500',
-    'reempaque' => 'bg-indigo-500',
+    'reempaque', 'traslado' => 'bg-indigo-500',
     default => 'bg-slate-400',
 };
 $lineaTiempo = static function (array $eventos) use ($h, $fecha, $colorMovimiento): void {
@@ -187,14 +189,15 @@ $lineaTiempo = static function (array $eventos) use ($h, $fecha, $colorMovimient
             <?php
             // Donde esta: bultos agrupados por la OS/DO vigente en que van, y los que siguen sueltos en bodega.
             $donde = [];
-            $sinOrden = ['bodega' => 0, 'otros' => []];
+            $sinOrden = ['bodega' => [], 'otros' => []];
             foreach ($rastreo['bultos'] as $b) {
                 if ($b['ordenId'] !== null) {
                     $donde[$b['ordenId']] ??= ['orden' => $b['orden'], 'estado' => $b['ordenEstado'], 'bultos' => 0, 'escaneados' => 0];
                     $donde[$b['ordenId']]['bultos']++;
                     $donde[$b['ordenId']]['escaneados'] += $b['escaneado'] ? 1 : 0;
                 } elseif ($b['estado'] === 'available') {
-                    $sinOrden['bodega']++;
+                    $enBodega = (string) ($b['bodega'] ?? '');
+                    $sinOrden['bodega'][$enBodega] = ($sinOrden['bodega'][$enBodega] ?? 0) + 1;
                 } else {
                     $label = $bultoEstadoLabel[$b['estado']] ?? $b['estado'];
                     $sinOrden['otros'][$label] = ($sinOrden['otros'][$label] ?? 0) + 1;
@@ -219,9 +222,9 @@ $lineaTiempo = static function (array $eventos) use ($h, $fecha, $colorMovimient
                             </span>
                         </li>
                     <?php endforeach; ?>
-                    <?php if ($sinOrden['bodega'] > 0): ?>
-                        <li><strong><?= $sinOrden['bodega'] ?> bulto(s)</strong> en bodega, sin orden de salida</li>
-                    <?php endif; ?>
+                    <?php foreach ($sinOrden['bodega'] as $nombreBodega => $n): ?>
+                        <li><strong><?= $n ?> bulto(s)</strong> en <?= hay_varias_bodegas() && $nombreBodega !== '' ? '<strong>' . $h($nombreBodega) . '</strong>' : 'bodega' ?>, sin orden de salida</li>
+                    <?php endforeach; ?>
                     <?php foreach ($sinOrden['otros'] as $label => $n): ?>
                         <li><strong><?= $n ?> bulto(s)</strong>: <?= $h($label) ?></li>
                     <?php endforeach; ?>
@@ -239,7 +242,7 @@ $lineaTiempo = static function (array $eventos) use ($h, $fecha, $colorMovimient
                     'Ingreso' => $fecha($rastreo['carga']['fechaIngreso'], true),
                     'Registrado por' => $rastreo['carga']['registradoPor'],
                     'Contenedor de llegada' => $rastreo['carga']['contenedor'],
-                ] as $k => $v): ?>
+                ] + (hay_varias_bodegas() ? ['Bodega de ingreso' => $rastreo['carga']['bodega'] ?? null] : []) as $k => $v): ?>
                     <div>
                         <dt class="text-xs text-zinc-500 uppercase"><?= $h($k) ?></dt>
                         <dd class="text-black font-medium break-words"><?= $h(($v ?? '') !== '' ? $v : '—') ?></dd>
@@ -372,7 +375,7 @@ $lineaTiempo = static function (array $eventos) use ($h, $fecha, $colorMovimient
                                 <tr class="text-left text-xs text-zinc-500 uppercase border-b border-slate-200">
                                     <th class="py-2 pr-3">Etiqueta</th>
                                     <th class="py-2 pr-3">Estado</th>
-                                    <th class="py-2 pr-3">Ubicacion</th>
+                                    <th class="py-2 pr-3"><?= hay_varias_bodegas() ? 'Bodega / ubicacion' : 'Ubicacion' ?></th>
                                     <th class="py-2 pr-3">Caja reempaque</th>
                                     <th class="py-2 pr-3">OS / DO</th>
                                     <th class="py-2">Escaneado salida</th>
@@ -385,7 +388,7 @@ $lineaTiempo = static function (array $eventos) use ($h, $fecha, $colorMovimient
                                         <td class="py-1.5 pr-3">
                                             <span class="px-2 py-0.5 rounded-full text-xs font-medium <?= $bultoEstadoClases[$b['estado']] ?? '' ?>"><?= $h($bultoEstadoLabel[$b['estado']] ?? $b['estado']) ?></span>
                                         </td>
-                                        <td class="py-1.5 pr-3 text-zinc-700"><?= $h($b['ubicacion'] ?? '—') ?></td>
+                                        <td class="py-1.5 pr-3 text-zinc-700"><?= hay_varias_bodegas() ? $h(($b['bodega'] ?? '') . ' · ') : '' ?><?= $h($b['ubicacion'] ?? '—') ?></td>
                                         <td class="py-1.5 pr-3 text-zinc-700 font-mono"><?= $h($b['caja'] ?? '—') ?></td>
                                         <td class="py-1.5 pr-3">
                                             <?php if ($b['ordenId'] !== null): ?>

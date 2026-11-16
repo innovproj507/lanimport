@@ -281,6 +281,9 @@ $opcionSalida = static fn (array $s): string => $s['etiqueta']
                             <?php else: ?>
                                 <?= htmlspecialchars($grupo['tracking']) ?>
                             <?php endif; ?>
+                            <?php if (hay_varias_bodegas() && !empty($grupo['bodega'])): ?>
+                                <span class="ml-1 px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-700 text-[11px] font-sans font-medium align-middle"><?= htmlspecialchars($grupo['bodega']) ?></span>
+                            <?php endif; ?>
                             <?php if (!empty($grupo['factura'])): ?>
                                 <?php // Factura del proveedor de la carga: se ve en el visor (modal). ?>
                                 <a href="/<?= htmlspecialchars($grupo['factura']['ruta']) ?>" target="_blank" rel="noopener" data-doc-ver

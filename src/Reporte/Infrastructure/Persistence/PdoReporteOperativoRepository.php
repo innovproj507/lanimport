@@ -4,18 +4,24 @@ declare(strict_types=1);
 
 namespace Courier\Reporte\Infrastructure\Persistence;
 
+use Courier\Shared\Domain\BodegaActivaInterface;
+use Courier\Shared\Infrastructure\Persistence\FiltraPorBodega;
 use PDO;
 
 final class PdoReporteOperativoRepository
 {
-    public function __construct(private readonly PDO $connection)
-    {
+    use FiltraPorBodega;
+
+    public function __construct(
+        private readonly PDO $connection,
+        private readonly ?BodegaActivaInterface $bodegaActiva = null,
+    ) {
     }
 
     /** @return array<string, int> */
     public function cargasPorServicio(string $desde, string $hasta): array
     {
-        $stmt = $this->connection->prepare(
+        $stmt = $this->prepare(
             "SELECT COALESCE(tipo_servicio, 'sin_especificar') AS tipo_servicio, COUNT(*) AS total FROM cargas
              WHERE DATE(created_at) BETWEEN :desde AND :hasta
              GROUP BY tipo_servicio"
@@ -34,7 +40,7 @@ final class PdoReporteOperativoRepository
     /** @return array<string, array{cantidad: int, total: float}> */
     public function facturacionPorEstado(string $desde, string $hasta): array
     {
-        $stmt = $this->connection->prepare(
+        $stmt = $this->prepare(
             'SELECT estado, COUNT(*) AS cantidad, COALESCE(SUM(total), 0) AS total FROM facturas
              WHERE DATE(created_at) BETWEEN :desde AND :hasta
              GROUP BY estado'
@@ -60,7 +66,7 @@ final class PdoReporteOperativoRepository
     /** @return array<int, array{nombre: string, totalFacturado: float}> */
     public function topClientesFacturacion(string $desde, string $hasta, int $limite = 5): array
     {
-        $stmt = $this->connection->prepare(
+        $stmt = $this->prepare(
             'SELECT c.nombre AS nombre, COALESCE(SUM(f.total), 0) AS total
              FROM facturas f
              JOIN clientes c ON c.id = f.cliente_id
@@ -81,7 +87,7 @@ final class PdoReporteOperativoRepository
     /** @return array<string, int> */
     public function inventarioPorEstado(): array
     {
-        $stmt = $this->connection->query('SELECT estado, COUNT(*) AS total FROM lpns GROUP BY estado');
+        $stmt = $this->query('SELECT estado, COUNT(*) AS total FROM lpns GROUP BY estado');
 
         $resultado = [
             'receiving' => 0,
@@ -110,13 +116,13 @@ final class PdoReporteOperativoRepository
     {
         $periodo = [':desde' => $desde, ':hasta' => $hasta];
         $uno = function (string $sql, array $params = []): array {
-            $stmt = $this->connection->prepare($sql);
+            $stmt = $this->prepare($sql);
             $stmt->execute($params);
 
             return $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
         };
         $todos = function (string $sql, array $params = []): array {
-            $stmt = $this->connection->prepare($sql);
+            $stmt = $this->prepare($sql);
             $stmt->execute($params);
 
             return $stmt->fetchAll(PDO::FETCH_ASSOC);

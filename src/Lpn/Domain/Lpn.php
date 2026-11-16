@@ -128,6 +128,48 @@ final class Lpn extends AggregateRoot
         $this->updatedAt = new DateTimeImmutable();
     }
 
+    /** Traslado a otra bodega: queda apartado (no sale en OS ni reempaque) hasta que llegue. */
+    public function enviarATraslado(): void
+    {
+        $this->estado->assertTransitionTo(EstadoLpn::IN_TRANSFER);
+
+        $this->estado = EstadoLpn::IN_TRANSFER;
+        $this->updatedAt = new DateTimeImmutable();
+    }
+
+    /** Llego a la bodega destino: queda ahi, disponible, sin ubicacion hasta que se acomode. */
+    public function recibirDeTraslado(string $bodegaDestinoId): void
+    {
+        $this->estado->assertTransitionTo(EstadoLpn::AVAILABLE);
+
+        $this->estado = EstadoLpn::AVAILABLE;
+        $this->bodegaId = $bodegaDestinoId;
+        $this->ubicacionId = null;
+        $this->updatedAt = new DateTimeImmutable();
+    }
+
+    /** Traslado cancelado antes de salir: vuelve a estar disponible en su bodega. */
+    public function cancelarTraslado(): void
+    {
+        $this->estado->assertTransitionTo(EstadoLpn::AVAILABLE);
+
+        $this->estado = EstadoLpn::AVAILABLE;
+        $this->updatedAt = new DateTimeImmutable();
+    }
+
+    /** Bodega donde esta el bulto ahora (cambia con un traslado). */
+    private string $bodegaId = '00000000-0000-0000-0000-000000000001';
+
+    public function bodegaId(): string
+    {
+        return $this->bodegaId;
+    }
+
+    public function asignarBodega(string $bodegaId): void
+    {
+        $this->bodegaId = $bodegaId;
+    }
+
     public function id(): string
     {
         return (string) $this->id;

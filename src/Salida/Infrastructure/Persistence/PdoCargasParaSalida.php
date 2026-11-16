@@ -5,14 +5,25 @@ declare(strict_types=1);
 namespace Courier\Salida\Infrastructure\Persistence;
 
 use Courier\Salida\Domain\CargasParaSalidaInterface;
+use Courier\Shared\Domain\BodegaActivaInterface;
 use PDO;
 
 final class PdoCargasParaSalida implements CargasParaSalidaInterface
 {
     private const PIE3_A_M3 = 0.028316846592;
 
-    public function __construct(private readonly PDO $connection)
+    public function __construct(
+        private readonly PDO $connection,
+        private readonly ?BodegaActivaInterface $bodegaActiva = null,
+    ) {
+    }
+
+    /** Condicion SQL "solo bultos de la bodega activa" (vacia = todas). */
+    private function enBodega(string $columna): string
     {
+        $id = $this->bodegaActiva?->id();
+
+        return $id !== null ? " AND {$columna} = " . $this->connection->quote($id) : '';
     }
 
     public function listar(): array
@@ -40,8 +51,9 @@ final class PdoCargasParaSalida implements CargasParaSalidaInterface
                                SUM(estado = 'in_repack') AS en_reempaque,
                                -- Reempacados en una caja que todavia no sale.
                                SUM(estado = 'consumed' AND EXISTS (SELECT 1 FROM lpn_genealogia g WHERE g.lpn_origen_id = lpns.id)) AS en_caja
-                        FROM lpns GROUP BY carga_id) lp ON lp.carga_id = c.id
+                        FROM lpns WHERE 1=1" . $this->enBodega('bodega_id') . " GROUP BY carga_id) lp ON lp.carga_id = c.id
              WHERE c.estado IN ('ingresado', 'en_bodega')"
+            . ($this->bodegaActiva?->id() !== null ? ' AND (lp.carga_id IS NOT NULL OR (1=1' . $this->enBodega('c.bodega_id') . '))' : '')
         )->fetchAll(PDO::FETCH_ASSOC);
 
         $cargas = array_map(function (array $f): array {
@@ -93,7 +105,7 @@ final class PdoCargasParaSalida implements CargasParaSalidaInterface
                     DATEDIFF(CURDATE(), l.created_at) AS dias
              FROM lpns l
              JOIN clientes cl ON cl.id = l.cliente_id
-             WHERE l.carga_id IS NULL AND l.estado = 'available'
+             WHERE l.carga_id IS NULL AND l.estado = 'available'" . $this->enBodega('l.bodega_id') . "
              ORDER BY cliente, l.codigo"
         )->fetchAll(PDO::FETCH_ASSOC);
 
@@ -145,7 +157,7 @@ final class PdoCargasParaSalida implements CargasParaSalidaInterface
 
         $marcas = implode(',', array_fill(0, count($cargaIds), '?'));
         $stmt = $this->connection->prepare(
-            "SELECT id FROM lpns WHERE estado = 'available' AND carga_id IN ({$marcas}) ORDER BY carga_id, orden_en_carga"
+            "SELECT id FROM lpns WHERE estado = 'available' AND carga_id IN ({$marcas})" . $this->enBodega('bodega_id') . " ORDER BY carga_id, orden_en_carga"
         );
         $stmt->execute(array_values($cargaIds));
 
@@ -202,7 +214,7 @@ final class PdoCargasParaSalida implements CargasParaSalidaInterface
                     (SELECT COUNT(*) FROM lpns t WHERE t.carga_id = l.carga_id) AS total
              FROM lpns l
              LEFT JOIN ubicaciones u ON u.id = l.ubicacion_id
-             WHERE l.carga_id = :carga AND l.estado = 'available'
+             WHERE l.carga_id = :carga AND l.estado = 'available'" . $this->enBodega('l.bodega_id') . "
              ORDER BY l.orden_en_carga, l.codigo"
         );
         $stmt->execute([':carga' => $cargaId]);
@@ -224,7 +236,7 @@ final class PdoCargasParaSalida implements CargasParaSalidaInterface
 
         $marcas = implode(',', array_fill(0, count($cargaIds), '?'));
         $stmt = $this->connection->prepare(
-            "SELECT carga_id, id FROM lpns WHERE estado = 'available' AND carga_id IN ({$marcas}) ORDER BY carga_id, orden_en_carga, codigo"
+            "SELECT carga_id, id FROM lpns WHERE estado = 'available' AND carga_id IN ({$marcas})" . $this->enBodega('bodega_id') . " ORDER BY carga_id, orden_en_carga, codigo"
         );
         $stmt->execute(array_values($cargaIds));
 
