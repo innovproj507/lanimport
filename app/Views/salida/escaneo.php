@@ -184,6 +184,10 @@ $claseInput = 'w-full rounded-lg border border-zinc-300 bg-white text-black px-3
             <form method="post" action="/salidas/<?= htmlspecialchars($orden->id()) ?>/finalizar"
                   onsubmit="return confirm('¿El contenedor de <?= htmlspecialchars($orden->etiquetaDo()) ?> YA SALIO?\n\nAl confirmar:\n- Sus cargas pasan a En transito y salen del inventario.\n- Se avisa al cliente por correo que su carga fue despachada.\n\nSi el contenedor todavia no sale, pulse Cancelar.');">
                 <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
+                <?php // Comentario del cierre: obligatorio (queda en el DO y en el historial de cada carga). ?>
+                <textarea name="comentario_cierre" required maxlength="500" rows="2"
+                          placeholder="Comentario del cierre (obligatorio): hora de salida, sello, chofer, novedades..."
+                          class="block w-full md:w-[28rem] mb-2 rounded-lg border border-zinc-300 bg-white text-black text-sm px-3 py-2 focus:ring-2 focus:ring-emerald-400 focus:outline-none"></textarea>
                 <button type="submit" id="salida-confirmar-btn" <?= $progreso['escaneadas'] < $progreso['total'] || $sinDo ? 'disabled' : '' ?> <?= $sinDo ? 'data-sin-do' : '' ?>
                         title="<?= $sinDo ? 'Falta que trafico genere el DO' : 'Pulse solo cuando el contenedor haya salido' ?>"
                         class="inline-flex items-center gap-2 bg-emerald-500 text-black rounded-lg px-4 py-2 text-sm font-medium hover:bg-emerald-400 transition disabled:opacity-40 disabled:cursor-not-allowed">
@@ -208,6 +212,14 @@ $claseInput = 'w-full rounded-lg border border-zinc-300 bg-white text-black px-3
         <p class="mt-4 text-sm font-medium <?= $confirmada ? 'text-emerald-600' : 'text-red-600' ?>">
             Esta orden esta <?= htmlspecialchars($orden->estado()->label()) ?><?= $orden->nota() ? ' (' . htmlspecialchars($orden->nota()) . ')' : '' ?>.
         </p>
+        <?php if ($confirmada): ?>
+            <?php $cerroNombre = $orden->confirmadoPorUsuarioId() !== null ? \Config\Services::courierContainer()->get(\Courier\Auth\Domain\UsuarioRepositoryInterface::class)->findById($orden->confirmadoPorUsuarioId())?->nombre() : null; ?>
+            <div class="mt-2 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-black max-w-2xl">
+                <p class="text-xs font-semibold uppercase text-emerald-800">Cierre del DO</p>
+                <p><?= htmlspecialchars($orden->comentarioCierre() ?? 'Sin comentario (se cerro antes de pedirse).') ?></p>
+                <p class="text-xs text-zinc-600 mt-1"><?= $orden->confirmedAt() !== null ? htmlspecialchars($orden->confirmedAt()->format('d/m/Y H:i')) : '' ?><?= $cerroNombre !== null ? ' · ' . htmlspecialchars($cerroNombre) : '' ?></p>
+            </div>
+        <?php endif; ?>
     <?php endif; ?>
     </div>
 </div>

@@ -239,7 +239,7 @@ final class BodegaApiController extends BaseApiController
     public function salidaFinalizar(string $id): ResponseInterface
     {
         try {
-            $this->container()->get(ConfirmarSalidaHandler::class)->handle(new ConfirmarSalidaCommand($id, $this->usuarioId()));
+            $this->container()->get(ConfirmarSalidaHandler::class)->handle(new ConfirmarSalidaCommand($id, $this->usuarioId(), (string) ($this->cuerpo()['comentario'] ?? '')));
 
             return $this->success(['id' => $id, 'estado' => 'confirmada']);
         } catch (Throwable $e) {

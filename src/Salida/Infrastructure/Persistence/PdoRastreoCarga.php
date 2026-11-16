@@ -67,7 +67,7 @@ final class PdoRastreoCarga implements RastreoCargaInterface
     {
         $stmt = $this->connection->prepare(
             "SELECT so.id, so.codigo, so.do_numero, so.do_anio, so.estado, so.numero_contenedor, so.numero_sello,
-                    n.nombre AS naviera, so.nombre_barco, so.fecha_cargue, so.fecha_salida_etd, so.destino_final, so.nota,
+                    n.nombre AS naviera, so.nombre_barco, so.fecha_cargue, so.fecha_salida_etd, so.destino_final, so.nota, so.comentario_cierre,
                     so.created_at, so.confirmed_at,
                     COUNT(*) AS bultos, SUM(sl.escaneado) AS escaneados
              FROM (" . self::BULTOS_Y_CAJAS . ") b
@@ -91,7 +91,8 @@ final class PdoRastreoCarga implements RastreoCargaInterface
             'fechaCargue' => $r['fecha_cargue'] ?: null,
             'etd' => $r['fecha_salida_etd'] ?: null,
             'destino' => $r['destino_final'] ?: null,
-            'nota' => $r['nota'] ?: null,
+            // Cancelada: por que; confirmada: el comentario de quien cerro el DO.
+            'nota' => ($r['nota'] ?: null) ?? (!empty($r['comentario_cierre']) ? 'Cierre: ' . $r['comentario_cierre'] : null),
             'creada' => (string) $r['created_at'],
             'confirmada' => $r['confirmed_at'] ?: null,
             'bultos' => (int) $r['bultos'],

@@ -86,7 +86,7 @@ final class PdoSalidaOrdenRepository implements SalidaOrdenRepositoryInterface
     private function update(SalidaOrden $orden): void
     {
         $stmt = $this->connection->prepare(
-            'UPDATE salida_ordenes SET estado = :estado, nota = :nota, confirmed_at = :confirmed_at, cliente_id = :cliente_id, do_anio = :do_anio, do_numero = :do_numero,
+            'UPDATE salida_ordenes SET estado = :estado, nota = :nota, comentario_cierre = :comentario_cierre, confirmado_por_usuario_id = :confirmado_por, confirmed_at = :confirmed_at, cliente_id = :cliente_id, do_anio = :do_anio, do_numero = :do_numero,
                 numero_contenedor = :numero_contenedor, numero_sello = :numero_sello, naviera_id = :naviera_id,
                 nombre_barco = :nombre_barco, fecha_cargue = :fecha_cargue, fecha_salida_etd = :fecha_salida_etd,
                 destino_final = :destino_final
@@ -97,6 +97,8 @@ final class PdoSalidaOrdenRepository implements SalidaOrdenRepositoryInterface
             ':id' => $orden->id(),
             ':estado' => $orden->estado()->value,
             ':nota' => $orden->nota(),
+            ':comentario_cierre' => $orden->comentarioCierre(),
+            ':confirmado_por' => $orden->confirmadoPorUsuarioId(),
             ':confirmed_at' => $orden->confirmedAt()?->format('Y-m-d H:i:s'),
             ':cliente_id' => $orden->clienteId(),
             ':do_anio' => $orden->doAnio(),
@@ -572,6 +574,7 @@ final class PdoSalidaOrdenRepository implements SalidaOrdenRepositoryInterface
             isset($row['nota']) && $row['nota'] !== null ? (string) $row['nota'] : null,
         );
         $orden->asignarBodega((string) ($row['bodega_id'] ?? '00000000-0000-0000-0000-000000000001'));
+        $orden->restaurarCierre($row['comentario_cierre'] ?? null, $row['confirmado_por_usuario_id'] ?? null);
 
         return $orden;
     }

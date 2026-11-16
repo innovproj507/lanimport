@@ -566,7 +566,7 @@ final class SalidaController extends BaseController
         $sessionManager = $this->container()->get(SessionManager::class);
 
         try {
-            $command = new ConfirmarSalidaCommand($id, (string) $sessionManager->currentUsuarioId());
+            $command = new ConfirmarSalidaCommand($id, (string) $sessionManager->currentUsuarioId(), (string) $this->request->getPost('comentario_cierre'));
             $this->container()->get(ConfirmarSalidaHandler::class)->handle($command);
 
             return redirect()->to('/salidas/' . $id);

@@ -11,6 +11,7 @@ final class ConfirmarSalidaCommand implements CommandInterface
     public function __construct(
         public readonly string $salidaOrdenId,
         public readonly string $usuarioId,
+        public readonly ?string $comentarioCierre = null,
     ) {
     }
 }

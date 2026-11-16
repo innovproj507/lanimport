@@ -36,7 +36,7 @@ final class ConfirmarSalidaHandler implements CommandHandlerInterface
             throw new OrdenSalidaNotFoundException("No se encontro la orden de salida con id {$command->salidaOrdenId}.");
         }
 
-        $orden->confirmar($command->usuarioId);
+        $orden->confirmar($command->usuarioId, $command->comentarioCierre);
 
         $cargaIds = [];
 
@@ -60,7 +60,7 @@ final class ConfirmarSalidaHandler implements CommandHandlerInterface
 
         // Las cargas que salieron completas pasan a "En transito" y se avisa a cada cliente.
         [$detalle, $datosEmbarque] = $this->datosDespacho($orden);
-        $this->bitacora?->registrarPorLpns(array_map(static fn ($l) => $l->lpnId(), $orden->lineas()), 'salida_confirmada', "{n} bulto(s) salieron en {$detalle}", $orden->id());
+        $this->bitacora?->registrarPorLpns(array_map(static fn ($l) => $l->lpnId(), $orden->lineas()), 'salida_confirmada', "{n} bulto(s) salieron en {$detalle}. Cierre: {$orden->comentarioCierre()}", $orden->id());
 
         foreach (array_keys($cargaIds) as $cargaId) {
             $this->sincronizarCarga->handle(new SincronizarEstadoCargaCommand($cargaId, $command->usuarioId, $detalle, $datosEmbarque));

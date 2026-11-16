@@ -39,6 +39,27 @@ final class SalidaOrden extends AggregateRoot
         return $this->nota;
     }
 
+    /** Comentario que deja quien cierra el DO (confirma que el contenedor salio). */
+    private ?string $comentarioCierre = null;
+    private ?string $confirmadoPorUsuarioId = null;
+
+    public function comentarioCierre(): ?string
+    {
+        return $this->comentarioCierre;
+    }
+
+    public function confirmadoPorUsuarioId(): ?string
+    {
+        return $this->confirmadoPorUsuarioId;
+    }
+
+    /** Solo para reconstituir desde la base. */
+    public function restaurarCierre(?string $comentario, ?string $usuarioId): void
+    {
+        $this->comentarioCierre = $comentario;
+        $this->confirmadoPorUsuarioId = $usuarioId;
+    }
+
     /**
      * Saca bultos de esta salida para pasarlos a otra (unir DOs del mismo contenedor, o corregir
      * una carga que se unio por error). Solo mientras esta pendiente; conservan su escaneo.
@@ -281,8 +302,14 @@ final class SalidaOrden extends AggregateRoot
         throw new ValidationException("El LPN {$codigoLpn} no pertenece a esta orden de salida.");
     }
 
-    public function confirmar(string $usuarioId): void
+    public function confirmar(string $usuarioId, ?string $comentarioCierre = null): void
     {
+        $comentarioCierre = trim((string) $comentarioCierre);
+
+        if ($comentarioCierre === '') {
+            throw new ValidationException('Escriba un comentario del cierre (p.ej. hora de salida, sello, chofer, novedades) para confirmar la salida.');
+        }
+
         // El contenedor lo ordena trafico: sin DO no hay contenedor asignado y no puede salir.
         if ($this->doNumero === null) {
             throw new ValidationException("La orden {$this->etiquetaDo()} todavia no tiene DO: trafico debe generar el DO y ordenar el contenedor antes de confirmar la salida.");
@@ -302,6 +329,8 @@ final class SalidaOrden extends AggregateRoot
         $this->estado->assertTransitionTo(EstadoSalidaOrden::CONFIRMADA);
         $this->estado = EstadoSalidaOrden::CONFIRMADA;
         $this->confirmedAt = new DateTimeImmutable();
+        $this->comentarioCierre = mb_substr($comentarioCierre, 0, 500);
+        $this->confirmadoPorUsuarioId = $usuarioId !== '' ? $usuarioId : null;
     }
 
     public function cancelar(): void
