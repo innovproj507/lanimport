@@ -26,17 +26,86 @@ $claseInput = 'w-full rounded-lg border border-zinc-300 bg-white text-black px-3
     <div class="bg-red-500/10 text-red-600 text-sm rounded-lg px-4 py-3 mb-4 border border-red-500/30"><?= htmlspecialchars($error) ?></div>
 <?php endif; ?>
 
+<?php // Que es un reempaque: abierto mientras no se ha elegido cliente; despues, plegado. ?>
+<details class="bg-white rounded-xl shadow-sm mb-6 group" <?= $cliente === null ? 'open' : '' ?>>
+    <summary class="cursor-pointer select-none px-6 py-4 font-semibold text-black flex items-center gap-2">
+        <?= icon_small('box', 'w-4 h-4 text-violet-600') ?> ¿Que es un reempaque?
+        <span class="text-sm font-normal text-zinc-500">· cambiar como vienen empacados los bultos de un cliente antes de despacharlos</span>
+    </summary>
+    <div class="px-6 pb-6 space-y-5">
+        <div class="grid gap-3 md:grid-cols-3">
+            <?php foreach ([
+                ['1', 'Trafico ordena', 'Aqui: elige el cliente, sus cargas y que hay que hacer. Esos bultos quedan apartados ("En reempaque") y no pueden salir en una OS mientras tanto.'],
+                ['2', 'Bodega decide y lo arma en la PDA', 'Bodega decide cuantas cajas o paletas arma, segun el tamano. En la app › Reempaque: abre una caja o paleta, escanea lo que mete, la cierra (sale su etiqueta LPN-R…) y abre otra si hace falta. Al final, Terminar.'],
+                ['3', 'La caja nueva se despacha', 'La caja aparece en Crear OS como "Caja reempacada", con lo que contiene. Rastreo de cada carga dice en que caja quedo cada bulto.'],
+            ] as [$num, $titulo, $texto]): ?>
+                <div class="rounded-lg border border-slate-200 p-4">
+                    <p class="flex items-center gap-2 font-semibold text-black"><span class="w-6 h-6 rounded-full bg-violet-600 text-white text-xs flex items-center justify-center"><?= $num ?></span><?= $titulo ?></p>
+                    <p class="text-sm text-zinc-600 mt-1"><?= $texto ?></p>
+                </div>
+            <?php endforeach; ?>
+        </div>
+        <div>
+            <p class="text-sm font-semibold text-black mb-2">Ejemplos</p>
+            <div class="grid gap-3 md:grid-cols-3 text-sm">
+                <div class="rounded-lg bg-amber-50 border border-amber-200 p-3">
+                    <p class="font-semibold text-black">Consolidar</p>
+                    <p class="text-2xl my-1">📦📦📦📦 → 🧱</p>
+                    <p class="text-zinc-700">El cliente tiene muchas cajas sueltas: se juntan en paletas. Bodega decide si salen <strong>1 o 2 paletas</strong> segun como queden.</p>
+                </div>
+                <div class="rounded-lg bg-sky-50 border border-sky-200 p-3">
+                    <p class="font-semibold text-black">Dividir</p>
+                    <p class="text-2xl my-1">🧱 → 📦📦</p>
+                    <p class="text-zinc-700">Una paleta muy grande no cabe en el contenedor: se parte en las cajas que bodega vea necesarias. Aqui un mismo bulto puede quedar repartido en varias.</p>
+                </div>
+                <div class="rounded-lg bg-rose-50 border border-rose-200 p-3">
+                    <p class="font-semibold text-black">Cambiar caja</p>
+                    <p class="text-2xl my-1">💥📦 → 📦</p>
+                    <p class="text-zinc-700">Una caja llego rota: su contenido pasa a una <strong>caja nueva</strong>, con etiqueta nueva.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</details>
+
 <div class="bg-white rounded-xl shadow-sm p-6 mb-6">
     <?= card_header('users', '1. Cliente', 'amber') ?>
-    <p class="text-xs text-zinc-500 mb-2">Un reempaque es siempre de un solo cliente.</p>
-    <input type="text" id="reempaque-cliente" list="reempaque-clientes" autocomplete="off"
-           placeholder="Escriba el codigo, nombre o marca del cliente..."
-           value="<?= $cliente !== null ? htmlspecialchars($etiquetaCliente($cliente)) : '' ?>" class="<?= $claseInput ?> max-w-2xl">
-    <datalist id="reempaque-clientes">
-        <?php foreach ($clientes as $c): if (!$c->activo()) { continue; } ?>
-            <option value="<?= htmlspecialchars($etiquetaCliente($c)) ?>" data-id="<?= htmlspecialchars($c->id()) ?>"></option>
-        <?php endforeach; ?>
-    </datalist>
+    <?php if ($cliente !== null): ?>
+        <div class="flex flex-wrap items-center gap-3">
+            <span class="inline-flex items-center gap-2 rounded-lg bg-amber-50 border border-amber-300 px-4 py-2 font-semibold text-black"><?= htmlspecialchars($etiquetaCliente($cliente)) ?></span>
+            <a href="/reempaques" class="text-sm text-blue-700 underline">Cambiar cliente</a>
+        </div>
+    <?php elseif ($clientesConBultos === []): ?>
+        <p class="text-sm text-zinc-500">Ningun cliente tiene bultos listos para reempacar (escaneados en bodega y libres).</p>
+    <?php else: ?>
+        <p class="text-xs text-zinc-500 mb-2">Un reempaque es siempre de un solo cliente. Aqui salen solo los clientes con bultos listos para reempacar.</p>
+        <input type="search" id="reempaque-cliente-buscar" autocomplete="off" placeholder="Buscar cliente o marca..." class="<?= $claseInput ?> max-w-md mb-3">
+        <div class="max-h-96 overflow-y-auto border border-slate-200 rounded-lg">
+            <table class="w-full text-sm">
+                <thead class="sticky top-0 bg-slate-50">
+                    <tr class="text-left text-xs text-zinc-500 uppercase border-b border-slate-200">
+                        <th class="py-2 px-3">Cliente</th>
+                        <th class="py-2 px-3">Marcas</th>
+                        <th class="py-2 px-3 text-right">Cargas</th>
+                        <th class="py-2 px-3 text-right">Bultos listos</th>
+                        <th class="py-2 px-3"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($clientesConBultos as $cb): $marcas = implode(', ', array_keys($cb['marcas'])); ?>
+                        <tr class="border-b border-slate-100 hover:bg-amber-50 cursor-pointer" data-cliente-fila data-buscar="<?= htmlspecialchars(mb_strtolower($cb['nombre'] . ' ' . $marcas)) ?>"
+                            onclick="location.href='/reempaques?cliente_id=<?= htmlspecialchars(rawurlencode($cb['id'])) ?>'">
+                            <td class="py-2 px-3 font-medium text-black"><?= htmlspecialchars($cb['nombre']) ?></td>
+                            <td class="py-2 px-3 text-zinc-600"><?= htmlspecialchars($marcas !== '' ? $marcas : '—') ?></td>
+                            <td class="py-2 px-3 text-right"><?= $cb['cargas'] ?></td>
+                            <td class="py-2 px-3 text-right font-semibold"><?= $n($cb['bultos']) ?></td>
+                            <td class="py-2 px-3 text-right"><span class="text-amber-700 font-medium">Elegir →</span></td>
+                        </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+    <?php endif; ?>
 </div>
 
 <?php if ($cliente !== null): ?>
@@ -104,7 +173,8 @@ $claseInput = 'w-full rounded-lg border border-zinc-300 bg-white text-black px-3
     </div>
 
     <div class="bg-white rounded-xl shadow-sm p-6 mb-6">
-        <?= card_header('pencil', '3. Que debe hacer bodega', 'amber') ?>
+        <?= card_header('pencil', '3. Que tipo de trabajo es', 'amber') ?>
+        <p class="text-xs text-zinc-500 mb-3">Trafico indica que hacer; <strong>bodega decide cuantas cajas o paletas arma</strong> segun el tamano de la mercancia.</p>
         <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
             <?php foreach ($tipos as $i => $t): ?>
                 <label class="flex items-start gap-3 rounded-lg border border-zinc-300 p-3 cursor-pointer has-[:checked]:border-amber-500 has-[:checked]:bg-amber-50">
@@ -118,7 +188,7 @@ $claseInput = 'w-full rounded-lg border border-zinc-300 bg-white text-black px-3
             <?php endforeach; ?>
         </div>
         <label class="block text-sm font-medium text-zinc-700 mb-1">Instruccion para bodega (opcional)</label>
-        <textarea name="instrucciones" rows="2" maxlength="500" placeholder="Ej: armar 1 paleta con todo; o 2 cajas, una por proveedor"
+        <textarea name="instrucciones" rows="2" maxlength="500" placeholder="Ej: emplasticar bien; separar por marca; no pasar de 1.80 m de alto"
                   class="<?= $claseInput ?>"><?= htmlspecialchars($instrucciones) ?></textarea>
     </div>
 
@@ -136,14 +206,17 @@ $claseInput = 'w-full rounded-lg border border-zinc-300 bg-white text-black px-3
 
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-    // Elegir el cliente recarga la pagina con sus cargas.
-    var buscador = document.getElementById('reempaque-cliente');
-    buscador.addEventListener('change', function () {
-        var opcion = [].find.call(document.querySelectorAll('#reempaque-clientes option'), function (o) { return o.value === buscador.value; });
-        if (opcion) {
-            location.href = '/reempaques?cliente_id=' + encodeURIComponent(opcion.dataset.id);
-        }
-    });
+    // Buscar en la lista de clientes (elegir uno recarga la pagina con sus cargas).
+    var buscador = document.getElementById('reempaque-cliente-buscar');
+    if (buscador) {
+        buscador.addEventListener('input', function () {
+            var q = buscador.value.trim().toLowerCase();
+            document.querySelectorAll('[data-cliente-fila]').forEach(function (fila) {
+                fila.classList.toggle('hidden', q !== '' && fila.getAttribute('data-buscar').indexOf(q) === -1);
+            });
+        });
+        buscador.focus();
+    }
 
     var tbody = document.getElementById('reempaque-cargas');
     if (!tbody) {

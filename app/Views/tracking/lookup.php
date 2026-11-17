@@ -199,7 +199,10 @@ $lineaTiempo = static function (array $eventos) use ($h, $fecha, $colorMovimient
                     $enBodega = (string) ($b['bodega'] ?? '');
                     $sinOrden['bodega'][$enBodega] = ($sinOrden['bodega'][$enBodega] ?? 0) + 1;
                 } else {
-                    $label = $bultoEstadoLabel[$b['estado']] ?? $b['estado'];
+                    // Reempacado: el bulto sigue en bodega, dentro de su caja nueva (no fue despachado).
+                    $label = $b['estado'] === 'consumed' && !empty($b['caja'])
+                        ? 'reempacados en la caja ' . $b['caja'] . ' (en bodega)'
+                        : ($bultoEstadoLabel[$b['estado']] ?? $b['estado']);
                     $sinOrden['otros'][$label] = ($sinOrden['otros'][$label] ?? 0) + 1;
                 }
             }

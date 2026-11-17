@@ -619,19 +619,22 @@
                 + '<section class="tarjeta">'
                 + '  <p class="sub">' + esc(orden.cliente || '') + '</p>'
                 + (orden.instrucciones ? '  <p class="aviso aviso-ok">Trafico: ' + esc(orden.instrucciones) + '</p>' : '')
+                // Bodega decide cuantas cajas/paletas arma: abre una, mete bultos, la cierra y abre otra si hace falta.
+                + '  <p class="sub">Usted decide cuantas cajas o paletas arma: abra una, escanee lo que mete, cierrela y abra otra si hace falta.'
+                + (orden.progreso.cajas > 0 ? ' Cajas cerradas: <strong>' + orden.progreso.cajas + '</strong>.' : '') + '</p>'
                 + '  <div class="progreso-grande">' + barraProgreso(orden.progreso.empacados, orden.progreso.total) + '</div>'
                 + '  <p id="rep-aviso" class="aviso oculto"></p>'
                 + (abierta
                     ? '  <h2>Caja abierta: ' + esc(abierta.codigo) + ' <span class="contador">' + abierta.contenido.length + ' bultos</span></h2>'
                       + '  <div id="zona-escaneo"></div>'
-                      + '  <button type="button" id="rep-cerrar" class="btn btn-primario btn-bloque">Cerrar caja</button>'
+                      + '  <button type="button" id="rep-cerrar" class="btn btn-primario btn-bloque">Cerrar esta caja / paleta</button>'
                       + (abierta.contenido.length === 0 ? '  <button type="button" id="rep-descartar" class="btn btn-claro btn-bloque">Descartar caja vacia</button>' : '')
                       + (abierta.contenido.length > 0 ? '  <ul class="lineas">' + abierta.contenido.map(function (c) {
                           return '<li class="hecho"><span>' + esc(c) + '</span><button type="button" class="btn-texto-oscuro" data-quitar="' + esc(c) + '">Quitar</button></li>';
                       }).join('') + '</ul>' : '')
                     : (todoEmpacado
                         ? '  <button type="button" id="rep-terminar" class="btn btn-primario btn-bloque">Terminar reempaque</button>'
-                        : '  <button type="button" id="rep-abrir" class="btn btn-primario btn-bloque">Abrir caja nueva</button>'))
+                        : '  <button type="button" id="rep-abrir" class="btn btn-primario btn-bloque">Abrir caja / paleta nueva</button>'))
                 + '</section>'
                 + (orden.pendientes.length > 0
                     ? '<section class="tarjeta"><h2>Por empacar <span class="contador">' + orden.pendientes.length + '</span></h2><ul class="lineas">'

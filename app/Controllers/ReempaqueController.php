@@ -45,15 +45,29 @@ final class ReempaqueController extends BaseController
         }
 
         $cliente = $clienteId !== '' ? $this->container()->get(ClienteRepositoryInterface::class)->findById($clienteId) : null;
-        // Las cargas del cliente en bodega (mismo listado que "Armar salida").
+        // Cargas en bodega (mismo listado que "Armar salida").
+        $todas = $this->container()->get(CargasParaSalidaInterface::class)->listar();
         $cargas = $cliente !== null
-            ? array_values(array_filter(
-                $this->container()->get(CargasParaSalidaInterface::class)->listar(),
-                static fn (array $c) => $c['clienteId'] === $clienteId,
-            ))
+            ? array_values(array_filter($todas, static fn (array $c) => $c['clienteId'] === $clienteId))
             : [];
 
+        // Para elegir el cliente: solo los que tienen bultos listos para reempacar (escaneados y libres).
+        $clientesConBultos = [];
+        foreach ($todas as $c) {
+            if ($c['listos'] <= 0) {
+                continue;
+            }
+            $clientesConBultos[$c['clienteId']] ??= ['id' => $c['clienteId'], 'nombre' => $c['cliente'], 'marcas' => [], 'cargas' => 0, 'bultos' => 0];
+            $clientesConBultos[$c['clienteId']]['cargas']++;
+            $clientesConBultos[$c['clienteId']]['bultos'] += $c['listos'];
+            if (($c['marca'] ?? '') !== '') {
+                $clientesConBultos[$c['clienteId']]['marcas'][$c['marca']] = true;
+            }
+        }
+        usort($clientesConBultos, static fn ($a, $b) => strcasecmp($a['nombre'], $b['nombre']));
+
         return view('reempaque/ordenar', [
+            'clientesConBultos' => $clientesConBultos,
             'clientes' => $this->container()->get(ListarClientesHandler::class)->handle(new ListarClientesQuery()),
             'cliente' => $cliente,
             'cargas' => $cargas,
