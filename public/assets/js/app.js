@@ -581,8 +581,27 @@ function initBusquedaPaginada(opciones) {
     var paginacion = document.getElementById(opciones.paginacionId);
     // Filtros (selects): uno con filtroId/filtroParam, o varios con filtros: [{id, param}].
     var filtros = (opciones.filtros || (opciones.filtroId ? [{ id: opciones.filtroId, param: opciones.filtroParam || 'filtro' }] : []))
-        .map(function (f) { return { select: document.getElementById(f.id), param: f.param }; })
+        .map(function (f) { return { select: document.getElementById(f.id), param: f.param, auto: f.auto }; })
         .filter(function (f) { return f.select; });
+    // Con botonFiltrarId los filtros se aplican solo al pulsar "Filtrar" (los marcados con auto: true, al instante).
+    var botonFiltrar = opciones.botonFiltrarId ? document.getElementById(opciones.botonFiltrarId) : null;
+    var botonLimpiar = opciones.botonLimpiarId ? document.getElementById(opciones.botonLimpiarId) : null;
+    filtros.forEach(function (f) { f.manual = !!botonFiltrar && f.auto !== true; });
+
+    function leerFiltro(f) {
+        if (f.select.hasAttribute('data-filtro-multi')) {
+            return [].map.call(f.select.querySelectorAll('input[type=checkbox]:checked'), function (c) { return c.value; });
+        }
+        return f.select.value;
+    }
+
+    // Valores ya aplicados de los filtros manuales (lo que esta en pantalla).
+    var aplicados = {};
+    function tomarFiltros() {
+        filtros.forEach(function (f) { if (f.manual) { aplicados[f.param] = leerFiltro(f); } });
+        if (botonFiltrar) { botonFiltrar.classList.remove('ring-2', 'ring-offset-1', 'ring-amber-500'); }
+    }
+    tomarFiltros();
     // Opcional: bloque de totales que el servidor devuelve como "resumen".
     var resumen = opciones.resumenId ? document.getElementById(opciones.resumenId) : null;
 
@@ -600,14 +619,18 @@ function initBusquedaPaginada(opciones) {
         params.set('per_page', perPageSelect.value);
 
         filtros.forEach(function (f) {
-            if (f.select.hasAttribute('data-filtro-multi')) {
-                f.select.querySelectorAll('input[type=checkbox]:checked').forEach(function (c) {
-                    params.append(f.param + '[]', c.value);
-                });
+            var valor = f.manual ? aplicados[f.param] : leerFiltro(f);
+            if (Array.isArray(valor)) {
+                valor.forEach(function (v) { params.append(f.param + '[]', v); });
             } else {
-                params.set(f.param, f.select.value);
+                params.set(f.param, valor);
             }
         });
+
+        // La ultima consulta hecha (para que el Excel baje exactamente lo que se ve).
+        if (opciones.alConsultar) {
+            opciones.alConsultar(params);
+        }
 
         return fetch(opciones.url + '?' + params.toString(), { headers: { 'Accept': 'application/json' } })
             .then(function (response) { return response.json(); })
@@ -637,9 +660,41 @@ function initBusquedaPaginada(opciones) {
 
     filtros.forEach(function (f) {
         f.select.addEventListener('change', function () {
+            if (f.manual) {
+                // Cambio pendiente: se aplica con "Filtrar" (el boton se resalta).
+                botonFiltrar.classList.add('ring-2', 'ring-offset-1', 'ring-amber-500');
+                return;
+            }
             cargar(1);
         });
     });
+
+    if (botonFiltrar) {
+        botonFiltrar.addEventListener('click', function () {
+            tomarFiltros();
+            filtros.forEach(function (f) {
+                if (f.select.hasAttribute('data-filtro-multi')) { f.select.removeAttribute('open'); }
+            });
+            cargar(1);
+        });
+    }
+
+    if (botonLimpiar) {
+        botonLimpiar.addEventListener('click', function () {
+            filtros.forEach(function (f) {
+                if (!f.manual) { return; }
+                if (f.select.hasAttribute('data-filtro-multi')) {
+                    f.select.querySelectorAll('input[type=checkbox]').forEach(function (c) { c.checked = false; });
+                    f.select.dispatchEvent(new Event('change'));
+                } else {
+                    f.select.value = '';
+                }
+            });
+            input.value = '';
+            tomarFiltros();
+            cargar(1);
+        });
+    }
 
     var timer = null;
 
@@ -683,12 +738,15 @@ document.addEventListener('DOMContentLoaded', function () {
         paginacionId: 'cargas-paginacion',
         botonClase: '.cargas-pagina-btn',
         filtros: [
-            { id: 'cargas-vista', param: 'vista' },
+            { id: 'cargas-vista', param: 'vista', auto: true },
             { id: 'cargas-estado-filtro', param: 'estado' },
             { id: 'cargas-cliente-filtro', param: 'cliente' },
             { id: 'cargas-aduanero-filtro', param: 'aduanero' }
         ],
         resumenId: 'cargas-resumen',
+        botonFiltrarId: 'cargas-filtrar',
+        botonLimpiarId: 'cargas-limpiar',
+        alConsultar: function (params) { window.cargasUltimaConsulta = params; },
         url: '/cargas/buscar',
         vivo: 'global'
     });

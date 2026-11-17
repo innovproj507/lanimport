@@ -54,6 +54,11 @@ $vistaInicial = array_key_first($vistasListado);
             ?>
             <?= filtro_multi('cargas-cliente-filtro', 'cliente', 'Cliente', $opcionesClientes, [], '') ?>
             <?= filtro_multi('cargas-aduanero-filtro', 'aduanero', 'Aduanero', $opcionesAduaneros, [], '') ?>
+            <?php // Los filtros se aplican al pulsar Filtrar (el boton se resalta si hay cambios sin aplicar). ?>
+            <button type="button" id="cargas-filtrar" class="inline-flex items-center gap-1.5 bg-amber-500 text-black rounded-lg px-4 py-2 text-sm font-medium hover:bg-amber-400 transition">
+                <?= icon_small('filter') ?><span>Filtrar</span>
+            </button>
+            <button type="button" id="cargas-limpiar" class="text-sm text-zinc-600 hover:text-black underline">Limpiar</button>
             <div class="flex items-center gap-2 text-sm text-zinc-600">
                 <label for="cargas-per-page">Mostrar</label>
                 <select id="cargas-per-page" class="rounded-lg border border-zinc-300 bg-white text-black px-2 py-1.5 text-sm focus:ring-2 focus:ring-amber-400 focus:outline-none">
@@ -98,15 +103,10 @@ $vistaInicial = array_key_first($vistasListado);
 <script>
 // Excel: al hacer clic se arma la URL con la busqueda y los filtros que esten puestos.
 document.getElementById('btn-excel-cargas').addEventListener('click', function () {
-    var params = new URLSearchParams();
-    [['buscar-cargas', 'q'], ['cargas-vista', 'vista'], ['cargas-estado-filtro', 'estado']].forEach(function (f) {
-        var el = document.getElementById(f[0]);
-        if (el && el.value.trim() !== '') { params.set(f[1], el.value.trim()); }
-    });
-    [['cargas-cliente-filtro', 'cliente'], ['cargas-aduanero-filtro', 'aduanero']].forEach(function (f) {
-        var el = document.getElementById(f[0]);
-        if (el) { el.querySelectorAll('input[type=checkbox]:checked').forEach(function (c) { params.append(f[1] + '[]', c.value); }); }
-    });
+    var params = new URLSearchParams(window.cargasUltimaConsulta ? window.cargasUltimaConsulta.toString() : '');
+    params.delete('page');
+    params.delete('per_page');
+    if (!params.get('vista')) { params.set('vista', document.getElementById('cargas-vista').value); }
     this.href = '/cargas/excel' + (params.toString() ? '?' + params.toString() : '');
 });
 
