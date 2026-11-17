@@ -11,12 +11,14 @@ final class ObtenerFlujoCargasQuery implements QueryInterface
     /**
      * @param string $desde Y-m-d: periodo de "Salieron" (las otras etapas muestran lo de ahora)
      * @param string $hasta Y-m-d
+     * @param array<int, string> $aduaneros identificadores (vacio = todos)
+     * @param array<int, string> $clienteIds (vacio = todos)
      */
     public function __construct(
         public readonly string $desde,
         public readonly string $hasta,
-        public readonly ?string $aduanero = null,
-        public readonly ?string $clienteId = null,
+        public readonly array $aduaneros = [],
+        public readonly array $clienteIds = [],
     ) {
     }
 }

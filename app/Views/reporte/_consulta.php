@@ -21,10 +21,36 @@ $estadoBadge = static fn (array $f): string => match ($f['estado']) {
     'salida' => badge($f['esOs'] ? 'En OS' : 'En contenedor', $f['esOs'] ? 'sky' : 'blue'),
     default => badge('Salio', 'violet'),
 };
+// Selector multiple: un <details> con buscador y casillas; vacio = todos.
+$multi = static function (string $nombre, string $titulo, array $opciones, array $marcados): string {
+    $texto = $marcados === [] ? 'Todos' : (count($marcados) === 1 ? ($opciones[$marcados[0]] ?? '1 seleccionado') : count($marcados) . ' seleccionados');
+    $html = '<details class="relative filtro-multi" data-filtro-multi>'
+        . '<summary class="list-none cursor-pointer w-full rounded-lg border border-zinc-300 bg-white text-black px-3 py-2 text-sm flex items-center justify-between gap-2">'
+        . '<span class="truncate" data-multi-texto>' . htmlspecialchars($texto) . '</span><span class="text-zinc-400">▾</span></summary>'
+        . '<div class="absolute z-30 mt-1 w-72 max-w-[90vw] bg-white border border-zinc-300 rounded-lg shadow-lg p-2">'
+        . '<input type="search" placeholder="Buscar ' . htmlspecialchars(mb_strtolower($titulo)) . '..." class="w-full mb-2 rounded border border-zinc-300 px-2 py-1 text-sm" data-multi-buscar>'
+        . '<div class="flex gap-3 text-xs mb-1"><button type="button" class="text-blue-700 underline" data-multi-ninguno>Todos (quitar seleccion)</button></div>'
+        . '<div class="max-h-64 overflow-y-auto space-y-0.5">';
+    foreach ($opciones as $valor => $etiqueta) {
+        $html .= '<label class="flex items-center gap-2 px-1 py-0.5 rounded hover:bg-slate-50 text-sm cursor-pointer" data-multi-opcion="' . htmlspecialchars(mb_strtolower($etiqueta)) . '">'
+            . '<input type="checkbox" name="' . $nombre . '[]" value="' . htmlspecialchars((string) $valor) . '" ' . (in_array((string) $valor, $marcados, true) ? 'checked' : '') . ' class="rounded border-zinc-300">'
+            . '<span>' . htmlspecialchars($etiqueta) . '</span></label>';
+    }
+
+    return $html . '</div></div></details>';
+};
+$opcionesClientes = [];
+foreach ($clientes as $cl) {
+    $opcionesClientes[$cl->id()] = $cl->nombreCompleto();
+}
+$opcionesAduaneros = [];
+foreach ($aduaneros as $a) {
+    $opcionesAduaneros[$a->identificador()] = $a->nombre();
+}
 $excelUrl = '/reportes/consulta/excel?' . http_build_query(array_filter([
     'estado' => $estadoConsulta, 'ver' => $verConsulta, 'cliente' => $filtroCliente, 'aduanero' => $filtroAduanero,
     'desde' => $reporte->desde, 'hasta' => $reporte->hasta,
-], static fn ($v) => $v !== '' && $v !== null));
+], static fn ($v) => $v !== '' && $v !== null && $v !== []));
 $th = 'py-2 pr-3';
 $thn = 'py-2 pr-3 text-right';
 $tdn = 'py-2 pr-3 text-right whitespace-nowrap';
@@ -43,21 +69,11 @@ $tdn = 'py-2 pr-3 text-right whitespace-nowrap';
         </div>
         <div class="xl:col-span-2">
             <label class="block text-sm font-medium text-zinc-700 mb-1">Cliente</label>
-            <select name="cliente" class="w-full <?= $campo ?>">
-                <option value="">Todos</option>
-                <?php foreach ($clientes as $cl): ?>
-                    <option value="<?= htmlspecialchars($cl->id()) ?>" <?= $filtroCliente === $cl->id() ? 'selected' : '' ?>><?= htmlspecialchars($cl->nombreCompleto()) ?></option>
-                <?php endforeach; ?>
-            </select>
+            <?= $multi('cliente', 'Cliente', $opcionesClientes, $filtroCliente) ?>
         </div>
         <div>
             <label class="block text-sm font-medium text-zinc-700 mb-1">Aduanero</label>
-            <select name="aduanero" class="w-full <?= $campo ?>">
-                <option value="">Todos</option>
-                <?php foreach ($aduaneros as $a): ?>
-                    <option value="<?= htmlspecialchars($a->identificador()) ?>" <?= $filtroAduanero === $a->identificador() ? 'selected' : '' ?>><?= htmlspecialchars($a->nombre()) ?></option>
-                <?php endforeach; ?>
-            </select>
+            <?= $multi('aduanero', 'Aduanero', $opcionesAduaneros, $filtroAduanero) ?>
         </div>
         <div>
             <label class="block text-sm font-medium text-zinc-700 mb-1" title="Aplica a lo que salio">Desde</label>
@@ -110,6 +126,7 @@ $tdn = 'py-2 pr-3 text-right whitespace-nowrap';
                 <thead class="sticky top-0 bg-slate-50">
                     <tr class="text-left text-xs text-zinc-500 uppercase border-b border-slate-200">
                         <th class="py-2 px-3">Tracking</th>
+                        <th class="<?= $th ?>">Compañia</th>
                         <th class="<?= $th ?>">Cliente</th>
                         <th class="<?= $th ?>">Aduanero</th>
                         <th class="<?= $th ?>">Estado</th>
@@ -127,6 +144,7 @@ $tdn = 'py-2 pr-3 text-right whitespace-nowrap';
                     <?php foreach ($consulta['filas'] as $f): ?>
                         <tr class="border-b border-slate-100 hover:bg-slate-50">
                             <td class="py-2 px-3 font-mono whitespace-nowrap"><a href="/cargas/<?= htmlspecialchars($f['cargaId']) ?>" class="text-amber-600 hover:underline"><?= htmlspecialchars($f['tracking']) ?></a></td>
+                            <td class="<?= $th ?> text-zinc-700"><?= htmlspecialchars($f['compania'] ?? '') ?></td>
                             <td class="<?= $th ?> text-zinc-700"><?= htmlspecialchars($f['cliente']) ?></td>
                             <td class="<?= $th ?> text-zinc-700"><?= htmlspecialchars($f['aduanero']) ?></td>
                             <td class="<?= $th ?> whitespace-nowrap"><?= $estadoBadge($f) ?></td>
@@ -145,7 +163,7 @@ $tdn = 'py-2 pr-3 text-right whitespace-nowrap';
                 </tbody>
                 <tfoot class="sticky bottom-0 bg-slate-100 font-semibold text-black">
                     <tr>
-                        <td class="py-2 px-3" colspan="6">Totales</td>
+                        <td class="py-2 px-3" colspan="7">Totales</td>
                         <td class="<?= $tdn ?>"><?= $nf($t['bultos']) ?></td>
                         <td class="<?= $tdn ?>"><?= $nf($t['kg'], 1) ?></td>
                         <td class="<?= $tdn ?>"><?= $nf($t['p3'], 2) ?></td>
@@ -210,3 +228,32 @@ $tdn = 'py-2 pr-3 text-right whitespace-nowrap';
         </div>
     <?php endif; ?>
 </div>
+
+<script>
+(function () {
+    function actualizar(d) {
+        var marcados = d.querySelectorAll('input[type=checkbox]:checked');
+        var texto = marcados.length === 0 ? 'Todos'
+            : (marcados.length === 1 ? marcados[0].parentNode.textContent.trim() : marcados.length + ' seleccionados');
+        d.querySelector('[data-multi-texto]').textContent = texto;
+    }
+    document.querySelectorAll('[data-filtro-multi]').forEach(function (d) {
+        d.addEventListener('change', function () { actualizar(d); });
+        d.querySelector('[data-multi-buscar]').addEventListener('input', function () {
+            var q = this.value.trim().toLowerCase();
+            d.querySelectorAll('[data-multi-opcion]').forEach(function (o) {
+                o.classList.toggle('hidden', q !== '' && o.getAttribute('data-multi-opcion').indexOf(q) === -1);
+            });
+        });
+        d.querySelector('[data-multi-ninguno]').addEventListener('click', function () {
+            d.querySelectorAll('input[type=checkbox]').forEach(function (c) { c.checked = false; });
+            actualizar(d);
+        });
+    });
+    document.addEventListener('click', function (e) {
+        document.querySelectorAll('[data-filtro-multi][open]').forEach(function (d) {
+            if (!d.contains(e.target)) { d.removeAttribute('open'); }
+        });
+    });
+})();
+</script>

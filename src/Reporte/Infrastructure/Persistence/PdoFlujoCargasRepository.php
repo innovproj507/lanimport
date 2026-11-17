@@ -23,30 +23,37 @@ final class PdoFlujoCargasRepository
     }
 
     /**
-     * Todas las cargas (filtradas por aduanero y/o cliente) con bultos, peso y p3 de sus lineas,
+     * Todas las cargas (filtradas por uno o varios aduaneros y/o clientes) con bultos, peso y p3 de sus lineas,
      * cuantas etiquetas tienen y cuantas faltan por escanear en recepcion.
      *
+     * @param array<int, string> $aduaneros vacio = todos
+     * @param array<int, string> $clienteIds vacio = todos
      * @return array<int, array<string, mixed>>
      */
-    public function cargas(?string $aduanero, ?string $clienteId): array
+    public function cargas(array $aduaneros, array $clienteIds): array
     {
         $where = [];
         $params = [];
 
-        if ($aduanero !== null) {
-            $where[] = 'c.aduanero_identificador = :aduanero';
-            $params[':aduanero'] = $aduanero;
-        }
+        foreach (['c.aduanero_identificador' => array_values($aduaneros), 'c.cliente_id' => array_values($clienteIds)] as $columna => $valores) {
+            if ($valores === []) {
+                continue;
+            }
 
-        if ($clienteId !== null) {
-            $where[] = 'c.cliente_id = :cliente';
-            $params[':cliente'] = $clienteId;
+            $marcas = [];
+            foreach ($valores as $i => $valor) {
+                $clave = ':f' . count($params) . '_' . $i;
+                $marcas[] = $clave;
+                $params[$clave] = $valor;
+            }
+            $where[] = "{$columna} IN (" . implode(', ', $marcas) . ')';
         }
 
         // p3: total de la linea; si no se escribio, W x H x L x cantidad / 28316.85 (igual que LineaCarga::cubicajePies()).
         $sql = "SELECT c.id, c.tracking_numero, c.estado, c.fecha_ingreso, c.created_at, c.updated_at,
                        TRIM(CONCAT(COALESCE(cl.nombre, ''), ' ', COALESCE(cl.apellido, ''))) AS cliente,
                        COALESCE(a.nombre, '') AS aduanero,
+                       COALESCE(c.proveedor, '') AS proveedor,
                        COALESCE(l.bultos, 0) AS bultos, COALESCE(l.peso, 0) AS peso, COALESCE(l.p3, 0) AS p3, COALESCE(l.valor, 0) AS valor,
                        COALESCE(e.total, 0) AS etiquetas, COALESCE(e.por_escanear, 0) AS por_escanear,
                        h.en_bodega_at, h.en_transito_at

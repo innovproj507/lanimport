@@ -42,8 +42,8 @@ final class ReporteController extends BaseController
             'alertaActiva' => in_array($this->request->getGet('alerta'), ['antiguedad', 'os', 'incompletos'], true) ? (string) $this->request->getGet('alerta') : 'antiguedad',
             'aduaneros' => $this->container()->get(ListarAduanerosHandler::class)->handle(new ListarAduanerosQuery()),
             'clientes' => $clientes,
-            'filtroAduanero' => $aduanero ?? '',
-            'filtroCliente' => $clienteId ?? '',
+            'filtroAduanero' => $aduanero,
+            'filtroCliente' => $clienteId,
         ]);
     }
 
@@ -63,11 +63,11 @@ final class ReporteController extends BaseController
         $t = $consulta['totales'];
 
         if ($ver === 'detalle') {
-            $filas = [['TRACKING', 'CLIENTE', 'ADUANERO', 'ESTADO', 'OS / DO', 'CONTENEDOR', 'NAVIERA', 'BULTOS', 'KG', 'P3', 'VALOR', 'INGRESO', 'FECHA', 'DIAS EN BODEGA']];
+            $filas = [['TRACKING', 'COMPAÑIA', 'CLIENTE', 'ADUANERO', 'ESTADO', 'OS / DO', 'CONTENEDOR', 'NAVIERA', 'BULTOS', 'KG', 'P3', 'VALOR', 'INGRESO', 'FECHA', 'DIAS EN BODEGA']];
 
             foreach ($consulta['filas'] as $f) {
                 $filas[] = [
-                    $f['tracking'], $f['cliente'], $f['aduanero'], $estados[$f['estado']] . ($f['estado'] === 'salida' ? ($f['esOs'] ? ' (OS)' : ' (contenedor)') : ''),
+                    $f['tracking'], $f['compania'] ?? '', $f['cliente'], $f['aduanero'], $estados[$f['estado']] . ($f['estado'] === 'salida' ? ($f['esOs'] ? ' (OS)' : ' (contenedor)') : ''),
                     $f['orden'] ?? '', $f['contenedor'] ?? '', $f['naviera'] ?? '',
                     $f['bultos'], round($f['kg'], 2), round($f['p3'], 2), round($f['valor'], 2),
                     $this->fechaDmy($f['ingreso']), $this->fechaDmy($f['fecha']), $f['dias'] ?? '',
@@ -233,11 +233,18 @@ final class ReporteController extends BaseController
             ->setBody($this->container()->get(EscritorXlsx::class)->generar($hoja));
     }
 
-    /** @return array{0: string, 1: string, 2: ?string, 3: ?string} desde, hasta, aduanero, cliente */
+    /**
+     * Cliente y aduanero admiten varios (cliente[]=..&cliente[]=..); un solo valor tambien sirve.
+     *
+     * @return array{0: string, 1: string, 2: array<int, string>, 3: array<int, string>} desde, hasta, aduaneros, clientes
+     */
     private function filtros(): array
     {
         $fecha = static fn (mixed $v, string $defecto): string => is_string($v) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $v) ? $v : $defecto;
-        $texto = static fn (mixed $v): ?string => is_string($v) && trim($v) !== '' ? trim($v) : null;
+        $texto = static fn (mixed $v): array => array_values(array_unique(array_filter(
+            array_map(static fn ($x) => is_string($x) ? trim($x) : '', is_array($v) ? $v : [$v]),
+            static fn (string $x) => $x !== '',
+        )));
 
         return [
             $fecha($this->request->getGet('desde'), date('Y-m-01')),
