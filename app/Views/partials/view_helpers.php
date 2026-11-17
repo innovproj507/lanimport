@@ -81,6 +81,36 @@ function badge(string $texto, string $color = 'slate'): string
  * URL de un archivo de public/ con su fecha de modificacion (?v=): si la imagen se regenera con el
  * mismo nombre (p.ej. una etiqueta), el navegador y el agente de impresion bajan la nueva, no la de cache.
  */
+/**
+ * Filtro de seleccion multiple (cliente, aduanero...): lista desplegable con buscador y casillas.
+ * Sin nada marcado = todos. Las casillas se llaman "$nombre[]" (sirve en un <form> GET), y el
+ * listado AJAX (initBusquedaPaginada) las lee por el id del contenedor. El JS esta en app.js.
+ *
+ * @param array<string, string> $opciones valor => texto
+ * @param array<int, string> $marcados
+ */
+function filtro_multi(string $id, string $nombre, string $titulo, array $opciones, array $marcados = [], string $clases = 'w-full'): string
+{
+    $texto = $marcados === [] ? 'Todos los ' . mb_strtolower($titulo) . 's'
+        : (count($marcados) === 1 ? ($opciones[$marcados[0]] ?? '1 seleccionado') : count($marcados) . ' ' . mb_strtolower($titulo) . 's');
+    $html = '<details id="' . htmlspecialchars($id) . '" class="relative ' . htmlspecialchars($clases) . '" data-filtro-multi data-titulo="' . htmlspecialchars($titulo) . '">'
+        . '<summary class="list-none cursor-pointer rounded-lg border border-zinc-300 bg-white text-black px-3 py-2 text-sm flex items-center justify-between gap-2 min-w-[11rem]">'
+        . '<span class="truncate" data-multi-texto>' . htmlspecialchars($texto) . '</span><span class="text-zinc-400">▾</span></summary>'
+        . '<div class="absolute right-0 z-30 mt-1 w-72 max-w-[90vw] bg-white border border-zinc-300 rounded-lg shadow-lg p-2">'
+        . '<input type="search" placeholder="Buscar ' . htmlspecialchars(mb_strtolower($titulo)) . '..." class="w-full mb-2 rounded border border-zinc-300 px-2 py-1 text-sm" data-multi-buscar>'
+        . '<button type="button" class="text-xs text-blue-700 underline mb-1" data-multi-ninguno>Todos (quitar seleccion)</button>'
+        . '<div class="max-h-64 overflow-y-auto space-y-0.5">';
+
+    foreach ($opciones as $valor => $etiqueta) {
+        $html .= '<label class="flex items-center gap-2 px-1 py-0.5 rounded hover:bg-slate-50 text-sm cursor-pointer" data-multi-opcion="' . htmlspecialchars(mb_strtolower((string) $etiqueta)) . '">'
+            . '<input type="checkbox" name="' . htmlspecialchars($nombre) . '[]" value="' . htmlspecialchars((string) $valor) . '" '
+            . (in_array((string) $valor, $marcados, true) ? 'checked' : '') . ' class="rounded border-zinc-300">'
+            . '<span>' . htmlspecialchars((string) $etiqueta) . '</span></label>';
+    }
+
+    return $html . '</div></div></details>';
+}
+
 /** @return array<int, \Courier\Bodega\Domain\Bodega> bodegas activas (para selectores) */
 function bodegas_activas(): array
 {

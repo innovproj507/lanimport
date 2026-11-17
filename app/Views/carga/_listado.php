@@ -40,12 +40,20 @@ $vistaInicial = array_key_first($vistasListado);
                     <option value="<?= htmlspecialchars($estadoOpcion->value) ?>"><?= htmlspecialchars($estadoOpcion->label()) ?></option>
                 <?php endforeach; ?>
             </select>
-            <select id="cargas-aduanero-filtro" class="rounded-lg border border-zinc-300 bg-white text-black px-2 py-1.5 text-sm focus:ring-2 focus:ring-amber-400 focus:outline-none">
-                <option value="">Todos los aduaneros</option>
-                <?php foreach ($aduaneros as $aduaneroOpcion): ?>
-                    <option value="<?= htmlspecialchars($aduaneroOpcion->identificador()) ?>"><?= htmlspecialchars($aduaneroOpcion->nombre()) ?></option>
-                <?php endforeach; ?>
-            </select>
+            <?php
+            // Cliente y aduanero: se pueden marcar varios (vacio = todos).
+            $opcionesClientes = [];
+            foreach ($clientes ?? [] as $clienteOpcion) {
+                $opcionesClientes[$clienteOpcion->id()] = $clienteOpcion->nombreCompleto();
+            }
+            asort($opcionesClientes, SORT_NATURAL | SORT_FLAG_CASE);
+            $opcionesAduaneros = [];
+            foreach ($aduaneros as $aduaneroOpcion) {
+                $opcionesAduaneros[$aduaneroOpcion->identificador()] = $aduaneroOpcion->nombre();
+            }
+            ?>
+            <?= filtro_multi('cargas-cliente-filtro', 'cliente', 'Cliente', $opcionesClientes, [], '') ?>
+            <?= filtro_multi('cargas-aduanero-filtro', 'aduanero', 'Aduanero', $opcionesAduaneros, [], '') ?>
             <div class="flex items-center gap-2 text-sm text-zinc-600">
                 <label for="cargas-per-page">Mostrar</label>
                 <select id="cargas-per-page" class="rounded-lg border border-zinc-300 bg-white text-black px-2 py-1.5 text-sm focus:ring-2 focus:ring-amber-400 focus:outline-none">
@@ -91,9 +99,13 @@ $vistaInicial = array_key_first($vistasListado);
 // Excel: al hacer clic se arma la URL con la busqueda y los filtros que esten puestos.
 document.getElementById('btn-excel-cargas').addEventListener('click', function () {
     var params = new URLSearchParams();
-    [['buscar-cargas', 'q'], ['cargas-vista', 'vista'], ['cargas-estado-filtro', 'estado'], ['cargas-aduanero-filtro', 'aduanero']].forEach(function (f) {
+    [['buscar-cargas', 'q'], ['cargas-vista', 'vista'], ['cargas-estado-filtro', 'estado']].forEach(function (f) {
         var el = document.getElementById(f[0]);
         if (el && el.value.trim() !== '') { params.set(f[1], el.value.trim()); }
+    });
+    [['cargas-cliente-filtro', 'cliente'], ['cargas-aduanero-filtro', 'aduanero']].forEach(function (f) {
+        var el = document.getElementById(f[0]);
+        if (el) { el.querySelectorAll('input[type=checkbox]:checked').forEach(function (c) { params.append(f[1] + '[]', c.value); }); }
     });
     this.href = '/cargas/excel' + (params.toString() ? '?' + params.toString() : '');
 });

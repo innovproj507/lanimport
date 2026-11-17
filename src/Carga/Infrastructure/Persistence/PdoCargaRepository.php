@@ -282,7 +282,7 @@ final class PdoCargaRepository implements CargaRepositoryInterface
     }
 
     /** @return array{items: array<int, Carga>, total: int} */
-    public function searchPaginado(string $term, ?string $estado, int $page, int $perPage, ?string $aduaneroIdentificador = null, ?bool $enSalida = null): array
+    public function searchPaginado(string $term, ?string $estado, int $page, int $perPage, array|string|null $aduaneroIdentificador = null, ?bool $enSalida = null, array $clienteIds = []): array
     {
         $page = max(1, $page);
         $perPage = max(1, $perPage);
@@ -328,9 +328,22 @@ final class PdoCargaRepository implements CargaRepositoryInterface
             $where .= $enSalida ? " AND {$condicion}" : " AND NOT {$condicion}";
         }
 
-        if ($aduaneroIdentificador !== null && $aduaneroIdentificador !== '') {
-            $where .= ' AND ca.aduanero_identificador = :aduanero';
-            $params[':aduanero'] = $aduaneroIdentificador;
+        // Uno o varios aduaneros / clientes (vacio = todos).
+        $listas = [
+            'ca.aduanero_identificador' => array_values(array_filter((array) $aduaneroIdentificador, static fn ($v) => $v !== null && $v !== '')),
+            'ca.cliente_id' => array_values(array_filter($clienteIds, static fn ($v) => $v !== '')),
+        ];
+        foreach ($listas as $columna => $valores) {
+            if ($valores === []) {
+                continue;
+            }
+            $marcas = [];
+            foreach ($valores as $i => $valor) {
+                $clave = ':f' . md5($columna) . $i;
+                $marcas[] = $clave;
+                $params[$clave] = $valor;
+            }
+            $where .= " AND {$columna} IN (" . implode(', ', $marcas) . ')';
         }
 
         // Bodega activa: cargas que ingresaron ahi o que tienen algun bulto ahi (traslados).

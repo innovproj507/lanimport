@@ -534,6 +534,46 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 });
 
+/**
+ * Filtros de seleccion multiple (helper filtro_multi() en view_helpers.php): buscador, texto del
+ * resumen, "Todos" y cerrar al hacer clic fuera. Al cambiar dispara "change" en el contenedor.
+ */
+function initFiltrosMulti() {
+    function actualizar(d) {
+        var marcados = d.querySelectorAll('input[type=checkbox]:checked');
+        var titulo = (d.getAttribute('data-titulo') || '').toLowerCase();
+        d.querySelector('[data-multi-texto]').textContent = marcados.length === 0 ? 'Todos los ' + titulo + 's'
+            : (marcados.length === 1 ? marcados[0].parentNode.textContent.trim() : marcados.length + ' ' + titulo + 's');
+    }
+
+    document.querySelectorAll('[data-filtro-multi]').forEach(function (d) {
+        if (d.dataset.multiListo) {
+            return;
+        }
+        d.dataset.multiListo = '1';
+        d.addEventListener('change', function () { actualizar(d); });
+        d.querySelector('[data-multi-buscar]').addEventListener('input', function () {
+            var q = this.value.trim().toLowerCase();
+            d.querySelectorAll('[data-multi-opcion]').forEach(function (o) {
+                o.classList.toggle('hidden', q !== '' && o.getAttribute('data-multi-opcion').indexOf(q) === -1);
+            });
+        });
+        d.querySelector('[data-multi-ninguno]').addEventListener('click', function () {
+            d.querySelectorAll('input[type=checkbox]').forEach(function (c) { c.checked = false; });
+            d.dispatchEvent(new Event('change'));
+        });
+    });
+}
+
+document.addEventListener('click', function (e) {
+    document.querySelectorAll('[data-filtro-multi][open]').forEach(function (d) {
+        if (!d.contains(e.target)) {
+            d.removeAttribute('open');
+        }
+    });
+});
+document.addEventListener('DOMContentLoaded', initFiltrosMulti);
+
 function initBusquedaPaginada(opciones) {
     var input = document.getElementById(opciones.inputId);
     var perPageSelect = document.getElementById(opciones.perPageId);
@@ -560,7 +600,13 @@ function initBusquedaPaginada(opciones) {
         params.set('per_page', perPageSelect.value);
 
         filtros.forEach(function (f) {
-            params.set(f.param, f.select.value);
+            if (f.select.hasAttribute('data-filtro-multi')) {
+                f.select.querySelectorAll('input[type=checkbox]:checked').forEach(function (c) {
+                    params.append(f.param + '[]', c.value);
+                });
+            } else {
+                params.set(f.param, f.select.value);
+            }
         });
 
         return fetch(opciones.url + '?' + params.toString(), { headers: { 'Accept': 'application/json' } })
@@ -639,6 +685,7 @@ document.addEventListener('DOMContentLoaded', function () {
         filtros: [
             { id: 'cargas-vista', param: 'vista' },
             { id: 'cargas-estado-filtro', param: 'estado' },
+            { id: 'cargas-cliente-filtro', param: 'cliente' },
             { id: 'cargas-aduanero-filtro', param: 'aduanero' }
         ],
         resumenId: 'cargas-resumen',

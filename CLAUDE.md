@@ -59,7 +59,7 @@ This is the single composition root. It builds a lazy-singleton `Courier\Shared\
   - `app.js` binds the search input to that URL.
   - Follow `PaisController` when adding a new one.
   - Cargas (`/cargas/ingreso`) adds more:
-    - filters by estado **and** aduanero (`initBusquedaPaginada({filtros: [{id, param}]})`);
+    - filters by estado, **clientes and aduaneros (several allowed)** (`initBusquedaPaginada({filtros: [{id, param}]})`; a filter element with `data-filtro-multi` sends its checked boxes as `param[]`). The multi-select is the shared helper `filtro_multi()` (view_helpers, JS `initFiltrosMulti()` in app.js), also used by Reportes; `CargaController::listaDesdeRequest()` reads `cliente[]`/`aduanero[]` (a single value still works) for buscar and Excel;
     - columns Aduanero, Bultos, Peso and Valor (summed from each carga's lines);
     - "Etiquetas (LPN)": how many of the carga's LPNs are in each state (`LpnRepositoryInterface::conteoPorEstado()`, `badge_conteo_lpn()`), the same badges as Inventario;
     - a totals block (`carga/_resumen.php`, `resumenId`) for **all** filtered cargas, not just the page, from `searchPaginado()['resumen']`;

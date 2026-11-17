@@ -18,8 +18,11 @@ final class BuscarCargasQuery implements QueryInterface
         public readonly ?string $estado = null,
         public readonly int $page = 1,
         public readonly int $perPage = 10,
-        public readonly ?string $aduaneroIdentificador = null,
+        /** @var array<int, string>|string|null uno o varios aduaneros */
+        public readonly array|string|null $aduaneroIdentificador = null,
         public readonly string $vista = self::VISTA_TODAS,
+        /** @var array<int, string> uno o varios clientes (vacio = todos) */
+        public readonly array $clienteIds = [],
     ) {
     }
 }

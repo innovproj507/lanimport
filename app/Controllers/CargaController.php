@@ -210,6 +210,7 @@ final class CargaController extends BaseController
         );
 
         return view('carga/historial', [
+            'clientes' => $this->container()->get(ListarClientesHandler::class)->handle(new ListarClientesQuery()),
             'aduaneros' => $this->container()->get(ListarAduanerosHandler::class)->handle(new ListarAduanerosQuery()),
             'cargas' => $resultado->items,
             'total' => $resultado->total,
@@ -227,12 +228,14 @@ final class CargaController extends BaseController
     {
         $termino = (string) ($this->request->getGet('q') ?? '');
         $estado = (string) ($this->request->getGet('estado') ?? '');
-        $aduanero = trim((string) ($this->request->getGet('aduanero') ?? ''));
+        // Cliente y aduanero: uno o varios (cliente[]=..), o un solo valor (enlaces viejos).
+        $aduanero = $this->listaDesdeRequest('aduanero');
+        $clientesFiltro = $this->listaDesdeRequest('cliente');
         $page = max(1, (int) ($this->request->getGet('page') ?? 1));
         $perPage = $this->perPageDesdeRequest();
 
         $resultado = $this->container()->get(BuscarCargasHandler::class)->handle(
-            new BuscarCargasQuery($termino, $estado !== '' ? $estado : null, $page, $perPage, $aduanero !== '' ? $aduanero : null, $this->vistaDesdeRequest())
+            new BuscarCargasQuery($termino, $estado !== '' ? $estado : null, $page, $perPage, $aduanero, $this->vistaDesdeRequest(), $clientesFiltro)
         );
 
         $clientes = $this->container()->get(ListarClientesHandler::class)->handle(new ListarClientesQuery());
@@ -263,10 +266,12 @@ final class CargaController extends BaseController
     {
         $termino = (string) ($this->request->getGet('q') ?? '');
         $estado = (string) ($this->request->getGet('estado') ?? '');
-        $aduanero = trim((string) ($this->request->getGet('aduanero') ?? ''));
+        // Cliente y aduanero: uno o varios (cliente[]=..), o un solo valor (enlaces viejos).
+        $aduanero = $this->listaDesdeRequest('aduanero');
+        $clientesFiltro = $this->listaDesdeRequest('cliente');
 
         $cargas = $this->container()->get(BuscarCargasHandler::class)->handle(
-            new BuscarCargasQuery($termino, $estado !== '' ? $estado : null, 1, 100000, $aduanero !== '' ? $aduanero : null, $this->vistaDesdeRequest())
+            new BuscarCargasQuery($termino, $estado !== '' ? $estado : null, 1, 100000, $aduanero, $this->vistaDesdeRequest(), $clientesFiltro)
         )->items;
         $nombresClientes = $this->nombresClientes($this->container()->get(ListarClientesHandler::class)->handle(new ListarClientesQuery()));
         $lpnsPorEstado = $this->lpnsPorEstado($cargas);
@@ -328,6 +333,17 @@ final class CargaController extends BaseController
     }
 
     /** Pestaña de Ingreso de Carga: En bodega (por defecto), En salida o Todas. */
+    /** @return array<int, string> valores no vacios de un parametro GET simple o de lista (param[]) */
+    private function listaDesdeRequest(string $param): array
+    {
+        $valor = $this->request->getGet($param);
+
+        return array_values(array_unique(array_filter(
+            array_map(static fn ($v) => is_string($v) ? trim($v) : '', is_array($valor) ? $valor : [$valor]),
+            static fn (string $v) => $v !== '',
+        )));
+    }
+
     private function vistaDesdeRequest(): string
     {
         $vista = (string) ($this->request->getGet('vista') ?? '');

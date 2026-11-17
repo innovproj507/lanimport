@@ -21,24 +21,6 @@ $estadoBadge = static fn (array $f): string => match ($f['estado']) {
     'salida' => badge($f['esOs'] ? 'En OS' : 'En contenedor', $f['esOs'] ? 'sky' : 'blue'),
     default => badge('Salio', 'violet'),
 };
-// Selector multiple: un <details> con buscador y casillas; vacio = todos.
-$multi = static function (string $nombre, string $titulo, array $opciones, array $marcados): string {
-    $texto = $marcados === [] ? 'Todos' : (count($marcados) === 1 ? ($opciones[$marcados[0]] ?? '1 seleccionado') : count($marcados) . ' seleccionados');
-    $html = '<details class="relative filtro-multi" data-filtro-multi>'
-        . '<summary class="list-none cursor-pointer w-full rounded-lg border border-zinc-300 bg-white text-black px-3 py-2 text-sm flex items-center justify-between gap-2">'
-        . '<span class="truncate" data-multi-texto>' . htmlspecialchars($texto) . '</span><span class="text-zinc-400">▾</span></summary>'
-        . '<div class="absolute z-30 mt-1 w-72 max-w-[90vw] bg-white border border-zinc-300 rounded-lg shadow-lg p-2">'
-        . '<input type="search" placeholder="Buscar ' . htmlspecialchars(mb_strtolower($titulo)) . '..." class="w-full mb-2 rounded border border-zinc-300 px-2 py-1 text-sm" data-multi-buscar>'
-        . '<div class="flex gap-3 text-xs mb-1"><button type="button" class="text-blue-700 underline" data-multi-ninguno>Todos (quitar seleccion)</button></div>'
-        . '<div class="max-h-64 overflow-y-auto space-y-0.5">';
-    foreach ($opciones as $valor => $etiqueta) {
-        $html .= '<label class="flex items-center gap-2 px-1 py-0.5 rounded hover:bg-slate-50 text-sm cursor-pointer" data-multi-opcion="' . htmlspecialchars(mb_strtolower($etiqueta)) . '">'
-            . '<input type="checkbox" name="' . $nombre . '[]" value="' . htmlspecialchars((string) $valor) . '" ' . (in_array((string) $valor, $marcados, true) ? 'checked' : '') . ' class="rounded border-zinc-300">'
-            . '<span>' . htmlspecialchars($etiqueta) . '</span></label>';
-    }
-
-    return $html . '</div></div></details>';
-};
 $opcionesClientes = [];
 foreach ($clientes as $cl) {
     $opcionesClientes[$cl->id()] = $cl->nombreCompleto();
@@ -69,11 +51,11 @@ $tdn = 'py-2 pr-3 text-right whitespace-nowrap';
         </div>
         <div class="xl:col-span-2">
             <label class="block text-sm font-medium text-zinc-700 mb-1">Cliente</label>
-            <?= $multi('cliente', 'Cliente', $opcionesClientes, $filtroCliente) ?>
+            <?= filtro_multi('reporte-cliente', 'cliente', 'Cliente', $opcionesClientes, $filtroCliente) ?>
         </div>
         <div>
             <label class="block text-sm font-medium text-zinc-700 mb-1">Aduanero</label>
-            <?= $multi('aduanero', 'Aduanero', $opcionesAduaneros, $filtroAduanero) ?>
+            <?= filtro_multi('reporte-aduanero', 'aduanero', 'Aduanero', $opcionesAduaneros, $filtroAduanero) ?>
         </div>
         <div>
             <label class="block text-sm font-medium text-zinc-700 mb-1" title="Aplica a lo que salio">Desde</label>
@@ -229,31 +211,3 @@ $tdn = 'py-2 pr-3 text-right whitespace-nowrap';
     <?php endif; ?>
 </div>
 
-<script>
-(function () {
-    function actualizar(d) {
-        var marcados = d.querySelectorAll('input[type=checkbox]:checked');
-        var texto = marcados.length === 0 ? 'Todos'
-            : (marcados.length === 1 ? marcados[0].parentNode.textContent.trim() : marcados.length + ' seleccionados');
-        d.querySelector('[data-multi-texto]').textContent = texto;
-    }
-    document.querySelectorAll('[data-filtro-multi]').forEach(function (d) {
-        d.addEventListener('change', function () { actualizar(d); });
-        d.querySelector('[data-multi-buscar]').addEventListener('input', function () {
-            var q = this.value.trim().toLowerCase();
-            d.querySelectorAll('[data-multi-opcion]').forEach(function (o) {
-                o.classList.toggle('hidden', q !== '' && o.getAttribute('data-multi-opcion').indexOf(q) === -1);
-            });
-        });
-        d.querySelector('[data-multi-ninguno]').addEventListener('click', function () {
-            d.querySelectorAll('input[type=checkbox]').forEach(function (c) { c.checked = false; });
-            actualizar(d);
-        });
-    });
-    document.addEventListener('click', function (e) {
-        document.querySelectorAll('[data-filtro-multi][open]').forEach(function (d) {
-            if (!d.contains(e.target)) { d.removeAttribute('open'); }
-        });
-    });
-})();
-</script>
