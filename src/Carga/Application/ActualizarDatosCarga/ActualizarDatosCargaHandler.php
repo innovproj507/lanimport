@@ -6,6 +6,7 @@ namespace Courier\Carga\Application\ActualizarDatosCarga;
 
 use Courier\Carga\Domain\CargaRepositoryInterface;
 use Courier\Carga\Domain\ClienteBultosCargaInterface;
+use Courier\Carga\Domain\TipoEnvio;
 use Courier\Carga\Domain\ValueObject\Aduanero;
 use Courier\Carga\Domain\ValueObject\Contenedor;
 use Courier\Carga\Domain\ValueObject\DatosEntrega;
@@ -66,6 +67,10 @@ final class ActualizarDatosCargaHandler implements CommandHandlerInterface
             $command->facturaProveedorNombre,
             $command->facturaProveedorRuta,
         );
+
+        if ($command->tipoEnvio !== null) {
+            $carga->asignarTipoEnvio(TipoEnvio::desdeFormulario($command->tipoEnvio));
+        }
 
         if ($command->datosEntrega !== null) {
             $carga->asignarDatosEntrega(DatosEntrega::desdeArreglo($command->datosEntrega));

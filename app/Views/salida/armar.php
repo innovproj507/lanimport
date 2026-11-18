@@ -128,6 +128,13 @@ $listas = count(array_filter($cargas, static fn (array $c) => $c['listos'] > 0))
                         <option value="<?= htmlspecialchars(mb_strtolower($aduaneroNombre)) ?>"><?= htmlspecialchars($aduaneroNombre) ?></option>
                     <?php endforeach; ?>
                 </select>
+                <?php // Como sale cada carga hacia el cliente; un contenedor normalmente lleva solo maritimas. ?>
+                <select id="armar-envio" class="rounded-lg border border-zinc-300 bg-white text-black px-3 py-2 text-sm focus:ring-2 focus:ring-amber-400 focus:outline-none">
+                    <option value="">Todos los envios</option>
+                    <?php foreach (\Courier\Carga\Domain\TipoEnvio::cases() as $envioOpcion): ?>
+                        <option value="<?= $envioOpcion->value ?>"><?= $envioOpcion->icono() ?> <?= $envioOpcion->label() ?></option>
+                    <?php endforeach; ?>
+                </select>
                 <label class="inline-flex items-center gap-2 text-sm text-zinc-700">
                     <input type="checkbox" id="armar-solo-listas" class="rounded border-zinc-300 text-amber-500 focus:ring-amber-400">
                     Solo listas para salir (<?= $listas ?>)
@@ -194,7 +201,7 @@ $listas = count(array_filter($cargas, static fn (array $c) => $c['listos'] > 0))
                             $busqueda = mb_strtolower($c['tracking'] . ' ' . $c['cliente'] . ' ' . ($c['marca'] ?? '') . ' ' . $c['proveedor']);
                             ?>
                             <tr class="border-b border-slate-100 <?= $puede ? 'hover:bg-amber-50 cursor-pointer' : 'text-zinc-400 bg-slate-50' ?>"
-                                data-buscar="<?= htmlspecialchars($busqueda) ?>" data-lista="<?= $puede ? '1' : '0' ?>" data-aduanero="<?= htmlspecialchars(mb_strtolower($c['aduanero'])) ?>">
+                                data-buscar="<?= htmlspecialchars($busqueda) ?>" data-lista="<?= $puede ? '1' : '0' ?>" data-aduanero="<?= htmlspecialchars(mb_strtolower($c['aduanero'])) ?>" data-envio="<?= htmlspecialchars($c['tipoEnvio']) ?>">
                                 <td class="py-2 pr-3">
                                     <input type="checkbox" name="carga_ids[]" value="<?= htmlspecialchars($c['cargaId']) ?>"
                                            class="armar-check rounded border-zinc-300 text-amber-500 focus:ring-amber-400 disabled:opacity-30"
@@ -202,7 +209,7 @@ $listas = count(array_filter($cargas, static fn (array $c) => $c['listos'] > 0))
                                            data-peso="<?= $c['peso'] ?>" data-m3="<?= $c['m3'] ?>" data-valor="<?= $c['valor'] ?>"
                                            <?= $puede ? '' : 'disabled' ?> <?= $marcada ? 'checked' : '' ?>>
                                 </td>
-                                <td class="py-2 pr-3 font-mono <?= $puede ? 'text-black' : '' ?>"><a href="/cargas/<?= htmlspecialchars($c['cargaId']) ?>" class="hover:underline" onclick="event.stopPropagation()"><?= htmlspecialchars($c['tracking']) ?></a></td>
+                                <td class="py-2 pr-3 font-mono <?= $puede ? 'text-black' : '' ?>"><a href="/cargas/<?= htmlspecialchars($c['cargaId']) ?>" class="hover:underline" onclick="event.stopPropagation()"><?= htmlspecialchars($c['tracking']) ?></a><?php $envioFila = \Courier\Carga\Domain\TipoEnvio::tryFrom($c['tipoEnvio']); if ($envioFila !== null): ?> <span title="Envio <?= $envioFila->label() ?>"><?= $envioFila->icono() ?></span><?php endif; ?></td>
                                 <td class="py-2 pr-3 <?= $puede ? 'text-black font-medium' : '' ?>"><?= htmlspecialchars($c['cliente']) ?></td>
                                 <td class="py-2 pr-3"><?= htmlspecialchars($c['marca'] ?? '—') ?></td>
                                 <td class="py-2 pr-3"><?= htmlspecialchars($c['proveedor']) ?></td>
@@ -369,16 +376,19 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     var filtroAduanero = document.getElementById('armar-aduanero');
+    var filtroEnvio = document.getElementById('armar-envio');
 
     function filtrar() {
         var texto = buscar.value.trim().toLowerCase();
         var aduanero = filtroAduanero.value;
+        var envio = filtroEnvio.value;
         var visibles = 0;
 
         tbody.querySelectorAll('tr').forEach(function (fila) {
             var coincide = (texto === '' || fila.dataset.buscar.indexOf(texto) !== -1)
                 && (!soloListas.checked || fila.dataset.lista === '1')
-                && (aduanero === '' || (fila.dataset.aduanero || '') === aduanero);
+                && (aduanero === '' || (fila.dataset.aduanero || '') === aduanero)
+                && (envio === '' || (fila.dataset.envio || '') === envio);
             // Lo ya marcado siempre se ve, para no perderlo al filtrar.
             var mostrar = coincide || fila.querySelector('.armar-check').checked;
             fila.classList.toggle('hidden', !mostrar);
@@ -513,7 +523,24 @@ document.addEventListener('DOMContentLoaded', function () {
     buscar.addEventListener('input', filtrar);
     soloListas.addEventListener('change', filtrar);
     filtroAduanero.addEventListener('change', filtrar);
-    document.getElementById('form-armar-salida').addEventListener('submit', function () {
+    filtroEnvio.addEventListener('change', filtrar);
+    document.getElementById('form-armar-salida').addEventListener('submit', function (evento) {
+        // Mezclar tipos de envio (p. ej. aerea con maritima) suele ser un error: se pide confirmar.
+        var nombresEnvio = { maritimo: 'Maritima', aereo: 'Aerea', terrestre: 'Terrestre' };
+        var envios = {};
+        tbody.querySelectorAll('.armar-check:checked').forEach(function (c) {
+            var e = c.closest('tr').dataset.envio;
+            if (e) { envios[e] = true; }
+        });
+        var distintos = Object.keys(envios);
+        if (distintos.length > 1 && !confirm('Las cargas marcadas tienen distinto tipo de envio: '
+                + distintos.map(function (e) { return nombresEnvio[e] || e; }).join(', ')
+                + '.
+
+¿Seguro que van juntas en esta orden?')) {
+            evento.preventDefault();
+            return;
+        }
         crear.disabled = true;
         crear.querySelector('span').textContent = <?= $ordenDestino !== null ? "'Agregando...'" : "'Creando...'" ?>;
     });

@@ -741,7 +741,8 @@ document.addEventListener('DOMContentLoaded', function () {
             { id: 'cargas-vista', param: 'vista', auto: true },
             { id: 'cargas-estado-filtro', param: 'estado' },
             { id: 'cargas-cliente-filtro', param: 'cliente' },
-            { id: 'cargas-aduanero-filtro', param: 'aduanero' }
+            { id: 'cargas-aduanero-filtro', param: 'aduanero' },
+            { id: 'cargas-envio-filtro', param: 'envio' }
         ],
         resumenId: 'cargas-resumen',
         botonFiltrarId: 'cargas-filtrar',

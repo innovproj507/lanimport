@@ -121,6 +121,7 @@ final class ConsultarTrackingPorNumeroHandler implements QueryHandlerInterface
             $carga->facturaProveedorRuta(),
             $bultosPorEstado,
             $carga->proveedor(),
+            $carga->tipoEnvio()->icono() . ' ' . $carga->tipoEnvio()->label(),
         );
     }
 }

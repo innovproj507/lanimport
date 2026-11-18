@@ -221,7 +221,8 @@ $lineas = $carga->lineas();
     <?php $entrega = $carga->datosEntrega(); require __DIR__ . '/_datos_entrega.php'; ?>
 
     <div class="bg-white rounded-xl shadow-sm p-6">
-        <?= card_header('shield', 'Aduana y contenedor', 'amber') ?>
+        <?= card_header('shield', 'Envio, aduana y contenedor', 'amber') ?>
+        <?php $tipoEnvioActual = $_POST['tipo_envio'] ?? $carga->tipoEnvio()->value; require __DIR__ . '/_tipo_envio.php'; ?>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div class="relative" id="aduanero-picker">
                 <input type="text" id="aduanero-buscar" placeholder="Escriba para buscar aduanero..." autocomplete="off"

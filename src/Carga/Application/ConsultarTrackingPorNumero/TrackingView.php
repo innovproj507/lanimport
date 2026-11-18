@@ -30,6 +30,8 @@ final class TrackingView
         public readonly ?string $facturaProveedorRuta = null,
         public readonly array $bultosPorEstado = [],
         public readonly ?string $proveedor = null,
+        // Tipo de envio al cliente: etiqueta con icono, ej. "🚢 Maritima".
+        public readonly ?string $tipoEnvio = null,
     ) {
     }
 }

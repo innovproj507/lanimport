@@ -20,7 +20,7 @@ if (empty($cargas)):
     }
     ?>
     <tr class="border-b border-slate-200">
-        <td class="py-2 pr-4 font-mono text-black whitespace-nowrap"><?= htmlspecialchars((string) $carga->trackingNumero()) ?></td>
+        <td class="py-2 pr-4 font-mono text-black whitespace-nowrap"><span title="Envio <?= htmlspecialchars($carga->tipoEnvio()->label()) ?>" class="mr-1"><?= $carga->tipoEnvio()->icono() ?></span><?= htmlspecialchars((string) $carga->trackingNumero()) ?></td>
         <td class="py-2 pr-4 text-zinc-700"><?= htmlspecialchars($nombresClientes[$carga->clienteId()] ?? '—') ?></td>
         <td class="py-2 pr-4 text-zinc-700"><?= htmlspecialchars($carga->proveedor()) ?></td>
         <td class="py-2 pr-4 text-zinc-700"><?= htmlspecialchars($carga->aduanero()?->nombre() ?? '—') ?></td>

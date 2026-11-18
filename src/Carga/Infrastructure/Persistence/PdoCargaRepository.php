@@ -7,6 +7,7 @@ namespace Courier\Carga\Infrastructure\Persistence;
 use Courier\Carga\Domain\Carga;
 use Courier\Carga\Domain\CargaRepositoryInterface;
 use Courier\Carga\Domain\CargaStatus;
+use Courier\Carga\Domain\TipoEnvio;
 use Courier\Carga\Domain\TipoServicio;
 use Courier\Carga\Domain\ValueObject\Aduanero;
 use Courier\Carga\Domain\ValueObject\Contenedor;
@@ -37,13 +38,13 @@ final class PdoCargaRepository implements CargaRepositoryInterface
             'INSERT INTO cargas (
                 id, tracking_numero, cliente_id, bodega_id, proveedor, proveedor_identificador,
                 aduanero_identificador, aduanero_nombre, numero_contenedor, notas,
-                factura_proveedor_nombre, factura_proveedor_ruta, tipo_servicio,
+                factura_proveedor_nombre, factura_proveedor_ruta, tipo_servicio, tipo_envio,
                 estado, registrado_por_usuario_id, fecha_ingreso, created_at, updated_at,
                 entrega_empresa_transporte, entrega_chofer, entrega_placa, entrega_por, entrega_cedula, entrega_tipos_mercancia
             ) VALUES (
                 :id, :tracking_numero, :cliente_id, :bodega_id, :proveedor, :proveedor_identificador,
                 :aduanero_identificador, :aduanero_nombre, :numero_contenedor, :notas,
-                :factura_proveedor_nombre, :factura_proveedor_ruta, :tipo_servicio,
+                :factura_proveedor_nombre, :factura_proveedor_ruta, :tipo_servicio, :tipo_envio,
                 :estado, :registrado_por_usuario_id, :fecha_ingreso, :created_at, :updated_at,
                 :entrega_empresa_transporte, :entrega_chofer, :entrega_placa, :entrega_por, :entrega_cedula, :entrega_tipos_mercancia
             )
@@ -52,7 +53,7 @@ final class PdoCargaRepository implements CargaRepositoryInterface
                 aduanero_identificador = VALUES(aduanero_identificador), aduanero_nombre = VALUES(aduanero_nombre),
                 numero_contenedor = VALUES(numero_contenedor), notas = VALUES(notas),
                 factura_proveedor_nombre = VALUES(factura_proveedor_nombre), factura_proveedor_ruta = VALUES(factura_proveedor_ruta),
-                fecha_ingreso = VALUES(fecha_ingreso), estado = VALUES(estado), updated_at = VALUES(updated_at),
+                fecha_ingreso = VALUES(fecha_ingreso), tipo_envio = VALUES(tipo_envio), estado = VALUES(estado), updated_at = VALUES(updated_at),
                 entrega_empresa_transporte = VALUES(entrega_empresa_transporte), entrega_chofer = VALUES(entrega_chofer),
                 entrega_placa = VALUES(entrega_placa), entrega_por = VALUES(entrega_por), entrega_cedula = VALUES(entrega_cedula),
                 entrega_tipos_mercancia = VALUES(entrega_tipos_mercancia)'
@@ -74,6 +75,7 @@ final class PdoCargaRepository implements CargaRepositoryInterface
             ':factura_proveedor_nombre' => $carga->facturaProveedorNombre(),
             ':factura_proveedor_ruta' => $carga->facturaProveedorRuta(),
             ':tipo_servicio' => $carga->tipoServicio()?->value,
+            ':tipo_envio' => $carga->tipoEnvio()->value,
             ':estado' => $carga->estado()->value,
             ':registrado_por_usuario_id' => $carga->registradoPorUsuarioId(),
             ':fecha_ingreso' => $carga->fechaIngreso()->format('Y-m-d H:i:s'),
@@ -282,7 +284,7 @@ final class PdoCargaRepository implements CargaRepositoryInterface
     }
 
     /** @return array{items: array<int, Carga>, total: int} */
-    public function searchPaginado(string $term, ?string $estado, int $page, int $perPage, array|string|null $aduaneroIdentificador = null, ?bool $enSalida = null, array $clienteIds = []): array
+    public function searchPaginado(string $term, ?string $estado, int $page, int $perPage, array|string|null $aduaneroIdentificador = null, ?bool $enSalida = null, array $clienteIds = [], array $tiposEnvio = []): array
     {
         $page = max(1, $page);
         $perPage = max(1, $perPage);
@@ -332,6 +334,7 @@ final class PdoCargaRepository implements CargaRepositoryInterface
         $listas = [
             'ca.aduanero_identificador' => array_values(array_filter((array) $aduaneroIdentificador, static fn ($v) => $v !== null && $v !== '')),
             'ca.cliente_id' => array_values(array_filter($clienteIds, static fn ($v) => $v !== '')),
+            'ca.tipo_envio' => array_values(array_filter($tiposEnvio, static fn ($v) => TipoEnvio::tryFrom((string) $v) !== null)),
         ];
         foreach ($listas as $columna => $valores) {
             if ($valores === []) {
@@ -419,6 +422,7 @@ final class PdoCargaRepository implements CargaRepositoryInterface
         );
 
         $carga->asignarBodega((string) ($row['bodega_id'] ?? Carga::BODEGA_PRINCIPAL));
+        $carga->asignarTipoEnvio(TipoEnvio::tryFrom((string) ($row['tipo_envio'] ?? '')) ?? TipoEnvio::MARITIMO);
         $carga->asignarDatosEntrega(DatosEntrega::desdeArreglo([
             'empresaTransporte' => $row['entrega_empresa_transporte'] ?? null,
             'chofer' => $row['entrega_chofer'] ?? null,

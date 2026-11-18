@@ -80,8 +80,8 @@ require __DIR__ . '/../partials/header.php';
         <div class="flex items-center gap-2 justify-between">
             <div class="flex items-center gap-2 flex-wrap">
                 <?= badge($view->estadoActualLabel, 'amber') ?>
-                <?php if ($view->tipoServicio !== null): ?>
-                    <span class="text-sm text-zinc-500">Servicio: <?= htmlspecialchars(ucfirst($view->tipoServicio)) ?></span>
+                <?php if ($view->tipoEnvio !== null): ?>
+                    <span class="text-sm font-medium text-zinc-700 bg-zinc-100 rounded-full px-2.5 py-0.5" title="Tipo de envio al cliente">Envio: <?= htmlspecialchars($view->tipoEnvio) ?></span>
                 <?php endif; ?>
                 <?php
                 $bultoEstadoColores = ['receiving' => 'amber', 'available' => 'emerald', 'in_repack' => 'indigo', 'reserved' => 'blue', 'quarantine' => 'red', 'consumed' => 'slate'];

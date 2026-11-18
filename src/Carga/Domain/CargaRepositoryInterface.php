@@ -41,6 +41,7 @@ interface CargaRepositoryInterface
     /**
      * @param array<int, string>|string|null $aduaneroIdentificador uno o varios (vacio = todos)
      * @param array<int, string> $clienteIds uno o varios (vacio = todos)
+     * @param array<int, string> $tiposEnvio maritimo|aereo|terrestre, uno o varios (vacio = todos)
      */
-    public function searchPaginado(string $term, ?string $estado, int $page, int $perPage, array|string|null $aduaneroIdentificador = null, ?bool $enSalida = null, array $clienteIds = []): array;
+    public function searchPaginado(string $term, ?string $estado, int $page, int $perPage, array|string|null $aduaneroIdentificador = null, ?bool $enSalida = null, array $clienteIds = [], array $tiposEnvio = []): array;
 }

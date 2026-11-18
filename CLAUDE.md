@@ -176,6 +176,12 @@ The paper delivery form (empresa de transporte, chofer, placa, entregado por, ce
   - **A new operation that moves bultos must log here too.**
 - Deleting a carga asks for a motivo (`prompt` in `carga/_tabla_filas.php`). `EliminarCargaHandler` first archives a copy (cliente, lineas, historial, motivo, who/when) into `cargas_eliminadas`. When the tracking is not found, Rastreo shows "Carga eliminada" with that data; clients only see "tracking anulado".
 
+### Tipo de envio (como sale la carga)
+
+- `cargas.tipo_envio` (migration 069, `maritimo|aereo|terrestre`, default `maritimo`) = how the carga ships to the client; enum `Carga\Domain\TipoEnvio` (`label()`, `icono()`, `desdeFormulario()` rejects empty). Not the legacy `tipo_servicio` (unused, always NULL).
+- Required in Ingreso/Editar (`carga/_tipo_envio.php`, radio `tipo_envio`, no preselection on Ingreso). Set on the entity with `asignarTipoEnvio()` like the bodega; `RegistrarCargaCommand::$tipoEnvio` null = maritimo (API, carga masiva).
+- Shown in the carga detail, Rastreo, the listado (icon before the tracking) and Excel (ENVIO). Listado filter `envio[]` (`filtro_multi` "Envio", `searchPaginado(..., $tiposEnvio)`). Crear OS has a client-side "Todos los envios" filter and asks to confirm when the ticked cargas mix tipos.
+
 ### Aduanero asignado al cliente
 
 `clientes.aduanero_identificador` (migration 056, FK to `aduaneros.identificador`) is the client's usual aduanero. It is edited in the client form, shown in the client list, and pre-selected in Ingreso de Carga when the client is picked (`alSeleccionar` in `app.js`), unless the user already chose another one.

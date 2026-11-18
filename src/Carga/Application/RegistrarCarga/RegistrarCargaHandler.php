@@ -7,6 +7,7 @@ namespace Courier\Carga\Application\RegistrarCarga;
 use Courier\Carga\Domain\BarcodeGeneratorInterface;
 use Courier\Carga\Domain\Carga;
 use Courier\Carga\Domain\CargaRepositoryInterface;
+use Courier\Carga\Domain\TipoEnvio;
 use Courier\Carga\Domain\TipoServicio;
 use Courier\Carga\Domain\TrackingNumeroGeneratorInterface;
 use Courier\Carga\Domain\ValueObject\Aduanero;
@@ -86,6 +87,7 @@ final class RegistrarCargaHandler implements CommandHandlerInterface
         // Queda "Ingresado" hasta que bodega escanee todos sus bultos (SincronizarEstadoCarga).
         $carga->asignarDatosEntrega(DatosEntrega::desdeArreglo($command->datosEntrega ?? []));
         $carga->asignarBodega($command->bodegaId ?? Carga::BODEGA_PRINCIPAL);
+        $carga->asignarTipoEnvio($command->tipoEnvio !== null ? TipoEnvio::desdeFormulario($command->tipoEnvio) : TipoEnvio::MARITIMO);
 
         $etiquetaUrl = $this->unitOfWork->run(function () use ($carga) {
             $this->cargas->save($carga);

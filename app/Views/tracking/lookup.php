@@ -175,8 +175,8 @@ $lineaTiempo = static function (array $eventos) use ($h, $fecha, $colorMovimient
             <span class="px-3 py-1 rounded-full bg-amber-500/10 text-amber-600 text-sm font-medium">
                 <?= $h($view->estadoActualLabel) ?>
             </span>
-            <?php if ($view->tipoServicio !== null): ?>
-                <span class="text-sm text-zinc-500">Servicio: <?= $h(ucfirst($view->tipoServicio)) ?></span>
+            <?php if ($view->tipoEnvio !== null): ?>
+                <span class="text-sm font-medium text-zinc-700 bg-zinc-100 rounded-full px-2.5 py-0.5">Envio: <?= $h($view->tipoEnvio) ?></span>
             <?php endif; ?>
             <?php foreach ($view->bultosPorEstado as $grupo): ?>
                 <span class="px-3 py-1 rounded-full text-sm font-medium <?= $bultoEstadoClases[$grupo['estado']] ?? 'bg-slate-500/10 text-slate-600' ?>">

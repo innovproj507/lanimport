@@ -32,6 +32,9 @@ final class Carga extends AggregateRoot
     /** Bodega donde ingreso (la de cada bulto esta en su LPN y cambia con un traslado). */
     private string $bodegaId = self::BODEGA_PRINCIPAL;
 
+    /** Como sale hacia el cliente (migracion 069). */
+    private TipoEnvio $tipoEnvio = TipoEnvio::MARITIMO;
+
     /** Bodega que existia antes de manejar varias (migracion 066). */
     public const BODEGA_PRINCIPAL = '00000000-0000-0000-0000-000000000001';
 
@@ -297,6 +300,16 @@ final class Carga extends AggregateRoot
     public function asignarBodega(string $bodegaId): void
     {
         $this->bodegaId = $bodegaId;
+    }
+
+    public function tipoEnvio(): TipoEnvio
+    {
+        return $this->tipoEnvio;
+    }
+
+    public function asignarTipoEnvio(TipoEnvio $tipoEnvio): void
+    {
+        $this->tipoEnvio = $tipoEnvio;
     }
 
     public function id(): string

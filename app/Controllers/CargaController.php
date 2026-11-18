@@ -24,6 +24,7 @@ use Courier\Carga\Application\RegistrarCarga\RegistrarCargaHandler;
 use Courier\Auth\Domain\UsuarioRepositoryInterface;
 use Courier\Carga\Domain\Carga;
 use Courier\Carga\Domain\CargaRepositoryInterface;
+use Courier\Carga\Domain\TipoEnvio;
 use Courier\Carga\Infrastructure\Persistence\PdoHistorialEstadoRepository;
 use Courier\Carga\Infrastructure\Storage\CargaDocumentoStorage;
 use Courier\Cliente\Application\ListarClientes\ListarClientesHandler;
@@ -120,6 +121,7 @@ final class CargaController extends BaseController
                 true,
                 $this->datosEntregaDesdeFormulario(),
                 $this->bodegaParaOperar($this->request->getPost('bodega_id')),
+                TipoEnvio::desdeFormulario((string) $this->request->getPost('tipo_envio'))->value,
             );
 
             $result = $this->container()->get(RegistrarCargaHandler::class)->handle($command);
@@ -231,11 +233,12 @@ final class CargaController extends BaseController
         // Cliente y aduanero: uno o varios (cliente[]=..), o un solo valor (enlaces viejos).
         $aduanero = $this->listaDesdeRequest('aduanero');
         $clientesFiltro = $this->listaDesdeRequest('cliente');
+        $enviosFiltro = $this->listaDesdeRequest('envio');
         $page = max(1, (int) ($this->request->getGet('page') ?? 1));
         $perPage = $this->perPageDesdeRequest();
 
         $resultado = $this->container()->get(BuscarCargasHandler::class)->handle(
-            new BuscarCargasQuery($termino, $estado !== '' ? $estado : null, $page, $perPage, $aduanero, $this->vistaDesdeRequest(), $clientesFiltro)
+            new BuscarCargasQuery($termino, $estado !== '' ? $estado : null, $page, $perPage, $aduanero, $this->vistaDesdeRequest(), $clientesFiltro, $enviosFiltro)
         );
 
         $clientes = $this->container()->get(ListarClientesHandler::class)->handle(new ListarClientesQuery());
@@ -269,14 +272,15 @@ final class CargaController extends BaseController
         // Cliente y aduanero: uno o varios (cliente[]=..), o un solo valor (enlaces viejos).
         $aduanero = $this->listaDesdeRequest('aduanero');
         $clientesFiltro = $this->listaDesdeRequest('cliente');
+        $enviosFiltro = $this->listaDesdeRequest('envio');
 
         $cargas = $this->container()->get(BuscarCargasHandler::class)->handle(
-            new BuscarCargasQuery($termino, $estado !== '' ? $estado : null, 1, 100000, $aduanero, $this->vistaDesdeRequest(), $clientesFiltro)
+            new BuscarCargasQuery($termino, $estado !== '' ? $estado : null, 1, 100000, $aduanero, $this->vistaDesdeRequest(), $clientesFiltro, $enviosFiltro)
         )->items;
         $nombresClientes = $this->nombresClientes($this->container()->get(ListarClientesHandler::class)->handle(new ListarClientesQuery()));
         $lpnsPorEstado = $this->lpnsPorEstado($cargas);
 
-        $filas = [['TRACKING', 'FECHA INGRESO', 'CLIENTE', 'PROVEEDOR', 'ADUANERO', 'MARCA', 'DESCRIPCION', 'BULTOS', 'PESO (KG)', 'CUBICAJE (P3)', 'VALOR', 'ESTADO CARGA', 'ETIQUETAS (LPN)', 'FACTURA']];
+        $filas = [['TRACKING', 'FECHA INGRESO', 'ENVIO', 'CLIENTE', 'PROVEEDOR', 'ADUANERO', 'MARCA', 'DESCRIPCION', 'BULTOS', 'PESO (KG)', 'CUBICAJE (P3)', 'VALOR', 'ESTADO CARGA', 'ETIQUETAS (LPN)', 'FACTURA']];
         $totales = ['bultos' => 0.0, 'peso' => 0.0, 'pies3' => 0.0, 'valor' => 0.0];
 
         foreach ($cargas as $carga) {
@@ -308,6 +312,7 @@ final class CargaController extends BaseController
             $filas[] = [
                 (string) $carga->trackingNumero(),
                 $carga->fechaIngreso()->format('d/m/Y'),
+                $carga->tipoEnvio()->label(),
                 $nombresClientes[$carga->clienteId()] ?? '',
                 $carga->proveedor(),
                 $carga->aduanero()?->nombre() ?? '',
@@ -320,10 +325,10 @@ final class CargaController extends BaseController
             ];
         }
 
-        $filas[] = ['TOTALES (' . count($cargas) . ' cargas)', '', '', '', '', '', '', $totales['bultos'], round($totales['peso'], 2), round($totales['pies3'], 2), round($totales['valor'], 2), '', '', ''];
+        $filas[] = ['TOTALES (' . count($cargas) . ' cargas)', '', '', '', '', '', '', '', $totales['bultos'], round($totales['peso'], 2), round($totales['pies3'], 2), round($totales['valor'], 2), '', '', ''];
 
         $contenido = $this->container()->get(EscritorXlsx::class)->generar([
-            'Cargas' => ['filas' => $filas, 'anchos' => [20, 13, 30, 24, 20, 14, 35, 9, 12, 13, 14, 14, 30, 9]],
+            'Cargas' => ['filas' => $filas, 'anchos' => [20, 13, 11, 30, 24, 20, 14, 35, 9, 12, 13, 14, 14, 30, 9]],
         ]);
 
         return $this->response
@@ -747,6 +752,7 @@ final class CargaController extends BaseController
                 $facturaProveedor['nombre_archivo'] ?? $carga->facturaProveedorNombre(),
                 $facturaProveedor['ruta_archivo'] ?? $carga->facturaProveedorRuta(),
                 $this->datosEntregaDesdeFormulario(),
+                TipoEnvio::desdeFormulario((string) $this->request->getPost('tipo_envio'))->value,
             );
 
             $this->container()->get(ActualizarDatosCargaHandler::class)->handle($command);

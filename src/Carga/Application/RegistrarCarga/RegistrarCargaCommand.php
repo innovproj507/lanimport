@@ -35,6 +35,8 @@ final class RegistrarCargaCommand implements CommandInterface
         public readonly ?array $datosEntrega = null,
         // Bodega donde ingresa (null = Bodega Principal). El controlador valida que el usuario pueda usarla.
         public readonly ?string $bodegaId = null,
+        // Como sale hacia el cliente: maritimo|aereo|terrestre (null = maritimo, p. ej. API vieja).
+        public readonly ?string $tipoEnvio = null,
     ) {
     }
 }

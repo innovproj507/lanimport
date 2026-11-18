@@ -54,6 +54,7 @@ $vistaInicial = array_key_first($vistasListado);
             ?>
             <?= filtro_multi('cargas-cliente-filtro', 'cliente', 'Cliente', $opcionesClientes, [], '') ?>
             <?= filtro_multi('cargas-aduanero-filtro', 'aduanero', 'Aduanero', $opcionesAduaneros, [], '') ?>
+            <?= filtro_multi('cargas-envio-filtro', 'envio', 'Envio', \Courier\Carga\Domain\TipoEnvio::opciones(), [], '') ?>
             <?php // Los filtros se aplican al pulsar Filtrar (el boton se resalta si hay cambios sin aplicar). ?>
             <button type="button" id="cargas-filtrar" class="inline-flex items-center gap-1.5 bg-amber-500 text-black rounded-lg px-4 py-2 text-sm font-medium hover:bg-amber-400 transition">
                 <?= icon_small('filter') ?><span>Filtrar</span>

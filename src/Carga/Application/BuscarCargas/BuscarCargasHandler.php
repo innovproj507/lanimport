@@ -24,7 +24,7 @@ final class BuscarCargasHandler implements QueryHandlerInterface
             default => null,
         };
 
-        $resultado = $this->cargas->searchPaginado($query->termino, $query->estado, $query->page, $query->perPage, $query->aduaneroIdentificador, $enSalida, $query->clienteIds);
+        $resultado = $this->cargas->searchPaginado($query->termino, $query->estado, $query->page, $query->perPage, $query->aduaneroIdentificador, $enSalida, $query->clienteIds, $query->tiposEnvio);
 
         return new BuscarCargasResult($resultado['items'], $resultado['total'], $query->page, $query->perPage, $resultado['resumen']);
     }

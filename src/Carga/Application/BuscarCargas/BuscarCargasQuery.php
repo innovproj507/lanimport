@@ -23,6 +23,8 @@ final class BuscarCargasQuery implements QueryInterface
         public readonly string $vista = self::VISTA_TODAS,
         /** @var array<int, string> uno o varios clientes (vacio = todos) */
         public readonly array $clienteIds = [],
+        /** @var array<int, string> tipos de envio maritimo|aereo|terrestre (vacio = todos) */
+        public readonly array $tiposEnvio = [],
     ) {
     }
 }

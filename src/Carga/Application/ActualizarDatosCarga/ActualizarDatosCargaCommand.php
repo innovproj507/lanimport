@@ -29,6 +29,8 @@ final class ActualizarDatosCargaCommand implements CommandInterface
         public readonly ?string $facturaProveedorRuta,
         // Formulario de entrega: ver DatosEntrega::desdeArreglo(). null = no cambiar.
         public readonly ?array $datosEntrega = null,
+        // maritimo|aereo|terrestre; null = no cambiar.
+        public readonly ?string $tipoEnvio = null,
     ) {
     }
 }
