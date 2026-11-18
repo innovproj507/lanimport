@@ -19,7 +19,7 @@ final class ReporteController extends BaseController
 {
     public function index(): string
     {
-        [$desde, $hasta, $aduanero, $clienteId] = $this->filtros();
+        [$desde, $hasta, $aduanero, $clienteId, $envios] = $this->filtros();
 
         $reporte = $this->container()->get(ObtenerReporteOperativoHandler::class)
             ->handle(new ObtenerReporteOperativoQuery($desde, $hasta));
@@ -28,7 +28,7 @@ final class ReporteController extends BaseController
         usort($clientes, static fn ($a, $b) => strcasecmp($a->nombreCompleto(), $b->nombreCompleto()));
 
         $flujo = $this->container()->get(ObtenerFlujoCargasHandler::class)
-            ->handle(new ObtenerFlujoCargasQuery($desde, $hasta, $aduanero, $clienteId));
+            ->handle(new ObtenerFlujoCargasQuery($desde, $hasta, $aduanero, $clienteId, $envios));
         [$estado, $ver] = $this->opcionesConsulta();
 
         return view('reporte/index', [
@@ -44,6 +44,7 @@ final class ReporteController extends BaseController
             'clientes' => $clientes,
             'filtroAduanero' => $aduanero,
             'filtroCliente' => $clienteId,
+            'filtroEnvio' => $envios,
         ]);
     }
 
@@ -54,28 +55,28 @@ final class ReporteController extends BaseController
     /** Excel de la consulta, exactamente con los filtros y la vista de la pantalla. */
     public function consultaExcel(): ResponseInterface
     {
-        [$desde, $hasta, $aduanero, $clienteId] = $this->filtros();
+        [$desde, $hasta, $aduanero, $clienteId, $envios] = $this->filtros();
         [$estado, $ver] = $this->opcionesConsulta();
         $flujo = $this->container()->get(ObtenerFlujoCargasHandler::class)
-            ->handle(new ObtenerFlujoCargasQuery($desde, $hasta, $aduanero, $clienteId));
+            ->handle(new ObtenerFlujoCargasQuery($desde, $hasta, $aduanero, $clienteId, $envios));
         $consulta = $this->agruparConsulta($this->filtrarConsulta($flujo['consulta'], $estado), $ver);
         $estados = ['bodega' => 'En bodega', 'salida' => 'En salida', 'salieron' => 'Salio'];
         $t = $consulta['totales'];
 
         if ($ver === 'detalle') {
-            $filas = [['TRACKING', 'COMPAÑIA', 'CLIENTE', 'ADUANERO', 'ESTADO', 'OS / DO', 'CONTENEDOR', 'NAVIERA', 'BULTOS', 'KG', 'P3', 'VALOR', 'INGRESO', 'FECHA', 'DIAS EN BODEGA']];
+            $filas = [['TRACKING', 'ENVIO', 'COMPAÑIA', 'CLIENTE', 'ADUANERO', 'ESTADO', 'OS / DO', 'CONTENEDOR', 'NAVIERA', 'BULTOS', 'KG', 'P3', 'VALOR', 'INGRESO', 'FECHA', 'DIAS EN BODEGA']];
 
             foreach ($consulta['filas'] as $f) {
                 $filas[] = [
-                    $f['tracking'], $f['compania'] ?? '', $f['cliente'], $f['aduanero'], $estados[$f['estado']] . ($f['estado'] === 'salida' ? ($f['esOs'] ? ' (OS)' : ' (contenedor)') : ''),
+                    $f['tracking'], \Courier\Carga\Domain\TipoEnvio::tryFrom($f['envio'] ?? '')?->label() ?? '', $f['compania'] ?? '', $f['cliente'], $f['aduanero'], $estados[$f['estado']] . ($f['estado'] === 'salida' ? ($f['esOs'] ? ' (OS)' : ' (contenedor)') : ''),
                     $f['orden'] ?? '', $f['contenedor'] ?? '', $f['naviera'] ?? '',
                     $f['bultos'], round($f['kg'], 2), round($f['p3'], 2), round($f['valor'], 2),
                     $this->fechaDmy($f['ingreso']), $this->fechaDmy($f['fecha']), $f['dias'] ?? '',
                 ];
             }
 
-            $filas[] = ['TOTALES', $t['cargas'] . ' cargas', '', '', '', '', '', $t['bultos'], round($t['kg'], 2), round($t['p3'], 2), round($t['valor'], 2), '', '', ''];
-            $anchos = [18, 30, 18, 20, 15, 16, 16, 9, 12, 11, 13, 12, 12, 10];
+            $filas[] = ['TOTALES', '', $t['cargas'] . ' cargas', '', '', '', '', '', $t['bultos'], round($t['kg'], 2), round($t['p3'], 2), round($t['valor'], 2), '', '', ''];
+            $anchos = [18, 11, 30, 18, 20, 15, 16, 16, 9, 12, 11, 13, 12, 12, 10];
         } else {
             $titulo = ['cliente' => 'CLIENTE', 'aduanero' => 'ADUANERO', 'contenedor' => 'OS / DO'][$ver];
             $filas = [array_merge([$titulo], $ver === 'contenedor' ? ['CONTENEDOR', 'NAVIERA'] : [], ['CARGAS', 'EN BODEGA', 'EN SALIDA', 'SALIERON', 'TOTAL BULTOS', 'KG', 'P3', 'VALOR'])];
@@ -195,11 +196,11 @@ final class ReporteController extends BaseController
     /** Excel de una alerta (antiguedad, os, incompletos), con los filtros de la pantalla. */
     public function alertaExcel(): ResponseInterface
     {
-        [$desde, $hasta, $aduanero, $clienteId] = $this->filtros();
+        [$desde, $hasta, $aduanero, $clienteId, $envios] = $this->filtros();
         $tipo = (string) ($this->request->getGet('alerta') ?? 'antiguedad');
         $tipo = in_array($tipo, ['antiguedad', 'os', 'incompletos'], true) ? $tipo : 'antiguedad';
         $alertas = $this->container()->get(ObtenerFlujoCargasHandler::class)
-            ->handle(new ObtenerFlujoCargasQuery($desde, $hasta, $aduanero, $clienteId))['alertas'];
+            ->handle(new ObtenerFlujoCargasQuery($desde, $hasta, $aduanero, $clienteId, $envios))['alertas'];
 
         if ($tipo === 'antiguedad') {
             $filas = [['CLIENTE', 'CARGAS', '0-15 DIAS', '16-30 DIAS', '31-60 DIAS', '+60 DIAS', 'TOTAL BULTOS', 'CARGA MAS ANTIGUA', 'DIAS']];
@@ -236,7 +237,7 @@ final class ReporteController extends BaseController
     /**
      * Cliente y aduanero admiten varios (cliente[]=..&cliente[]=..); un solo valor tambien sirve.
      *
-     * @return array{0: string, 1: string, 2: array<int, string>, 3: array<int, string>} desde, hasta, aduaneros, clientes
+     * @return array{0: string, 1: string, 2: array<int, string>, 3: array<int, string>, 4: array<int, string>} desde, hasta, aduaneros, clientes, tipos de envio
      */
     private function filtros(): array
     {
@@ -251,6 +252,7 @@ final class ReporteController extends BaseController
             $fecha($this->request->getGet('hasta'), date('Y-m-d')),
             $texto($this->request->getGet('aduanero')),
             $texto($this->request->getGet('cliente')),
+            array_values(array_filter($texto($this->request->getGet('envio')), static fn (string $e) => \Courier\Carga\Domain\TipoEnvio::tryFrom($e) !== null)),
         ];
     }
 }

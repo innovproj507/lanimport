@@ -30,7 +30,7 @@ foreach ($aduaneros as $a) {
     $opcionesAduaneros[$a->identificador()] = $a->nombre();
 }
 $excelUrl = '/reportes/consulta/excel?' . http_build_query(array_filter([
-    'estado' => $estadoConsulta, 'ver' => $verConsulta, 'cliente' => $filtroCliente, 'aduanero' => $filtroAduanero,
+    'estado' => $estadoConsulta, 'ver' => $verConsulta, 'cliente' => $filtroCliente, 'aduanero' => $filtroAduanero, 'envio' => $filtroEnvio ?? [],
     'desde' => $reporte->desde, 'hasta' => $reporte->hasta,
 ], static fn ($v) => $v !== '' && $v !== null && $v !== []));
 $th = 'py-2 pr-3';
@@ -56,6 +56,10 @@ $tdn = 'py-2 pr-3 text-right whitespace-nowrap';
         <div>
             <label class="block text-sm font-medium text-zinc-700 mb-1">Aduanero</label>
             <?= filtro_multi('reporte-aduanero', 'aduanero', 'Aduanero', $opcionesAduaneros, $filtroAduanero) ?>
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-zinc-700 mb-1">Envio</label>
+            <?= filtro_multi('reporte-envio', 'envio', 'Envio', \Courier\Carga\Domain\TipoEnvio::opciones(), $filtroEnvio ?? []) ?>
         </div>
         <div>
             <label class="block text-sm font-medium text-zinc-700 mb-1" title="Aplica a lo que salio">Desde</label>
@@ -108,6 +112,7 @@ $tdn = 'py-2 pr-3 text-right whitespace-nowrap';
                 <thead class="sticky top-0 bg-slate-50">
                     <tr class="text-left text-xs text-zinc-500 uppercase border-b border-slate-200">
                         <th class="py-2 px-3">Tracking</th>
+                        <th class="<?= $th ?>">Envio</th>
                         <th class="<?= $th ?>">Compañia</th>
                         <th class="<?= $th ?>">Cliente</th>
                         <th class="<?= $th ?>">Aduanero</th>
@@ -126,6 +131,7 @@ $tdn = 'py-2 pr-3 text-right whitespace-nowrap';
                     <?php foreach ($consulta['filas'] as $f): ?>
                         <tr class="border-b border-slate-100 hover:bg-slate-50">
                             <td class="py-2 px-3 font-mono whitespace-nowrap"><a href="/cargas/<?= htmlspecialchars($f['cargaId']) ?>" class="text-amber-600 hover:underline"><?= htmlspecialchars($f['tracking']) ?></a></td>
+                            <td class="<?= $th ?> text-zinc-700 whitespace-nowrap"><?php $envioFila = \Courier\Carga\Domain\TipoEnvio::tryFrom($f['envio'] ?? ''); echo $envioFila !== null ? $envioFila->icono() . ' ' . $envioFila->label() : '—'; ?></td>
                             <td class="<?= $th ?> text-zinc-700"><?= htmlspecialchars($f['compania'] ?? '') ?></td>
                             <td class="<?= $th ?> text-zinc-700"><?= htmlspecialchars($f['cliente']) ?></td>
                             <td class="<?= $th ?> text-zinc-700"><?= htmlspecialchars($f['aduanero']) ?></td>
@@ -145,7 +151,7 @@ $tdn = 'py-2 pr-3 text-right whitespace-nowrap';
                 </tbody>
                 <tfoot class="sticky bottom-0 bg-slate-100 font-semibold text-black">
                     <tr>
-                        <td class="py-2 px-3" colspan="7">Totales</td>
+                        <td class="py-2 px-3" colspan="8">Totales</td>
                         <td class="<?= $tdn ?>"><?= $nf($t['bultos']) ?></td>
                         <td class="<?= $tdn ?>"><?= $nf($t['kg'], 1) ?></td>
                         <td class="<?= $tdn ?>"><?= $nf($t['p3'], 2) ?></td>

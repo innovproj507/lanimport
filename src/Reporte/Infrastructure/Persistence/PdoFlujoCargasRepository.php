@@ -28,14 +28,15 @@ final class PdoFlujoCargasRepository
      *
      * @param array<int, string> $aduaneros vacio = todos
      * @param array<int, string> $clienteIds vacio = todos
+     * @param array<int, string> $tiposEnvio maritimo|aereo|terrestre, vacio = todos
      * @return array<int, array<string, mixed>>
      */
-    public function cargas(array $aduaneros, array $clienteIds): array
+    public function cargas(array $aduaneros, array $clienteIds, array $tiposEnvio = []): array
     {
         $where = [];
         $params = [];
 
-        foreach (['c.aduanero_identificador' => array_values($aduaneros), 'c.cliente_id' => array_values($clienteIds)] as $columna => $valores) {
+        foreach (['c.aduanero_identificador' => array_values($aduaneros), 'c.cliente_id' => array_values($clienteIds), 'c.tipo_envio' => array_values($tiposEnvio)] as $columna => $valores) {
             if ($valores === []) {
                 continue;
             }
@@ -53,7 +54,7 @@ final class PdoFlujoCargasRepository
         $sql = "SELECT c.id, c.tracking_numero, c.estado, c.fecha_ingreso, c.created_at, c.updated_at,
                        TRIM(CONCAT(COALESCE(cl.nombre, ''), ' ', COALESCE(cl.apellido, ''))) AS cliente,
                        COALESCE(a.nombre, '') AS aduanero,
-                       COALESCE(c.proveedor, '') AS proveedor,
+                       COALESCE(c.proveedor, '') AS proveedor, c.tipo_envio,
                        COALESCE(l.bultos, 0) AS bultos, COALESCE(l.peso, 0) AS peso, COALESCE(l.p3, 0) AS p3, COALESCE(l.valor, 0) AS valor,
                        COALESCE(e.total, 0) AS etiquetas, COALESCE(e.por_escanear, 0) AS por_escanear,
                        h.en_bodega_at, h.en_transito_at

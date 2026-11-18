@@ -19,6 +19,8 @@ final class ObtenerFlujoCargasQuery implements QueryInterface
         public readonly string $hasta,
         public readonly array $aduaneros = [],
         public readonly array $clienteIds = [],
+        /** @var array<int, string> maritimo|aereo|terrestre (vacio = todos) */
+        public readonly array $tiposEnvio = [],
     ) {
     }
 }

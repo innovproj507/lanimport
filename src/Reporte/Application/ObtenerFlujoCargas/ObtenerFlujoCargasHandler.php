@@ -52,7 +52,7 @@ final class ObtenerFlujoCargasHandler implements QueryHandlerInterface
         // Consulta de Reportes: una fila por carga y estado (bodega, en salida por OS/DO, salieron).
         $consulta = [];
 
-        foreach ($this->repository->cargas($query->aduaneros, $query->clienteIds) as $c) {
+        foreach ($this->repository->cargas($query->aduaneros, $query->clienteIds, $query->tiposEnvio) as $c) {
             $id = (string) $c['id'];
             $dos = $salidas[$id] ?? [];
             $pendientes = array_values(array_filter($dos, static fn (array $d) => $d['estado'] === 'pendiente'));
@@ -227,6 +227,7 @@ final class ObtenerFlujoCargasHandler implements QueryHandlerInterface
                 'tracking' => (string) $c['tracking_numero'],
                 'cliente' => $cliente,
                 'compania' => (string) ($c['proveedor'] ?? ''),
+                'envio' => (string) ($c['tipo_envio'] ?? 'maritimo'),
                 'aduanero' => $aduanero,
                 'estado' => $d['estado'] === 'pendiente' ? 'salida' : 'salieron',
                 'ordenId' => (string) $d['id'],
@@ -318,6 +319,7 @@ final class ObtenerFlujoCargasHandler implements QueryHandlerInterface
                 'tracking' => (string) $c['tracking_numero'],
                 'cliente' => $cliente,
                 'compania' => (string) ($c['proveedor'] ?? ''),
+                'envio' => (string) ($c['tipo_envio'] ?? 'maritimo'),
                 'aduanero' => $aduanero,
                 'estado' => 'bodega',
                 'ordenId' => null,
