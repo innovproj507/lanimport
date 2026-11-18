@@ -535,9 +535,7 @@ document.addEventListener('DOMContentLoaded', function () {
         var distintos = Object.keys(envios);
         if (distintos.length > 1 && !confirm('Las cargas marcadas tienen distinto tipo de envio: '
                 + distintos.map(function (e) { return nombresEnvio[e] || e; }).join(', ')
-                + '.
-
-¿Seguro que van juntas en esta orden?')) {
+                + '. ¿Seguro que van juntas en esta orden?')) {
             evento.preventDefault();
             return;
         }
