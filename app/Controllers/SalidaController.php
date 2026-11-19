@@ -1065,9 +1065,9 @@ final class SalidaController extends BaseController
             static fn ($o) => $o->tieneDo() || $o->estado()->value !== 'pendiente',
         ));
 
-        // En orden de DO, ascendente (DO.211, DO.212...) y por anio; las que no tienen DO, al final.
-        usort($ordenes, static fn ($a, $b) => [$a->doAnio() === null, $a->doAnio() ?? 0, $a->doNumero() ?? 0, $a->createdAt()]
-            <=> [$b->doAnio() === null, $b->doAnio() ?? 0, $b->doNumero() ?? 0, $b->createdAt()]);
+        // En orden de DO, descendente (DO.311, DO.310... DO.001), el anio mas reciente primero; las que no tienen DO, al final.
+        usort($ordenes, static fn ($a, $b) => [$a->doAnio() === null, $b->doAnio() ?? 0, $b->doNumero() ?? 0, $b->createdAt()]
+            <=> [$b->doAnio() === null, $a->doAnio() ?? 0, $a->doNumero() ?? 0, $a->createdAt()]);
 
         $clientes = $this->container()->get(ListarClientesHandler::class)->handle(new ListarClientesQuery());
         $mapaClientes = [];
