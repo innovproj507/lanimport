@@ -297,6 +297,7 @@ final class SalidaController extends BaseController
         return view('salida/escaneo', [
             'orden' => $orden,
             'clienteNombre' => $clienteNombre,
+            'aduaneros' => $repositorio->aduanerosPorOrden([$orden->id()])[$orden->id()] ?? [],
             'avance' => $repositorio->avancePorCarga($orden->id()),
             'navieras' => $navieras,
             'fotos' => $this->container()->get(FotoEvidenciaRepositoryInterface::class)->listar(TipoEvidencia::Salida, $orden->id()),

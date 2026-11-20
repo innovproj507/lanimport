@@ -9,7 +9,9 @@ use App\Libraries\Csrf;
 require_once __DIR__ . '/../partials/view_helpers.php';
 // Sin DO es una OS (orden de salida); con DO, la salida del contenedor.
 $pageTitle = ($orden->tieneDo() ? 'Salida ' : 'Orden de Salida ') . $orden->etiquetaDo();
-$pageSubtitle = (str_contains($clienteNombre, ', ') ? 'Clientes: ' : 'Cliente: ') . $clienteNombre;
+// Debajo del titulo van los aduaneros de las cargas de la orden (no los clientes).
+$aduaneros ??= [];
+$pageSubtitle = (count($aduaneros) > 1 ? 'Aduaneros: ' : 'Aduanero: ') . ($aduaneros !== [] ? implode(', ', $aduaneros) : 'sin aduanero');
 // Una OS sin DO vuelve a Orden de Salida; con DO, a Salidas.
 $backHref = !$orden->tieneDo() && $orden->estado()->value === 'pendiente' ? '/salidas/ordenes' : '/salidas/historial';
 // Bodega escanea desde la PDA mientras trafico mira: la pantalla revisa cambios cada 8 s (vivo.js).
