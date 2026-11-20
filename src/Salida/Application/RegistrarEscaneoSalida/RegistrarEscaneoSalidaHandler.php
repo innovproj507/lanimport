@@ -12,6 +12,7 @@ use Courier\Salida\Domain\Exception\OrdenSalidaNotFoundException;
 use Courier\Salida\Domain\SalidaOrdenRepositoryInterface;
 use Courier\Shared\Application\CommandHandlerInterface;
 use Courier\Shared\Application\CommandInterface;
+use Courier\Shared\Infrastructure\Persistence\UnitOfWork;
 
 final class RegistrarEscaneoSalidaHandler implements CommandHandlerInterface
 {
@@ -20,6 +21,7 @@ final class RegistrarEscaneoSalidaHandler implements CommandHandlerInterface
         private readonly ?BitacoraCargaInterface $bitacora = null,
         private readonly ?BodegaActivaInterface $bodegaActiva = null,
         private readonly ?LpnRepositoryInterface $lpns = null,
+        private readonly ?UnitOfWork $unitOfWork = null,
     ) {
     }
 
@@ -28,6 +30,16 @@ final class RegistrarEscaneoSalidaHandler implements CommandHandlerInterface
     {
         assert($command instanceof RegistrarEscaneoSalidaCommand);
 
+        // En una transaccion: la orden queda bloqueada desde que se lee hasta que se guarda, asi
+        // un "Agregar cargas" o "Ajustar" que llegue a la vez espera en vez de pisarse.
+        return $this->unitOfWork !== null
+            ? $this->unitOfWork->run(fn () => $this->escanear($command))
+            : $this->escanear($command);
+    }
+
+    /** @return array{escaneadas: int, total: int} */
+    private function escanear(RegistrarEscaneoSalidaCommand $command): array
+    {
         $orden = $this->ordenes->findById($command->salidaOrdenId);
 
         if ($orden === null) {

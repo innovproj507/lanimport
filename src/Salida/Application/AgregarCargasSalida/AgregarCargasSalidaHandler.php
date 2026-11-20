@@ -34,31 +34,35 @@ final class AgregarCargasSalidaHandler implements CommandHandlerInterface
     {
         assert($command instanceof AgregarCargasSalidaCommand);
 
-        $orden = $this->ordenes->findById($command->ordenId) ?? throw new NotFoundException('Orden de salida no encontrada.');
+        // Todo en la transaccion: la orden se lee bloqueada (ver findById), asi un escaneo de la PDA
+        // en ese mismo momento espera y luego ve las lineas nuevas.
+        [$orden, $lpns] = $this->unitOfWork->run(function () use ($command): array {
+            $orden = $this->ordenes->findById($command->ordenId) ?? throw new NotFoundException('Orden de salida no encontrada.');
 
-        $lpns = [];
-        foreach (array_unique($command->lpnIds) as $lpnId) {
-            $lpn = $this->lpns->findById($lpnId) ?? throw new ValidationException("No se encontro el LPN con id {$lpnId}.");
+            $lpns = [];
+            foreach (array_unique($command->lpnIds) as $lpnId) {
+                $lpn = $this->lpns->findById($lpnId) ?? throw new ValidationException("No se encontro el LPN con id {$lpnId}.");
 
-            if ($lpn->estado() !== EstadoLpn::AVAILABLE) {
-                throw new ValidationException("El LPN {$lpn->codigo()} ya no esta disponible (otra salida lo tomo o cambio de estado). Recargue la pagina.");
+                if ($lpn->estado() !== EstadoLpn::AVAILABLE) {
+                    throw new ValidationException("El LPN {$lpn->codigo()} ya no esta disponible (otra salida lo tomo o cambio de estado). Recargue la pagina.");
+                }
+
+                $lpns[] = $lpn;
             }
 
-            $lpns[] = $lpn;
-        }
+            $orden->agregarLineas(
+                array_map(static fn ($lpn) => new SalidaLinea($lpn->id(), (string) $lpn->codigo()), $lpns),
+                array_map(static fn ($lpn) => (string) $lpn->clienteId(), $lpns),
+            );
 
-        $orden->agregarLineas(
-            array_map(static fn ($lpn) => new SalidaLinea($lpn->id(), (string) $lpn->codigo()), $lpns),
-            array_map(static fn ($lpn) => (string) $lpn->clienteId(), $lpns),
-        );
-
-        $this->unitOfWork->run(function () use ($orden, $lpns): void {
             $this->ordenes->save($orden);
 
             foreach ($lpns as $lpn) {
                 $lpn->reservarParaSalida();
                 $this->lpns->save($lpn);
             }
+
+            return [$orden, $lpns];
         });
 
         $this->bitacora?->registrarPorLpns(array_map(static fn ($lpn) => $lpn->id(), $lpns), 'salida_agregada', "{n} bulto(s) agregados a {$orden->etiquetaDo()}", $orden->id());

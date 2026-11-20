@@ -105,19 +105,26 @@ final class PdoSalidaOrdenRepository implements SalidaOrdenRepositoryInterface
             ':do_numero' => $orden->doNumero(),
         ] + $this->parametrosEmbarque($orden));
 
-        // Lineas que se sacaron (pasaron a otro DO o volvieron a bodega) se borran de esta salida.
-        $lpnIds = array_map(static fn ($linea) => $linea->lpnId(), $orden->lineas());
-        $marcas = implode(',', array_fill(0, count($lpnIds), '?'));
-        $borrar = $this->connection->prepare(
-            'DELETE FROM salida_lineas WHERE salida_orden_id = ?' . ($lpnIds !== [] ? " AND lpn_id NOT IN ({$marcas})" : '')
-        );
-        $borrar->execute(array_merge([$orden->id()], $lpnIds));
+        // Solo se borran las lineas que esta operacion saco (pasaron a otro DO o volvieron a bodega).
+        // Antes se borraba "todo lo que no estaba en memoria", y un escaneo que leyo la orden justo
+        // antes de que otro usuario agregara cargas borraba esas lineas: los bultos quedaban
+        // reservados sin orden.
+        $sacados = $orden->lpnIdsSacados();
+        if ($sacados !== []) {
+            $marcas = implode(',', array_fill(0, count($sacados), '?'));
+            $borrar = $this->connection->prepare(
+                "DELETE FROM salida_lineas WHERE salida_orden_id = ? AND lpn_id IN ({$marcas})"
+            );
+            $borrar->execute(array_merge([$orden->id()], $sacados));
+        }
 
         // Lineas nuevas (cargas agregadas a una salida pendiente) se insertan; las demas se actualizan.
+        // Un escaneo ya guardado no se desmarca (dos PDA escaneando la misma orden a la vez).
         $upsertLinea = $this->connection->prepare(
             'INSERT INTO salida_lineas (id, salida_orden_id, lpn_id, escaneado, escaneado_at)
              VALUES (:id, :salida_orden_id, :lpn_id, :escaneado, :escaneado_at)
-             ON DUPLICATE KEY UPDATE escaneado = VALUES(escaneado), escaneado_at = VALUES(escaneado_at)'
+             ON DUPLICATE KEY UPDATE escaneado_at = IF(escaneado = 1, escaneado_at, VALUES(escaneado_at)),
+                escaneado = GREATEST(escaneado, VALUES(escaneado))'
         );
 
         foreach ($orden->lineas() as $linea) {
@@ -542,6 +549,9 @@ final class PdoSalidaOrdenRepository implements SalidaOrdenRepositoryInterface
         $stmt = $this->connection->prepare(
             'SELECT s.*, n.nombre AS naviera_nombre FROM salida_ordenes s
              LEFT JOIN navieras n ON n.id = s.naviera_id WHERE s.id = :id LIMIT 1'
+            // Dentro de una transaccion se bloquea la orden hasta el commit: dos operaciones sobre
+            // la misma orden (escaneo + agregar cargas) se hacen una despues de la otra.
+            . ($this->connection->inTransaction() ? ' FOR UPDATE' : '')
         );
         $stmt->execute([':id' => $id]);
         $row = $stmt->fetch();

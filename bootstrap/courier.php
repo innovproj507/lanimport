@@ -332,7 +332,7 @@ $container->set(AgregarCargasSalidaHandler::class, fn (Container $c) => new Agre
 $container->set(CargasParaSalidaInterface::class, fn (Container $c) => new PdoCargasParaSalida($c->get(PDO::class), $c->get(BodegaActivaInterface::class)));
 // Lectura para Rastreo: en que OS/DO va cada bulto de una carga.
 $container->set(RastreoCargaInterface::class, fn (Container $c) => new PdoRastreoCarga($c->get(PDO::class)));
-$container->set(RegistrarEscaneoSalidaHandler::class, fn (Container $c) => new RegistrarEscaneoSalidaHandler($c->get(SalidaOrdenRepositoryInterface::class), $c->get(BitacoraCargaInterface::class), $c->get(BodegaActivaInterface::class), $c->get(LpnRepositoryInterface::class)));
+$container->set(RegistrarEscaneoSalidaHandler::class, fn (Container $c) => new RegistrarEscaneoSalidaHandler($c->get(SalidaOrdenRepositoryInterface::class), $c->get(BitacoraCargaInterface::class), $c->get(BodegaActivaInterface::class), $c->get(LpnRepositoryInterface::class), $c->get(UnitOfWork::class)));
 $container->set(ConfirmarSalidaHandler::class, fn (Container $c) => new ConfirmarSalidaHandler(
     $c->get(SalidaOrdenRepositoryInterface::class),
     $c->get(LpnRepositoryInterface::class),

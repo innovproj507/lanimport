@@ -90,7 +90,26 @@ final class SalidaOrden extends AggregateRoot
 
         $this->lineas = $quedan;
 
+        foreach ($sacadas as $linea) {
+            $this->lpnIdsSacados[$linea->lpnId()] = true;
+        }
+
         return $sacadas;
+    }
+
+    /**
+     * Bultos que salieron de esta orden en esta operacion. El repositorio borra solo estas lineas,
+     * nunca "las que no estan en memoria": asi una operacion que leyo la orden antes de que otro
+     * usuario le agregara cargas (p.ej. un escaneo en la PDA) no borra lo que se agrego.
+     *
+     * @var array<string, true>
+     */
+    private array $lpnIdsSacados = [];
+
+    /** @return array<int, string> */
+    public function lpnIdsSacados(): array
+    {
+        return array_keys($this->lpnIdsSacados);
     }
 
     /**
@@ -280,6 +299,7 @@ final class SalidaOrden extends AggregateRoot
 
             $this->lineas[] = $linea;
             $existentes[] = $linea->lpnId();
+            unset($this->lpnIdsSacados[$linea->lpnId()]);
         }
 
         if ($this->clienteId !== null && array_diff(array_unique($clienteIds), [$this->clienteId]) !== []) {
