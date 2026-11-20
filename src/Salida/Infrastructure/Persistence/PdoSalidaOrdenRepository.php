@@ -228,6 +228,17 @@ final class PdoSalidaOrdenRepository implements SalidaOrdenRepositoryInterface
 
     public function pasarFotosDeCargasMovidas(string $origenId, string $destinoId): void
     {
+        // Una foto que el destino ya tiene (copia de una carga dividida) no se duplica: sobra la del origen.
+        $this->connection->prepare(
+            'DELETE f FROM fotos_evidencia f
+             JOIN fotos_evidencia d ON d.salida_orden_id = :destino AND d.ruta_archivo = f.ruta_archivo
+             WHERE f.salida_orden_id = :origen
+               AND NOT EXISTS (
+                   SELECT 1 FROM salida_lineas sl JOIN lpns l ON l.id = sl.lpn_id
+                   WHERE sl.salida_orden_id = :origen_lineas AND l.carga_id = f.carga_id
+               )'
+        )->execute([':destino' => $destinoId, ':origen' => $origenId, ':origen_lineas' => $origenId]);
+
         $stmt = $this->connection->prepare(
             'UPDATE fotos_evidencia f SET f.salida_orden_id = :destino
              WHERE f.salida_orden_id = :origen
@@ -237,6 +248,24 @@ final class PdoSalidaOrdenRepository implements SalidaOrdenRepositoryInterface
                )'
         );
         $stmt->execute([':destino' => $destinoId, ':origen' => $origenId, ':origen_lineas' => $origenId]);
+    }
+
+    public function copiarFotosDeCargasDivididas(string $origenId, string $destinoId): void
+    {
+        // Cargas con bultos en las dos salidas; no se duplica una foto que el destino ya tiene.
+        $stmt = $this->connection->prepare(
+            "INSERT INTO fotos_evidencia (id, tipo, carga_id, salida_orden_id, ruta_archivo, usuario_id, created_at)
+             SELECT UUID(), f.tipo, f.carga_id, :destino, f.ruta_archivo, f.usuario_id, f.created_at
+             FROM fotos_evidencia f
+             WHERE f.salida_orden_id = :origen AND f.tipo = 'salida'
+               AND EXISTS (SELECT 1 FROM salida_lineas sl JOIN lpns l ON l.id = sl.lpn_id
+                           WHERE sl.salida_orden_id = :origen2 AND l.carga_id = f.carga_id)
+               AND EXISTS (SELECT 1 FROM salida_lineas sl JOIN lpns l ON l.id = sl.lpn_id
+                           WHERE sl.salida_orden_id = :destino2 AND l.carga_id = f.carga_id)
+               AND NOT EXISTS (SELECT 1 FROM fotos_evidencia d
+                               WHERE d.salida_orden_id = :destino3 AND d.ruta_archivo = f.ruta_archivo)"
+        );
+        $stmt->execute([':destino' => $destinoId, ':origen' => $origenId, ':origen2' => $origenId, ':destino2' => $destinoId, ':destino3' => $destinoId]);
     }
 
     public function avancePorCarga(string $ordenId): array

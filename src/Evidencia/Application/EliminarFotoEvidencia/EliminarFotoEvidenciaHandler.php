@@ -28,7 +28,11 @@ final class EliminarFotoEvidenciaHandler implements CommandHandlerInterface
         $foto = $this->fotos->findById($command->fotoId) ?? throw new NotFoundException('Foto no encontrada.');
 
         $this->fotos->delete($foto->id());
-        $this->almacen->eliminar($foto->rutaArchivo());
+
+        // El archivo se borra solo si ninguna otra foto lo usa (carga dividida entre dos DO).
+        if (!$this->fotos->archivoEnUso($foto->rutaArchivo())) {
+            $this->almacen->eliminar($foto->rutaArchivo());
+        }
 
         return $foto;
     }

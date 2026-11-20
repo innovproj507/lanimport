@@ -60,6 +60,14 @@ final class PdoFotoEvidenciaRepository implements FotoEvidenciaRepositoryInterfa
         $this->connection->prepare('DELETE FROM fotos_evidencia WHERE id = :id')->execute([':id' => $id]);
     }
 
+    public function archivoEnUso(string $rutaArchivo): bool
+    {
+        $stmt = $this->connection->prepare('SELECT 1 FROM fotos_evidencia WHERE ruta_archivo = :ruta LIMIT 1');
+        $stmt->execute([':ruta' => $rutaArchivo]);
+
+        return $stmt->fetchColumn() !== false;
+    }
+
     public function listar(TipoEvidencia $tipo, string $referenciaId, ?string $cargaId = null): array
     {
         $columna = $tipo === TipoEvidencia::Recepcion ? 'carga_id' : 'salida_orden_id';

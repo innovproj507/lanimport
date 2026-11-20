@@ -18,6 +18,8 @@ final class MoverCargasSalidaCommand implements CommandInterface
         public readonly ?string $destinoId,
         public readonly ?array $grupos,
         public readonly string $usuarioId,
+        // Bultos exactos a mover (parte de una carga, desde "Ajustar bultos"); si se da, manda sobre $grupos.
+        public readonly ?array $lpnIds = null,
     ) {
     }
 }

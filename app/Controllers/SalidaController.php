@@ -748,6 +748,13 @@ final class SalidaController extends BaseController
             }
         }
 
+        // Trafico: los desmarcados pasan a otro DO (o a uno nuevo) con su escaneo, en vez de volver a bodega.
+        $destino = trim((string) $this->request->getPost('destino_desmarcados'));
+        $esTrafico = in_array($_SESSION['usuario_rol'] ?? null, ['operaciones', 'gerente', 'admin'], true);
+        if ($destino !== '' && $orden !== null && $orden->tieneDo() && $esTrafico) {
+            return $this->pasarDesmarcadosAOtroDo($orden, trim((string) $this->request->getPost('carga_id')), $lpns, $destino === 'nuevo' ? null : $destino);
+        }
+
         try {
             $r = $this->container()->get(AjustarBultosCargaSalidaHandler::class)->handle(new AjustarBultosCargaSalidaCommand(
                 $id,
@@ -762,6 +769,62 @@ final class SalidaController extends BaseController
         }
 
         return redirect()->to('/salidas/' . $id);
+    }
+
+    /**
+     * "Ajustar bultos" con destino: los bultos de la carga que quedaron desmarcados pasan a otro DO
+     * pendiente (o a uno nuevo), con lo ya escaneado y las fotos de la carga.
+     *
+     * @param array<int, string> $marcados los que se quedan en este DO
+     */
+    private function pasarDesmarcadosAOtroDo(SalidaOrden $orden, string $cargaId, array $marcados, ?string $destinoId): RedirectResponse
+    {
+        $repo = $this->container()->get(SalidaOrdenRepositoryInterface::class);
+        $porCodigo = [];
+        foreach ($orden->lineas() as $linea) {
+            $porCodigo[$linea->codigoLpn()] = $linea->lpnId();
+        }
+
+        $deLaCarga = [];
+        foreach ($repo->avancePorCarga($orden->id()) as $grupo) {
+            if ($grupo['cargaId'] === $cargaId) {
+                foreach ($grupo['codigos'] as $codigo) {
+                    if (isset($porCodigo[$codigo])) {
+                        $deLaCarga[] = $porCodigo[$codigo];
+                    }
+                }
+            }
+        }
+
+        $pasan = array_values(array_diff($deLaCarga, $marcados));
+
+        if ($destinoId !== null && !($repo->findById($destinoId)?->tieneDo() ?? false)) {
+            $_SESSION['salida_error'] = 'Elija otro DO (contenedor) pendiente o "DO nuevo".';
+
+            return redirect()->to('/salidas/' . $orden->id());
+        }
+
+        if ($pasan === []) {
+            $_SESSION['salida_error'] = 'Desmarque los bultos que pasan al otro DO.';
+
+            return redirect()->to('/salidas/' . $orden->id());
+        }
+
+        try {
+            $destino = $this->container()->get(MoverCargasSalidaHandler::class)->handle(new MoverCargasSalidaCommand(
+                $orden->id(),
+                $destinoId,
+                null,
+                (string) $this->container()->get(SessionManager::class)->currentUsuarioId(),
+                $pasan,
+            ));
+            $_SESSION['salida_mensaje'] = count($pasan) . " bulto(s) pasaron a {$destino->etiquetaDo()} con su escaneo; quedan "
+                . (count($deLaCarga) - count($pasan)) . " en {$orden->etiquetaDo()}. Las fotos de la carga se ven en los dos.";
+        } catch (NotFoundException|ValidationException|\Courier\Shared\Domain\Exception\DomainException $e) {
+            $_SESSION['salida_error'] = $e->getMessage();
+        }
+
+        return redirect()->to('/salidas/' . $orden->id());
     }
 
     /** Saca una carga del DO y la devuelve a bodega (sus bultos vuelven a estar disponibles). */

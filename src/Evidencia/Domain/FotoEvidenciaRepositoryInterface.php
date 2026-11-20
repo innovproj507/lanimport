@@ -12,6 +12,9 @@ interface FotoEvidenciaRepositoryInterface
 
     public function delete(string $id): void;
 
+    /** true si otra foto usa el mismo archivo (una carga dividida entre dos DO comparte sus fotos). */
+    public function archivoEnUso(string $rutaArchivo): bool;
+
     /**
      * Fotos de recepcion de una carga, o de una salida (todas sus cargas, o solo $cargaId).
      * Las mas recientes primero.

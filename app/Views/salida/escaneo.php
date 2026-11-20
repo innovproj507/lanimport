@@ -399,6 +399,20 @@ $opcionSalida = static fn (array $s): string => $s['etiqueta']
             </div>
         </div>
         <div id="ajustar-lista" class="overflow-y-auto flex-1"></div>
+        <?php if ($ordenaContenedor && !$sinDo): ?>
+            <?php // Trafico: los desmarcados pueden pasar a otro DO (con su escaneo) en vez de volver a bodega. ?>
+            <div class="px-4 pt-3 flex flex-wrap items-center gap-2 text-sm">
+                <label for="ajustar-destino" class="text-zinc-700">Los desmarcados:</label>
+                <select name="destino_desmarcados" id="ajustar-destino" class="flex-1 min-w-[12rem] rounded-lg border border-zinc-300 bg-white text-black px-2 py-1 text-sm">
+                    <option value="">Vuelven a bodega</option>
+                    <?php // Solo a otros DO (contenedores) pendientes; una OS no recibe bultos sueltos de un DO. ?>
+                    <?php foreach ($otrasSalidas as $s): if ($s['estado'] !== 'pendiente' || !str_starts_with($s['etiqueta'], 'DO.')) { continue; } ?>
+                        <option value="<?= htmlspecialchars($s['id']) ?>" title="<?= htmlspecialchars($s['clientesTodos'] ?? $s['clientes']) ?>">Pasan a<?= htmlspecialchars($opcionSalida($s)) ?></option>
+                    <?php endforeach; ?>
+                    <option value="nuevo">Pasan a un DO nuevo</option>
+                </select>
+            </div>
+        <?php endif; ?>
         <div class="p-4 border-t border-slate-200 flex flex-wrap items-center justify-between gap-3">
             <span class="text-sm text-zinc-700">Suben <strong id="ajustar-suben" class="text-black">0</strong> de <span id="ajustar-total">0</span> · <span id="ajustar-quedan" class="text-amber-700"></span></span>
             <div class="flex gap-2">
@@ -413,6 +427,15 @@ document.addEventListener('DOMContentLoaded', function () {
     var modal = document.getElementById('modal-ajustar');
     var lista = document.getElementById('ajustar-lista');
 
+    // Texto del destino de los desmarcados ('' = vuelven a bodega).
+    function destinoAjuste() {
+        var sel = document.getElementById('ajustar-destino');
+        return sel && sel.value !== '' ? sel.options[sel.selectedIndex].text.replace(/^Pasan a /, '') : '';
+    }
+    if (document.getElementById('ajustar-destino')) {
+        document.getElementById('ajustar-destino').addEventListener('change', function () { contar(); });
+    }
+
     function checks() { return Array.prototype.slice.call(lista.querySelectorAll('input[type=checkbox]:not(:disabled)')); }
 
     function contar() {
@@ -420,7 +443,7 @@ document.addEventListener('DOMContentLoaded', function () {
         var total = lista.querySelectorAll('input[type=checkbox]').length;
         document.getElementById('ajustar-suben').textContent = marcados;
         document.getElementById('ajustar-total').textContent = total;
-        document.getElementById('ajustar-quedan').textContent = (total - marcados) + ' se quedan';
+        document.getElementById('ajustar-quedan').textContent = (total - marcados) + (destinoAjuste() ? ' pasan a ' + destinoAjuste() : ' se quedan');
     }
 
     // Delegado: la tabla se reemplaza cuando hay cambios (vivo.js) y los botones son nuevos.
@@ -479,7 +502,11 @@ document.addEventListener('DOMContentLoaded', function () {
     modal.querySelector('form').addEventListener('submit', function (e) {
         var marcados = checks().filter(function (c) { return c.checked; }).length;
         if (marcados === 0) { e.preventDefault(); alert('Deje marcado al menos un bulto. Para sacar toda la carga use "Sacar > Devolver a bodega".'); return; }
-        if (!confirm('¿Guardar? Van ' + marcados + ' bultos de esta carga <?= $enEsteDoc ?>; los demas quedan en bodega.')) { e.preventDefault(); }
+        var total = lista.querySelectorAll('input[type=checkbox]').length;
+        var mensaje = destinoAjuste()
+            ? '¿Guardar? Quedan ' + marcados + ' bultos <?= $enEsteDoc ?> y ' + (total - marcados) + ' pasan a ' + destinoAjuste() + ' con su escaneo.'
+            : '¿Guardar? Van ' + marcados + ' bultos de esta carga <?= $enEsteDoc ?>; los demas quedan en bodega.';
+        if (!confirm(mensaje)) { e.preventDefault(); }
     });
 });
 </script>

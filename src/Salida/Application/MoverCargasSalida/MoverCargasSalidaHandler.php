@@ -52,7 +52,7 @@ final class MoverCargasSalidaHandler implements CommandHandlerInterface
             $destino = $this->ordenes->findById($command->destinoId) ?? throw new NotFoundException('La salida destino no existe.');
         }
 
-        $lineas = $origen->sacarLineas($this->lpnIds($origen, $command->grupos));
+        $lineas = $origen->sacarLineas($command->lpnIds !== null ? $this->lpnIdsExactos($origen, $command->lpnIds) : $this->lpnIds($origen, $command->grupos));
         $etiquetaOrigen = $origen->etiquetaDo();
         $clienteIds = [];
         $lpnsMovidos = [];
@@ -88,6 +88,7 @@ final class MoverCargasSalidaHandler implements CommandHandlerInterface
             $this->ordenes->save($destino);
             $this->ordenes->save($origen);
             $this->ordenes->pasarFotosDeCargasMovidas($origen->id(), $destino->id());
+            $this->ordenes->copiarFotosDeCargasDivididas($origen->id(), $destino->id());
 
             if ($origen->lineas() === []) {
                 $this->ordenes->eliminar($origen->id());
@@ -128,6 +129,26 @@ final class MoverCargasSalidaHandler implements CommandHandlerInterface
         }
 
         return $destino;
+    }
+
+    /**
+     * @param array<int, string> $lpnIds
+     * @return array<int, string>
+     */
+    private function lpnIdsExactos(SalidaOrden $origen, array $lpnIds): array
+    {
+        $enOrigen = array_map(static fn ($l) => $l->lpnId(), $origen->lineas());
+        $ids = array_values(array_intersect(array_unique($lpnIds), $enOrigen));
+
+        if ($ids === []) {
+            throw new ValidationException('Ninguno de esos bultos esta en esta salida.');
+        }
+
+        if (count($ids) === count($enOrigen)) {
+            throw new ValidationException('No se pueden pasar todos los bultos: el DO quedaria vacio. Use "Unir" o "Sacar > Mover".');
+        }
+
+        return $ids;
     }
 
     /**

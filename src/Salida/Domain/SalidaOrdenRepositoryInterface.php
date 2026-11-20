@@ -82,4 +82,10 @@ interface SalidaOrdenRepositoryInterface
 
     /** Las fotos de las cargas que ya no estan en el origen pasan al destino, junto con sus bultos. */
     public function pasarFotosDeCargasMovidas(string $origenId, string $destinoId): void;
+
+    /**
+     * Carga dividida entre dos salidas (parte de sus bultos paso al destino): sus fotos del origen
+     * se copian al destino (mismo archivo), para que se vean en las dos.
+     */
+    public function copiarFotosDeCargasDivididas(string $origenId, string $destinoId): void;
 }
