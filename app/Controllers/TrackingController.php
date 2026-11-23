@@ -37,6 +37,17 @@ final class TrackingController extends BaseController
 
     private function buscar(string $numero): string
     {
+        // Caja o paleta de reempaque (LPN-R00002-1): no tiene tracking propio; se muestra que
+        // contiene y en que orden va. Solo personal interno.
+        if (in_array($_SESSION['usuario_rol'] ?? null, self::ROLES_INTERNOS, true)
+            && preg_match('/^LPN[-\'?_]?R\d+/i', trim($numero))) {
+            $caja = $this->container()->get(RastreoCargaInterface::class)->caja($numero);
+
+            if ($caja !== null) {
+                return view('tracking/lookup', ['view' => null, 'error' => null, 'numero' => $numero, 'interno' => true, 'caja' => $caja]);
+            }
+        }
+
         try {
             $view = $this->container()->get(ConsultarTrackingPorNumeroHandler::class)
                 ->handle(AlcanceRastreo::query($this->container(), $numero, $_SESSION['usuario_rol'] ?? null, $_SESSION['usuario_id'] ?? null));
@@ -54,7 +65,7 @@ final class TrackingController extends BaseController
             }
 
             $mensaje = $e instanceof ValidationException
-                ? "No se reconoce \"{$numero}\". Escriba el tracking completo (LAN-2026-XXXXXX), sus 6 caracteres finales (XXXXXX) o el codigo de una etiqueta (LPN-XXXXXX-1)."
+                ? "No se reconoce \"{$numero}\". Escriba el tracking completo (LAN-2026-XXXXXX), sus 6 caracteres finales (XXXXXX), el codigo de una etiqueta (LPN-XXXXXX-1) o de una caja de reempaque (LPN-R00001-1)."
                 : $e->getMessage();
 
             return $this->render(null, $mensaje, $numero);

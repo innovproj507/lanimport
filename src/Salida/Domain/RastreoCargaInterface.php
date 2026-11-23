@@ -39,4 +39,16 @@ interface RastreoCargaInterface
      * @return array<string, mixed>|null
      */
     public function eliminada(string $trackingNumero): ?array;
+
+    /**
+     * Caja o paleta de reempaque buscada por su codigo (LPN-R00002-1): no es una carga ni tiene
+     * tracking propio. Que contiene (los trackings originales y sus bultos), a nombre de quien
+     * esta, el reempaque que la armo y en que OS/DO va. null si el codigo no es una caja.
+     *
+     * @return array{id: string, codigo: string, estado: string, marca: ?string, cliente: string, clienteCodigo: ?string, bodega: ?string,
+     *     ubicacion: ?string, creada: string, reempaque: ?array{id: string, codigo: string, estado: string},
+     *     dentroDe: ?string, contenido: array<int, array{cargaId: string, tracking: string, cliente: string, proveedor: string, marca: string, bultos: int, etiquetas: string}>,
+     *     ordenes: array<int, array{id: string, etiqueta: string, esOs: bool, estado: string, contenedor: ?string, escaneado: bool}>}|null
+     */
+    public function caja(string $codigo): ?array;
 }

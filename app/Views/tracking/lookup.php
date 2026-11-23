@@ -9,6 +9,7 @@ $interno = $interno ?? false;
 $rastreo = $rastreo ?? null;
 $movimientos = $movimientos ?? null;
 $eliminada = $eliminada ?? null;
+$caja = $caja ?? null;
 require __DIR__ . '/../partials/header.php';
 
 $h = static fn ($v): string => htmlspecialchars((string) $v);
@@ -162,6 +163,91 @@ $lineaTiempo = static function (array $eventos) use ($h, $fecha, $colorMovimient
     <?php endif; ?>
 <?php endif; ?>
 
+<?php if ($caja !== null): ?>
+    <?php
+    $ordenEstadoCaja = static fn (string $e, bool $esOs): array => match ($e) {
+        'pendiente' => $esOs ? ['OS pendiente', 'bg-amber-500/10 text-amber-700'] : ['DO pendiente (cargando)', 'bg-blue-500/10 text-blue-700'],
+        'confirmada' => ['Salio (confirmada)', 'bg-emerald-500/10 text-emerald-700'],
+        default => ['Cancelada', 'bg-slate-500/10 text-slate-500'],
+    };
+    $totalBultosCaja = array_sum(array_column($caja['contenido'], 'bultos'));
+    ?>
+    <div class="bg-white rounded-xl shadow p-6 space-y-5">
+        <div class="flex flex-wrap items-center gap-3">
+            <p class="text-2xl font-bold text-black font-mono"><?= $h($caja['codigo']) ?></p>
+            <span class="px-3 py-1 rounded-full text-sm font-semibold bg-violet-500/10 text-violet-700">Caja de reempaque</span>
+            <span class="px-3 py-1 rounded-full text-sm font-medium <?= $bultoEstadoClases[$caja['estado']] ?? 'bg-slate-500/10 text-slate-600' ?>"><?= $h($bultoEstadoLabel[$caja['estado']] ?? $caja['estado']) ?></span>
+        </div>
+        <p class="text-sm text-zinc-600">No tiene tracking propio: lleva los bultos de los trackings de abajo, que siguen siendo sus cargas.</p>
+
+        <dl class="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-3 text-sm">
+            <?php foreach ([
+                'A nombre de' => trim(($caja['clienteCodigo'] ? $caja['clienteCodigo'] . ' — ' : '') . $caja['cliente']),
+                'Marca' => $caja['marca'] ?? '—',
+                'Contiene' => $totalBultosCaja . ' bulto(s) de ' . count($caja['contenido']) . ' carga(s)',
+                'Armada' => $fecha($caja['creada'], true),
+            ] + (hay_varias_bodegas() ? ['Bodega' => $caja['bodega'] ?? '—'] : []) + ['Ubicacion' => $caja['ubicacion'] ?? '—'] as $k => $v): ?>
+                <div><dt class="text-xs text-zinc-500 uppercase"><?= $k ?></dt><dd class="text-black font-medium"><?= $h($v) ?></dd></div>
+            <?php endforeach; ?>
+            <?php if ($caja['reempaque'] !== null): ?>
+                <div><dt class="text-xs text-zinc-500 uppercase">Reempaque</dt><dd><a href="/reempaques/<?= $h($caja['reempaque']['id']) ?>" class="font-semibold text-blue-700 underline"><?= $h($caja['reempaque']['codigo']) ?></a></dd></div>
+            <?php endif; ?>
+            <?php if ($caja['dentroDe'] !== null): ?>
+                <div><dt class="text-xs text-zinc-500 uppercase">Dentro de la caja</dt><dd><a href="/tracking?numero=<?= $h(rawurlencode($caja['dentroDe'])) ?>" class="font-mono text-blue-700 underline"><?= $h($caja['dentroDe']) ?></a></dd></div>
+            <?php endif; ?>
+        </dl>
+
+        <div class="rounded-lg border border-blue-200 bg-blue-50 p-4">
+            <p class="text-xs font-semibold uppercase text-blue-800 mb-2">Donde esta ahora</p>
+            <?php if ($caja['ordenes'] === []): ?>
+                <p class="text-sm text-black">En bodega, sin orden de salida.</p>
+            <?php else: ?>
+                <ul class="space-y-1.5 text-sm text-black">
+                    <?php foreach ($caja['ordenes'] as $o): [$lbl, $cls] = $ordenEstadoCaja($o['estado'], $o['esOs']); ?>
+                        <li class="flex flex-wrap items-center gap-2">
+                            <a href="/salidas/<?= $h($o['id']) ?>" class="font-semibold text-blue-700 underline"><?= $h($o['etiqueta']) ?></a>
+                            <span class="px-2 py-0.5 rounded-full text-xs font-medium <?= $cls ?>"><?= $h($lbl) ?></span>
+                            <?php if ($o['contenedor'] !== null): ?><span class="text-zinc-600">· contenedor <?= $h($o['contenedor']) ?></span><?php endif; ?>
+                            <?php if ($o['estado'] !== 'cancelada'): ?><span class="<?= $o['escaneado'] ? 'text-emerald-700' : 'text-red-600' ?>">· <?= $o['escaneado'] ? 'escaneada' : 'sin escanear' ?></span><?php endif; ?>
+                        </li>
+                    <?php endforeach; ?>
+                </ul>
+            <?php endif; ?>
+        </div>
+
+        <div class="overflow-x-auto">
+            <p class="font-semibold text-black mb-2">Trackings que contiene</p>
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="text-left text-xs text-zinc-500 uppercase border-b border-slate-200">
+                        <th class="py-2 pr-3">Tracking</th>
+                        <th class="py-2 pr-3">Cliente de la carga</th>
+                        <th class="py-2 pr-3">Compania</th>
+                        <th class="py-2 pr-3">Marca</th>
+                        <th class="py-2 pr-3 text-right">Bultos</th>
+                        <th class="py-2">Etiquetas</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($caja['contenido'] as $c): ?>
+                        <tr class="border-b border-slate-100 align-top">
+                            <td class="py-2 pr-3"><a href="/tracking?numero=<?= $h(rawurlencode($c['tracking'])) ?>" class="font-semibold text-blue-700 underline"><?= $h($c['tracking']) ?></a></td>
+                            <td class="py-2 pr-3"><?= $h($c['cliente']) ?></td>
+                            <td class="py-2 pr-3"><?= $h($c['proveedor'] !== '' ? $c['proveedor'] : '—') ?></td>
+                            <td class="py-2 pr-3"><?= $h($c['marca'] !== '' ? $c['marca'] : '—') ?></td>
+                            <td class="py-2 pr-3 text-right"><?= $c['bultos'] ?></td>
+                            <td class="py-2 font-mono text-xs text-zinc-600"><?= $h($c['etiquetas']) ?></td>
+                        </tr>
+                    <?php endforeach; ?>
+                    <?php if ($caja['contenido'] === []): ?>
+                        <tr><td colspan="6" class="py-3 text-zinc-500">La caja todavia no tiene bultos (el reempaque sigue abierto).</td></tr>
+                    <?php endif; ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
+<?php endif; ?>
+
 <?php if ($view): ?>
     <div class="bg-white rounded-xl shadow p-6 <?= $interno ? 'max-w-6xl' : 'max-w-2xl' ?> space-y-4">
         <div class="flex items-start justify-between gap-3 flex-wrap">
@@ -234,7 +320,7 @@ $lineaTiempo = static function (array $eventos) use ($h, $fecha, $colorMovimient
                         <li><strong><?= $n ?> bulto(s)</strong> en <?= hay_varias_bodegas() && $nombreBodega !== '' ? '<strong>' . $h($nombreBodega) . '</strong>' : 'bodega' ?>, sin orden de salida</li>
                     <?php endforeach; ?>
                     <?php foreach ($sinOrden['otros'] as $label => $n): ?>
-                        <li><strong><?= $n ?> bulto(s)</strong>: <?= $h($label) ?></li>
+                        <li><strong><?= $n ?> bulto(s)</strong>: <?= preg_replace_callback('/LPN-R\d+-\d+/', static fn ($m) => '<a href="/tracking?numero=' . rawurlencode($m[0]) . '" class="font-mono text-blue-700 underline">' . $m[0] . '</a>', $h($label)) ?></li>
                     <?php endforeach; ?>
                     <?php if ($rastreo['bultos'] === []): ?>
                         <li class="text-zinc-600">La carga aun no tiene etiquetas (LPN) generadas.</li>
@@ -397,7 +483,7 @@ $lineaTiempo = static function (array $eventos) use ($h, $fecha, $colorMovimient
                                             <span class="px-2 py-0.5 rounded-full text-xs font-medium <?= $bultoEstadoClases[$b['estado']] ?? '' ?>"><?= $h($bultoEstadoLabel[$b['estado']] ?? $b['estado']) ?></span>
                                         </td>
                                         <td class="py-1.5 pr-3 text-zinc-700"><?= hay_varias_bodegas() ? $h(($b['bodega'] ?? '') . ' · ') : '' ?><?= $h($b['ubicacion'] ?? '—') ?></td>
-                                        <td class="py-1.5 pr-3 text-zinc-700 font-mono"><?= $h($b['caja'] ?? '—') ?></td>
+                                        <td class="py-1.5 pr-3 text-zinc-700 font-mono"><?= !empty($b['caja']) ? '<a href="/tracking?numero=' . $h(rawurlencode($b['caja'])) . '" class="text-blue-700 underline">' . $h($b['caja']) . '</a>' : '—' ?></td>
                                         <td class="py-1.5 pr-3">
                                             <?php if ($b['ordenId'] !== null): ?>
                                                 <a href="/salidas/<?= $h($b['ordenId']) ?>" class="text-blue-700 underline"><?= $h($b['orden']) ?></a>

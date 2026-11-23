@@ -22,6 +22,101 @@ final class PdoRastreoCarga implements RastreoCargaInterface
     {
     }
 
+    public function caja(string $codigo): ?array
+    {
+        $codigo = strtoupper(str_replace(["'", '?', '_', ' '], ['-', '-', '-', ''], trim($codigo)));
+        $stmt = $this->connection->prepare(
+            "SELECT l.id, l.codigo, l.estado, l.marca, l.created_at, cl.codigo AS cliente_codigo,
+                    TRIM(CONCAT(COALESCE(cl.nombre, ''), ' ', COALESCE(cl.apellido, ''))) AS cliente,
+                    bo.nombre AS bodega, u.codigo AS ubicacion
+             FROM lpns l
+             LEFT JOIN clientes cl ON cl.id = l.cliente_id
+             LEFT JOIN bodegas bo ON bo.id = l.bodega_id
+             LEFT JOIN ubicaciones u ON u.id = l.ubicacion_id
+             WHERE l.codigo = ? AND l.carga_id IS NULL LIMIT 1"
+        );
+        $stmt->execute([$codigo]);
+        $caja = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if ($caja === false) {
+            return null;
+        }
+
+        $id = (string) $caja['id'];
+
+        $rep = $this->connection->prepare(
+            "SELECT ro.id, ro.codigo, ro.estado FROM reempaque_lpns rl JOIN reempaque_ordenes ro ON ro.id = rl.reempaque_orden_id
+             WHERE rl.lpn_id = ? AND rl.rol = 'destino' LIMIT 1"
+        );
+        $rep->execute([$id]);
+        $reempaque = $rep->fetch(PDO::FETCH_ASSOC) ?: null;
+
+        // Si a su vez se reempaco dentro de otra caja.
+        $padre = $this->connection->prepare(
+            'SELECT d.codigo FROM lpn_genealogia g JOIN lpns d ON d.id = g.lpn_destino_id WHERE g.lpn_origen_id = ? LIMIT 1'
+        );
+        $padre->execute([$id]);
+        $dentroDe = $padre->fetchColumn();
+
+        // Contenido: se abre la caja (a cualquier nivel) hasta los bultos originales, por carga.
+        $cont = $this->connection->prepare(
+            "WITH RECURSIVE contenido (lpn_id) AS (
+                 SELECT g.lpn_origen_id FROM lpn_genealogia g WHERE g.lpn_destino_id = ?
+                 UNION
+                 SELECT g.lpn_origen_id FROM contenido x JOIN lpn_genealogia g ON g.lpn_destino_id = x.lpn_id
+             )
+             SELECT ca.id, ca.tracking_numero, COALESCE(ca.proveedor, '') AS proveedor,
+                    TRIM(CONCAT(COALESCE(cl.nombre, ''), ' ', COALESCE(cl.apellido, ''))) AS cliente,
+                    GROUP_CONCAT(DISTINCT NULLIF(l.marca, '') SEPARATOR ', ') AS marca,
+                    COUNT(*) AS bultos, GROUP_CONCAT(l.codigo ORDER BY l.secuencia SEPARATOR ', ') AS etiquetas
+             FROM contenido x
+             JOIN lpns l ON l.id = x.lpn_id AND l.carga_id IS NOT NULL
+             JOIN cargas ca ON ca.id = l.carga_id
+             LEFT JOIN clientes cl ON cl.id = ca.cliente_id
+             GROUP BY ca.id, ca.tracking_numero, ca.proveedor, cl.nombre, cl.apellido
+             ORDER BY ca.tracking_numero"
+        );
+        $cont->execute([$id]);
+
+        $ord = $this->connection->prepare(
+            'SELECT so.id, so.codigo, so.do_numero, so.do_anio, so.estado, so.numero_contenedor, sl.escaneado
+             FROM salida_lineas sl JOIN salida_ordenes so ON so.id = sl.salida_orden_id
+             WHERE sl.lpn_id = ? ORDER BY so.created_at DESC'
+        );
+        $ord->execute([$id]);
+
+        return [
+            'id' => $id,
+            'codigo' => (string) $caja['codigo'],
+            'estado' => (string) $caja['estado'],
+            'marca' => $caja['marca'] !== null ? (string) $caja['marca'] : null,
+            'cliente' => (string) $caja['cliente'],
+            'clienteCodigo' => $caja['cliente_codigo'] !== null ? (string) $caja['cliente_codigo'] : null,
+            'bodega' => $caja['bodega'] !== null ? (string) $caja['bodega'] : null,
+            'ubicacion' => $caja['ubicacion'] !== null ? (string) $caja['ubicacion'] : null,
+            'creada' => (string) $caja['created_at'],
+            'reempaque' => $reempaque !== null ? ['id' => (string) $reempaque['id'], 'codigo' => (string) $reempaque['codigo'], 'estado' => (string) $reempaque['estado']] : null,
+            'dentroDe' => $dentroDe !== false ? (string) $dentroDe : null,
+            'contenido' => array_map(static fn (array $r) => [
+                'cargaId' => (string) $r['id'],
+                'tracking' => (string) $r['tracking_numero'],
+                'cliente' => (string) $r['cliente'],
+                'proveedor' => (string) $r['proveedor'],
+                'marca' => (string) ($r['marca'] ?? ''),
+                'bultos' => (int) $r['bultos'],
+                'etiquetas' => (string) $r['etiquetas'],
+            ], $cont->fetchAll(PDO::FETCH_ASSOC)),
+            'ordenes' => array_map(static fn (array $r) => [
+                'id' => (string) $r['id'],
+                'etiqueta' => self::etiqueta($r),
+                'esOs' => $r['do_numero'] === null,
+                'estado' => (string) $r['estado'],
+                'contenedor' => $r['numero_contenedor'] !== null && $r['numero_contenedor'] !== '' ? (string) $r['numero_contenedor'] : null,
+                'escaneado' => (bool) $r['escaneado'],
+            ], $ord->fetchAll(PDO::FETCH_ASSOC)),
+        ];
+    }
+
     public function detalle(string $cargaId): array
     {
         return [
