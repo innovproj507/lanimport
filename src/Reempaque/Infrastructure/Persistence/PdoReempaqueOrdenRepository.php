@@ -91,6 +91,16 @@ final class PdoReempaqueOrdenRepository implements ReempaqueOrdenRepositoryInter
         ]);
     }
 
+    public function cambiarClienteCajas(string $ordenId, ?string $clienteDestinoId, string $clienteCajasId): void
+    {
+        $this->connection->prepare('UPDATE reempaque_ordenes SET cliente_destino_id = ? WHERE id = ?')
+            ->execute([$clienteDestinoId, $ordenId]);
+        $this->connection->prepare(
+            "UPDATE lpns SET cliente_id = ?, updated_at = NOW()
+             WHERE id IN (SELECT lpn_id FROM reempaque_lpns WHERE reempaque_orden_id = ? AND rol = 'destino')"
+        )->execute([$clienteCajasId, $ordenId]);
+    }
+
     /** Sincroniza las cajas (destino) y su contenido (genealogia) con el estado de la orden. */
     private function guardarCajas(ReempaqueOrden $orden): void
     {

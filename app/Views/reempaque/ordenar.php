@@ -187,6 +187,13 @@ $claseInput = 'w-full rounded-lg border border-zinc-300 bg-white text-black px-3
                 </label>
             <?php endforeach; ?>
         </div>
+        <label class="block text-sm font-medium text-zinc-700 mb-1">Instruccion para bodega (opcional)</label>
+        <textarea name="instrucciones" rows="2" maxlength="500" placeholder="Ej: emplasticar bien; separar por marca; no pasar de 1.80 m de alto"
+                  class="<?= $claseInput ?>"><?= htmlspecialchars($instrucciones) ?></textarea>
+    </div>
+
+    <div class="bg-white rounded-xl shadow-sm p-6 mb-6">
+        <?= card_header('users', '4. A nombre de que cliente salen las cajas', 'amber') ?>
         <?php $destinoElegido = (string) ($_POST['cliente_destino_id'] ?? ''); ?>
         <label class="block text-sm font-medium text-zinc-700 mb-1" for="cliente-destino">Las cajas nuevas quedan a nombre de</label>
         <select name="cliente_destino_id" id="cliente-destino" class="<?= $claseInput ?> mb-1">
@@ -196,9 +203,6 @@ $claseInput = 'w-full rounded-lg border border-zinc-300 bg-white text-black px-3
             <?php endforeach; ?>
         </select>
         <p class="text-xs text-zinc-500 mb-4">Si la mercancia sale a nombre de otro cliente, elijalo aqui: <strong>las cargas siguen a nombre de su cliente</strong> (sus facturas no cambian) y solo las cajas nuevas, con las que se arma la salida, quedan a nombre del otro.</p>
-        <label class="block text-sm font-medium text-zinc-700 mb-1">Instruccion para bodega (opcional)</label>
-        <textarea name="instrucciones" rows="2" maxlength="500" placeholder="Ej: emplasticar bien; separar por marca; no pasar de 1.80 m de alto"
-                  class="<?= $claseInput ?>"><?= htmlspecialchars($instrucciones) ?></textarea>
     </div>
 
     <div class="sticky bottom-0 z-20 bg-white rounded-xl border border-slate-200 shadow-[0_-4px_12px_rgba(0,0,0,0.08)]">

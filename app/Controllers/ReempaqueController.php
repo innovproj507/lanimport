@@ -134,15 +134,38 @@ final class ReempaqueController extends BaseController
         }
 
         $mensaje = $_SESSION['reempaque_mensaje'] ?? null;
-        unset($_SESSION['reempaque_mensaje']);
+        $error = $_SESSION['reempaque_error'] ?? null;
+        unset($_SESSION['reempaque_mensaje'], $_SESSION['reempaque_error']);
 
         return view('reempaque/detalle', [
             'orden' => $orden,
             'cliente' => $this->container()->get(ClienteRepositoryInterface::class)->findById($orden->clienteId()),
+            'clientes' => $this->container()->get(ListarClientesHandler::class)->handle(new ListarClientesQuery()),
             'clienteCajas' => $orden->clienteDestinoId() !== null ? $this->container()->get(ClienteRepositoryInterface::class)->findById($orden->clienteDestinoId()) : null,
             'lpnsPorId' => $lpnsPorId,
             'mensaje' => $mensaje,
+            'error' => $error,
         ]);
+    }
+
+    /** Cambia a nombre de que cliente quedan las cajas (las cargas no cambian). */
+    public function clienteCajas(string $id): RedirectResponse
+    {
+        if (!Csrf::verify($this->request->getPost('_csrf'))) {
+            $_SESSION['reempaque_error'] = 'Sesion expirada, intente de nuevo.';
+
+            return redirect()->to('/reempaques/' . $id);
+        }
+
+        try {
+            $nombre = $this->container()->get(\Courier\Reempaque\Application\CambiarClienteCajas\CambiarClienteCajasHandler::class)
+                ->handle($id, (string) $this->request->getPost('cliente_cajas_id'));
+            $_SESSION['reempaque_mensaje'] = "Las cajas quedan a nombre de {$nombre}. Las cargas siguen a nombre de su cliente.";
+        } catch (ValidationException|\Courier\Shared\Domain\Exception\NotFoundException $e) {
+            $_SESSION['reempaque_error'] = $e->getMessage();
+        }
+
+        return redirect()->to('/reempaques/' . $id);
     }
 
     public function cancelar(string $id): RedirectResponse

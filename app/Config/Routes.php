@@ -258,6 +258,7 @@ $routes->get('reempaques', 'ReempaqueController::index', ['filter' => $ordenaRee
 $routes->post('reempaques', 'ReempaqueController::store', ['filter' => $ordenaReempaque]);
 $routes->get('reempaques/(:segment)', 'ReempaqueController::show/$1', ['filter' => $bodegaFilter]);
 $routes->post('reempaques/(:segment)/cancelar', 'ReempaqueController::cancelar/$1', ['filter' => $ordenaReempaque]);
+$routes->post('reempaques/(:segment)/cliente-cajas', 'ReempaqueController::clienteCajas/$1', ['filter' => $ordenaReempaque]);
 
 // Impresoras — trafico/gerencia/owner (bodega no configura impresoras)
 $routes->get('impresoras', 'ImpresoraController::index', ['filter' => ['auth', 'role:inventario,operaciones,gerente,admin']]);

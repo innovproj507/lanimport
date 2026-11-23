@@ -24,6 +24,9 @@ foreach ($sinEmpacar as $id) {
 }
 ?>
 
+<?php if (!empty($error)): ?>
+    <div class="bg-red-500/10 text-red-600 text-sm rounded-lg px-4 py-3 mb-4 border border-red-500/30"><?= htmlspecialchars($error) ?></div>
+<?php endif; ?>
 <?php if (!empty($mensaje)): ?>
     <div class="bg-emerald-500/10 text-emerald-700 text-sm rounded-lg px-4 py-3 mb-4 border border-emerald-500/30"><?= htmlspecialchars($mensaje) ?></div>
 <?php endif; ?>
@@ -36,9 +39,29 @@ foreach ($sinEmpacar as $id) {
         </div>
         <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-sm">
             <div><dt class="text-zinc-500">Cliente</dt><dd class="text-black font-medium"><?= htmlspecialchars($cliente?->nombreCompleto() ?? '—') ?></dd></div>
-            <?php if (!empty($clienteCajas)): ?>
-                <div><dt class="text-zinc-500">Cajas nuevas a nombre de</dt><dd class="text-orange-700 font-semibold"><?= htmlspecialchars($clienteCajas->nombreCompleto()) ?></dd></div>
-            <?php endif; ?>
+            <div class="sm:col-span-2">
+                <dt class="text-zinc-500">Cajas nuevas a nombre de</dt>
+                <dd class="<?= !empty($clienteCajas) ? 'text-orange-700 font-semibold' : 'text-black' ?>">
+                    <?= htmlspecialchars(!empty($clienteCajas) ? $clienteCajas->nombreCompleto() : ($cliente?->nombreCompleto() ?? '—') . ' (el mismo de las cargas)') ?>
+                </dd>
+                <?php if ($puedeOrdenar && $orden->estado()->value !== 'cancelado'): ?>
+                    <?php $etqCli = static fn ($c): string => trim(($c->codigo() ? $c->codigo() . ' — ' : '') . $c->nombreCompleto() . ($c->empresa() ? ' — ' . $c->empresa() : '')); ?>
+                    <details class="mt-2" <?= !empty($error) ? 'open' : '' ?>>
+                        <summary class="cursor-pointer text-sm text-blue-700 underline select-none">Cambiar cliente de las cajas</summary>
+                        <form method="post" action="/reempaques/<?= htmlspecialchars($orden->id()) ?>/cliente-cajas" class="mt-2 flex flex-wrap items-center gap-2"
+                              onsubmit="return confirm('Las cajas de este reempaque quedaran a nombre del cliente elegido. Las cargas siguen a nombre de su cliente. ¿Continuar?');">
+                            <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
+                            <select name="cliente_cajas_id" required class="rounded-lg border border-zinc-300 bg-white text-black px-3 py-2 text-sm min-w-[18rem] focus:ring-2 focus:ring-amber-400 focus:outline-none">
+                                <?php foreach ($clientes as $cl): ?>
+                                    <option value="<?= htmlspecialchars($cl->id()) ?>" <?= $cl->id() === $orden->clienteCajas() ? 'selected' : '' ?>><?= htmlspecialchars($etqCli($cl)) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                            <button type="submit" class="inline-flex items-center gap-2 bg-amber-500 text-black rounded-lg px-4 py-2 text-sm font-medium hover:bg-amber-400">Guardar</button>
+                        </form>
+                        <p class="text-xs text-zinc-500 mt-1">Las cargas no cambian (sus facturas siguen igual). Solo las cajas, con las que se arma la salida. No se puede si la caja ya esta en una OS/DO.</p>
+                    </details>
+                <?php endif; ?>
+            </div>
             <div><dt class="text-zinc-500">Tipo</dt><dd class="text-black font-medium"><?= htmlspecialchars($orden->tipo()->label()) ?></dd></div>
             <div class="sm:col-span-2"><dt class="text-zinc-500">Instruccion</dt><dd class="text-black"><?= htmlspecialchars($orden->instrucciones() ?? 'Sin instruccion') ?></dd></div>
             <div><dt class="text-zinc-500">Ordenada</dt><dd class="text-black"><?= htmlspecialchars($orden->createdAt()->format('d/m/Y H:i')) ?></dd></div>

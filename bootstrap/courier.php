@@ -386,6 +386,13 @@ $container->set(IniciarReempaqueHandler::class, fn (Container $c) => new Iniciar
     $c->get(BitacoraCargaInterface::class),
     $c->get(ClienteRepositoryInterface::class),
 ));
+$container->set(\Courier\Reempaque\Application\CambiarClienteCajas\CambiarClienteCajasHandler::class, fn (Container $c) => new \Courier\Reempaque\Application\CambiarClienteCajas\CambiarClienteCajasHandler(
+    $c->get(ReempaqueOrdenRepositoryInterface::class),
+    $c->get(LpnRepositoryInterface::class),
+    $c->get(ClienteRepositoryInterface::class),
+    $c->get(UnitOfWork::class),
+    $c->get(BitacoraCargaInterface::class),
+));
 // Bodega ejecuta la orden caja por caja (app de bodega).
 $container->set(AbrirCajaReempaqueHandler::class, fn (Container $c) => new AbrirCajaReempaqueHandler(
     $c->get(ReempaqueOrdenRepositoryInterface::class),
