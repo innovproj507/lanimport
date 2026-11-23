@@ -12,6 +12,7 @@ final class GuardarPreferenciasNotificacionCommand implements CommandInterface
         public readonly bool $notificarIngresoCarga,
         public readonly string $usuarioId,
         public readonly bool $notificarDespachoCarga = true,
+        public readonly bool $notificarDevolucionProveedor = true,
     ) {
     }
 }

@@ -12,6 +12,8 @@ final class BuscarCargasQuery implements QueryInterface
     public const VISTA_BODEGA = 'bodega';
     public const VISTA_EN_SALIDA = 'salida';
     public const VISTA_TODAS = 'todas';
+    /** Cargas con alguna devolucion al proveedor (total o parcial). */
+    public const VISTA_DEVUELTAS = 'devueltas';
 
     public function __construct(
         public readonly string $termino,

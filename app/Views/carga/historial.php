@@ -16,6 +16,6 @@ require __DIR__ . '/../partials/header.php';
 ?>
 
 <?php // Lo que sigue en bodega esta en Ingreso de Carga; si sacan una carga del DO, vuelve alla. ?>
-<?php $vistasListado = ['salida' => 'En salida', 'todas' => 'Todas']; require __DIR__ . '/_listado.php'; ?>
+<?php $vistasListado = ['salida' => 'En salida', 'devueltas' => 'Devueltas al proveedor', 'todas' => 'Todas']; require __DIR__ . '/_listado.php'; ?>
 
 <?php require __DIR__ . '/../partials/footer.php'; ?>

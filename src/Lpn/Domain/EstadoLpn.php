@@ -16,18 +16,21 @@ enum EstadoLpn: string
     case CONSUMED = 'consumed';
     /** Va de una bodega a otra (traslado): no se puede despachar ni reempacar. */
     case IN_TRANSFER = 'in_transfer';
+    /** Se le devolvio al proveedor (el cliente ya no la quiere): sale del inventario, queda en el historial. */
+    case RETURNED = 'returned';
 
     /** @return array<int, self> */
     private static function transitions(self $estado): array
     {
         return match ($estado) {
-            self::RECEIVING => [self::AVAILABLE, self::QUARANTINE],
-            self::AVAILABLE => [self::IN_REPACK, self::RESERVED, self::QUARANTINE, self::CONSUMED, self::IN_TRANSFER],
+            self::RECEIVING => [self::AVAILABLE, self::QUARANTINE, self::RETURNED],
+            self::AVAILABLE => [self::IN_REPACK, self::RESERVED, self::QUARANTINE, self::CONSUMED, self::IN_TRANSFER, self::RETURNED],
             self::IN_REPACK => [self::CONSUMED, self::AVAILABLE],
             self::RESERVED => [self::CONSUMED, self::AVAILABLE],
-            self::QUARANTINE => [self::AVAILABLE, self::CONSUMED],
+            self::QUARANTINE => [self::AVAILABLE, self::CONSUMED, self::RETURNED],
             self::CONSUMED => [],
             self::IN_TRANSFER => [self::AVAILABLE],
+            self::RETURNED => [],
         };
     }
 
@@ -45,6 +48,12 @@ enum EstadoLpn: string
         }
     }
 
+    /** Se puede devolver al proveedor: esta en bodega (o por recibir) y no en una OS/DO, reempaque o traslado. */
+    public function devolvible(): bool
+    {
+        return $this->canTransitionTo(self::RETURNED);
+    }
+
     public function label(): string
     {
         return match ($this) {
@@ -55,6 +64,7 @@ enum EstadoLpn: string
             self::QUARANTINE => 'En cuarentena',
             self::CONSUMED => 'Consumido',
             self::IN_TRANSFER => 'En traslado',
+            self::RETURNED => 'Devuelto al proveedor',
         };
     }
 }

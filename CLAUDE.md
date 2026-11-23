@@ -182,6 +182,15 @@ The paper delivery form (empresa de transporte, chofer, placa, entregado por, ce
 - Required in Ingreso/Editar (`carga/_tipo_envio.php`, radio `tipo_envio`, no preselection on Ingreso). Set on the entity with `asignarTipoEnvio()` like the bodega; `RegistrarCargaCommand::$tipoEnvio` null = maritimo (API, carga masiva).
 - Shown in the carga detail, Rastreo, the listado (icon before the tracking) and Excel (ENVIO). Listado filter `envio[]` (`filtro_multi` "Envio", `searchPaginado(..., $tiposEnvio)`). Crear OS has a client-side "Todos los envios" filter and asks to confirm when the ticked cargas mix tipos.
 
+### Devolucion al proveedor (migration 070)
+
+- The client no longer wants the carga: Inventario/Trafico/Gerencia/Owner return all of it or some bultos to the proveedor from the carga detail ("Devolver al proveedor", `GET|POST cargas/{id}/devolver-proveedor`, view `carga/devolver_proveedor.php`, `DevolverCargaProveedorHandler`). Nothing is deleted.
+- Each bulto becomes `EstadoLpn::RETURNED` ("Devuelto al proveedor", `Lpn::devolverAProveedor()`, no ubicacion). Only bultos `devolvible()` (receiving/available/quarantine) can go: those in an OS/DO, reempaque or traslado must be taken out first.
+- The carga becomes `CargaStatus::DEVUELTO_PROVEEDOR` when every bulto was returned (`Carga::sincronizarConBultos(..., $devueltos)`; a carga without LPNs goes at once with `Carga::devolverAProveedor()`). A partial return leaves it as is; if the rest already shipped it goes `en_transito` (`despachados + devueltos >= total`). `ConteoBultosCargaInterface` returns `devueltos`.
+- Tables: `devoluciones_proveedor` (motivo required, bultos, completa, who/when), `devolucion_proveedor_lpns`, `devolucion_proveedor_documentos` (files in `public/uploads/cargas` via `CargaDocumentoStorage`; `AdjuntarDocumentoDevolucionHandler::EXTENSIONES` whitelist, 10 MB each). Documents can be added on the form or later (`POST cargas/{id}/devoluciones/{devId}/documentos`). The carga detail lists them ("Devoluciones al proveedor").
+- Client email `NotificarDevolucionProveedorHandler` (toggle in Configuracion > Notificaciones, `notificarDevolucionProveedor`). Bitacora type `devuelta_proveedor`.
+- Listings: Ingreso de Carga hides `devuelto_proveedor`; Historial de cargas has the tab "Devueltas al proveedor" (`BuscarCargasQuery::VISTA_DEVUELTAS` = cargas with any devolucion). Crear OS, Ajustar bultos, dashboard and reportes don't count returned bultos as in bodega.
+
 ### Aduanero asignado al cliente
 
 `clientes.aduanero_identificador` (migration 056, FK to `aduaneros.identificador`) is the client's usual aduanero. It is edited in the client form, shown in the client list, and pre-selected in Ingreso de Carga when the client is picked (`alSeleccionar` in `app.js`), unless the user already chose another one.

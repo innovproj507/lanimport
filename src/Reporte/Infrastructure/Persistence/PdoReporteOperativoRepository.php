@@ -131,7 +131,8 @@ final class PdoReporteOperativoRepository
         // Bultos, peso y valor por carga, y bultos ya despachados (salidas confirmadas).
         $porCarga = "SELECT c.id, c.cliente_id, c.estado, c.fecha_ingreso, c.created_at,
                             COALESCE(l.bultos, 0) AS bultos, COALESCE(l.peso, 0) AS peso, COALESCE(l.valor, 0) AS valor,
-                            COALESCE(d.despachados, 0) AS despachados
+                            -- Los devueltos al proveedor tampoco estan en bodega.
+                            COALESCE(d.despachados, 0) + COALESCE(dv.devueltos, 0) AS despachados
                      FROM cargas c
                      LEFT JOIN (SELECT carga_id, SUM(cantidad) AS bultos, SUM(peso) AS peso, SUM(valor) AS valor
                                 FROM carga_lineas GROUP BY carga_id) l ON l.carga_id = c.id
@@ -139,7 +140,8 @@ final class PdoReporteOperativoRepository
                                 FROM salida_lineas sl
                                 JOIN salida_ordenes so ON so.id = sl.salida_orden_id AND so.estado = 'confirmada'
                                 JOIN lpns lp ON lp.id = sl.lpn_id
-                                GROUP BY lp.carga_id) d ON d.carga_id = c.id";
+                                GROUP BY lp.carga_id) d ON d.carga_id = c.id
+                     LEFT JOIN (SELECT carga_id, COUNT(*) AS devueltos FROM lpns WHERE estado = 'returned' GROUP BY carga_id) dv ON dv.carga_id = c.id";
         $enBodega = "({$porCarga}) x";
         $soloEnBodega = "x.estado IN ('ingresado', 'en_bodega')";
 

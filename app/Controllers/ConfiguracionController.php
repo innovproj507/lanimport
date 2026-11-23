@@ -124,6 +124,7 @@ final class ConfiguracionController extends BaseController
                 $this->request->getPost('notificar_ingreso_carga') !== null,
                 $this->usuarioId(),
                 $this->request->getPost('notificar_despacho_carga') !== null,
+                $this->request->getPost('notificar_devolucion_proveedor') !== null,
             ));
 
             return $this->redirectConMensaje('/configuracion/notificaciones', 'Preferencias de notificacion guardadas.');

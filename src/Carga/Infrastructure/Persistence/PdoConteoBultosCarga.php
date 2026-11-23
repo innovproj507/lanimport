@@ -37,6 +37,7 @@ final class PdoConteoBultosCarga implements ConteoBultosCargaInterface
              )
              SELECT COUNT(*) AS total,
                     COALESCE(SUM(l.estado <> 'receiving'), 0) AS recibidos,
+                    COALESCE(SUM(l.estado = 'returned'), 0) AS devueltos,
                     COALESCE(SUM(NOT EXISTS (
                         SELECT 1 FROM hojas h WHERE h.origen = l.id AND h.nodo NOT IN (SELECT lpn_id FROM despachadas)
                     )), 0) AS despachados
@@ -50,6 +51,7 @@ final class PdoConteoBultosCarga implements ConteoBultosCargaInterface
             'total' => (int) ($fila['total'] ?? 0),
             'recibidos' => (int) ($fila['recibidos'] ?? 0),
             'despachados' => (int) ($fila['despachados'] ?? 0),
+            'devueltos' => (int) ($fila['devueltos'] ?? 0),
         ];
     }
 }

@@ -284,7 +284,7 @@ final class PdoCargaRepository implements CargaRepositoryInterface
     }
 
     /** @return array{items: array<int, Carga>, total: int} */
-    public function searchPaginado(string $term, ?string $estado, int $page, int $perPage, array|string|null $aduaneroIdentificador = null, ?bool $enSalida = null, array $clienteIds = [], array $tiposEnvio = []): array
+    public function searchPaginado(string $term, ?string $estado, int $page, int $perPage, array|string|null $aduaneroIdentificador = null, ?bool $enSalida = null, array $clienteIds = [], array $tiposEnvio = [], bool $soloConDevolucion = false): array
     {
         $page = max(1, $page);
         $perPage = max(1, $perPage);
@@ -328,6 +328,15 @@ final class PdoCargaRepository implements CargaRepositoryInterface
                     JOIN salida_ordenes so ON so.id = sl.salida_orden_id AND so.estado <> 'cancelada'
                     WHERE l.carga_id = ca.id))";
             $where .= $enSalida ? " AND {$condicion}" : " AND NOT {$condicion}";
+
+            // Ingreso de Carga: la devuelta completa al proveedor ya no esta en bodega.
+            if (!$enSalida) {
+                $where .= " AND ca.estado <> 'devuelto_proveedor'";
+            }
+        }
+
+        if ($soloConDevolucion) {
+            $where .= ' AND EXISTS (SELECT 1 FROM devoluciones_proveedor dp WHERE dp.carga_id = ca.id)';
         }
 
         // Uno o varios aduaneros / clientes (vacio = todos).

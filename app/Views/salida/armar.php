@@ -197,6 +197,9 @@ $listas = count(array_filter($cargas, static fn (array $c) => $c['listos'] > 0))
                         <?php endforeach; ?>
                         <?php foreach ($cargas as $c):
                             $puede = $c['listos'] > 0;
+                            // Los devueltos al proveedor ya no son de la carga para salir.
+                            $devueltosFila = (int) ($c['devueltos'] ?? 0);
+                            $enJuego = max(0, $c['bultos'] - $devueltosFila);
                             $marcada = $puede && in_array($c['cargaId'], $seleccionadas, true);
                             $busqueda = mb_strtolower($c['tracking'] . ' ' . $c['cliente'] . ' ' . ($c['marca'] ?? '') . ' ' . $c['proveedor']);
                             ?>
@@ -223,8 +226,11 @@ $listas = count(array_filter($cargas, static fn (array $c) => $c['listos'] > 0))
                                                class="armar-cantidad w-20 rounded-lg border border-zinc-300 bg-white text-black text-right px-2 py-1 text-sm focus:ring-2 focus:ring-amber-400 focus:outline-none disabled:bg-slate-100 disabled:text-zinc-400 read-only:bg-amber-50"
                                                <?= $marcada ? '' : 'disabled' ?> <?= $yaElegidas !== [] ? 'readonly' : '' ?>>
                                         <span class="text-xs text-zinc-500">de <?= $n($c['listos']) ?></span>
-                                        <?php if ($c['listos'] < $c['bultos']): ?>
-                                            <span class="block text-xs text-zinc-400"><?= $n($c['bultos']) ?> en total</span>
+                                        <?php if ($c['listos'] < $enJuego): ?>
+                                            <span class="block text-xs text-zinc-400"><?= $n($enJuego) ?> en total</span>
+                                        <?php endif; ?>
+                                        <?php if ($devueltosFila > 0): ?>
+                                            <span class="block text-xs text-orange-600"><?= $n($devueltosFila) ?> devueltos al proveedor</span>
                                         <?php endif; ?>
                                         <button type="button" class="armar-elegir block ml-auto mt-1 text-xs text-blue-700 hover:underline disabled:text-zinc-300 disabled:no-underline"
                                                 data-carga="<?= htmlspecialchars($c['cargaId']) ?>" data-tracking="<?= htmlspecialchars($c['tracking']) ?>" <?= $marcada ? '' : 'disabled' ?>>
@@ -243,11 +249,11 @@ $listas = count(array_filter($cargas, static fn (array $c) => $c['listos'] > 0))
                                 <td class="py-2 pr-3 text-right"><?= $n($puede ? $c['valor'] : $c['valorTotal'], 2) ?></td>
                                 <td class="py-2 pr-3 text-right <?= $c['dias'] > 60 ? 'text-red-600 font-medium' : '' ?>"><?= $c['dias'] ?></td>
                                 <td class="py-2 whitespace-nowrap">
-                                    <?php if ($puede && $c['listos'] >= $c['bultos']): ?>
+                                    <?php if ($puede && $c['listos'] >= $enJuego): ?>
                                         <?= badge('Lista', 'emerald') ?>
                                     <?php elseif ($puede): ?>
                                         <?= badge('Parcial', 'amber') ?>
-                                        <span class="text-xs text-zinc-500 ml-1"><?= $n($c['bultos'] - $c['listos']) ?> quedan</span>
+                                        <span class="text-xs text-zinc-500 ml-1"><?= $n($enJuego - $c['listos']) ?> quedan</span>
                                     <?php elseif ($c['etiquetas'] === 0): ?>
                                         <?= badge('Sin etiquetas', 'red') ?>
                                         <a href="/cargas/<?= htmlspecialchars($c['cargaId']) ?>" class="text-xs text-blue-700 underline ml-1" onclick="event.stopPropagation()">Generar LPNs</a>

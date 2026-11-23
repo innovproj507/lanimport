@@ -103,6 +103,10 @@ final class ObtenerFlujoCargasHandler implements QueryHandlerInterface
                 continue;
             }
 
+            if ($c['estado'] === CargaStatus::DEVUELTO_PROVEEDOR->value) {
+                continue;
+            }
+
             if ($c['estado'] === CargaStatus::INGRESADO->value) {
                 $registrada = new DateTimeImmutable((string) $c['created_at']);
                 $etapas['llegando'][] = $fila + [
@@ -306,7 +310,7 @@ final class ObtenerFlujoCargasHandler implements QueryHandlerInterface
 
         // En bodega: bultos de la carga que no estan en ninguna OS/DO ni salieron.
         if (!$despachada) {
-            $suma['bodega'] = max(0, $base - $enOrdenes - $despachados);
+            $suma['bodega'] = max(0, $base - $enOrdenes - $despachados - (int) ($c['devueltos'] ?? 0));
         }
 
         if ($suma['bodega'] > 0) {

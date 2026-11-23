@@ -224,7 +224,7 @@ final class PdoResumenDashboardRepository
             "SELECT COALESCE(u.codigo, 'Sin ubicacion') AS nombre, COUNT(*) AS total
              FROM lpns l
              LEFT JOIN ubicaciones u ON u.id = l.ubicacion_id
-             WHERE l.estado <> 'consumed'
+             WHERE l.estado NOT IN ('consumed', 'returned')
              GROUP BY nombre
              ORDER BY total DESC
              LIMIT " . max(1, $limite)

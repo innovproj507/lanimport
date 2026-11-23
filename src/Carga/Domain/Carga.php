@@ -238,13 +238,15 @@ final class Carga extends AggregateRoot
 
     /**
      * El estado sigue a los bultos fisicos (LPNs):
-     *  - Ingresado -> En bodega cuando bodega escaneo todos los bultos.
-     *  - En bodega -> En transito cuando todos los bultos salieron en salidas confirmadas.
-     * Una salida parcial no cambia el estado. Sin LPNs no hay nada que sincronizar.
+     *  - Todos devueltos al proveedor -> Devuelta al proveedor.
+     *  - Ingresado -> En bodega cuando bodega escaneo todos los bultos (un devuelto cuenta como recibido).
+     *  - En bodega -> En transito cuando todos los bultos salieron en salidas confirmadas
+     *    (los devueltos al proveedor no cuentan: ya no estan).
+     * Una salida o devolucion parcial no cambia el estado. Sin LPNs no hay nada que sincronizar.
      *
      * @return array<int, CargaStatus> estados nuevos alcanzados, en orden (vacio si no cambio)
      */
-    public function sincronizarConBultos(int $total, int $recibidos, int $despachados, string $usuarioId, ?string $detalleDespacho = null): array
+    public function sincronizarConBultos(int $total, int $recibidos, int $despachados, string $usuarioId, ?string $detalleDespacho = null, int $devueltos = 0): array
     {
         $alcanzados = [];
 
@@ -252,17 +254,33 @@ final class Carga extends AggregateRoot
             return $alcanzados;
         }
 
+        if ($devueltos >= $total && $this->estado->permiteDevolucionProveedor()) {
+            $this->cambiarEstado(CargaStatus::DEVUELTO_PROVEEDOR, $usuarioId, "Devuelta al proveedor: sus {$total} bultos");
+
+            return [CargaStatus::DEVUELTO_PROVEEDOR];
+        }
+
         if ($this->estado === CargaStatus::INGRESADO && $recibidos >= $total) {
             $this->cambiarEstado(CargaStatus::EN_BODEGA, $usuarioId, "Recepcion completa: {$total} bultos escaneados en bodega");
             $alcanzados[] = CargaStatus::EN_BODEGA;
         }
 
-        if ($this->estado === CargaStatus::EN_BODEGA && $despachados >= $total) {
+        if ($this->estado === CargaStatus::EN_BODEGA && $despachados > 0 && $despachados + $devueltos >= $total) {
             $this->cambiarEstado(CargaStatus::EN_TRANSITO, $usuarioId, 'Despachada' . ($detalleDespacho !== null ? ': ' . $detalleDespacho : ''));
             $alcanzados[] = CargaStatus::EN_TRANSITO;
         }
 
         return $alcanzados;
+    }
+
+    /** Carga sin etiquetas (LPN) que se devuelve completa al proveedor. */
+    public function devolverAProveedor(string $usuarioId, string $comentario): void
+    {
+        if (!$this->estado->permiteDevolucionProveedor()) {
+            throw new ValidationException("La carga esta {$this->estado->label()}: ya no se puede devolver al proveedor.");
+        }
+
+        $this->cambiarEstado(CargaStatus::DEVUELTO_PROVEEDOR, $usuarioId, mb_substr($comentario, 0, 255));
     }
 
     private function assertDetalleCoincideConTipoServicio(?TipoServicio $tipo, ?DetalleServicioInterface $detalle): void

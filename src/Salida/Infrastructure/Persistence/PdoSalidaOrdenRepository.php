@@ -372,7 +372,7 @@ final class PdoSalidaOrdenRepository implements SalidaOrdenRepositoryInterface
                      WHERE x.lpn_id = l.id AND s.estado <> 'cancelada' ORDER BY s.created_at DESC LIMIT 1) AS otra_salida
              FROM lpns l
              LEFT JOIN ubicaciones u ON u.id = l.ubicacion_id
-             WHERE l.carga_id = :carga AND l.estado <> 'consumed'
+             WHERE l.carga_id = :carga AND l.estado NOT IN ('consumed', 'returned')
                AND NOT EXISTS (SELECT 1 FROM salida_lineas sl WHERE sl.lpn_id = l.id AND sl.salida_orden_id = :orden)
              ORDER BY l.orden_en_carga, l.codigo"
         );

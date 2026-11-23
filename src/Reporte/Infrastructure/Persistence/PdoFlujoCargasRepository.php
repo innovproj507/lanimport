@@ -56,7 +56,7 @@ final class PdoFlujoCargasRepository
                        COALESCE(a.nombre, '') AS aduanero,
                        COALESCE(c.proveedor, '') AS proveedor, c.tipo_envio,
                        COALESCE(l.bultos, 0) AS bultos, COALESCE(l.peso, 0) AS peso, COALESCE(l.p3, 0) AS p3, COALESCE(l.valor, 0) AS valor,
-                       COALESCE(e.total, 0) AS etiquetas, COALESCE(e.por_escanear, 0) AS por_escanear,
+                       COALESCE(e.total, 0) AS etiquetas, COALESCE(e.por_escanear, 0) AS por_escanear, COALESCE(e.devueltos, 0) AS devueltos,
                        h.en_bodega_at, h.en_transito_at
                 FROM cargas c
                 LEFT JOIN clientes cl ON cl.id = c.cliente_id
@@ -65,7 +65,7 @@ final class PdoFlujoCargasRepository
                                   SUM(CASE WHEN cubicaje_p3 > 0 THEN cubicaje_p3
                                            ELSE COALESCE(ancho, 0) * COALESCE(alto, 0) * COALESCE(largo, 0) * cantidad / 28316.85 END) AS p3
                            FROM carga_lineas GROUP BY carga_id) l ON l.carga_id = c.id
-                LEFT JOIN (SELECT carga_id, COUNT(*) AS total, SUM(estado = 'receiving') AS por_escanear
+                LEFT JOIN (SELECT carga_id, COUNT(*) AS total, SUM(estado = 'receiving') AS por_escanear, SUM(estado = 'returned') AS devueltos
                            FROM lpns WHERE carga_id IS NOT NULL GROUP BY carga_id) e ON e.carga_id = c.id
                 LEFT JOIN (SELECT carga_id,
                                   MAX(CASE WHEN estado = 'en_bodega' THEN fecha END) AS en_bodega_at,

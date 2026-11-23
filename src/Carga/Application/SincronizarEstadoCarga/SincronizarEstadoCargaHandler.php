@@ -46,7 +46,7 @@ final class SincronizarEstadoCargaHandler implements CommandHandlerInterface
 
         $c = $this->conteo->contar($carga->id());
         $antes = count($carga->historial());
-        $alcanzados = $carga->sincronizarConBultos($c['total'], $c['recibidos'], $c['despachados'], $command->usuarioId, $command->detalleDespacho);
+        $alcanzados = $carga->sincronizarConBultos($c['total'], $c['recibidos'], $c['despachados'], $command->usuarioId, $command->detalleDespacho, $c['devueltos'] ?? 0);
 
         if ($alcanzados === []) {
             return [];
@@ -59,6 +59,11 @@ final class SincronizarEstadoCargaHandler implements CommandHandlerInterface
                 $this->historial->append($carga->id(), $entrada);
             }
         });
+
+        if (in_array(CargaStatus::DEVUELTO_PROVEEDOR, $alcanzados, true)) {
+            // Ya no esta en bodega: sus imagenes de etiqueta no hacen falta. El aviso al cliente lo manda la devolucion.
+            $this->imagenesEtiquetas->liberar($carga->id());
+        }
 
         if (in_array(CargaStatus::EN_TRANSITO, $alcanzados, true)) {
             // Ya salio toda: sus imagenes de etiqueta no hacen falta (se regeneran si se piden).

@@ -21,6 +21,7 @@ $estadoColores = [
     'reserved' => 'blue',
     'quarantine' => 'red',
     'consumed' => 'slate',
+    'returned' => 'orange',
 ];
 ?>
 

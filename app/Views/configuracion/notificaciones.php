@@ -34,6 +34,15 @@ require __DIR__ . '/../partials/header.php';
         </span>
     </label>
 
+    <label class="flex items-start gap-3">
+        <input type="checkbox" name="notificar_devolucion_proveedor" value="1" <?= $preferencias->notificarDevolucionProveedor ? 'checked' : '' ?>
+               class="mt-1 rounded border-zinc-300 text-amber-500 focus:ring-amber-400">
+        <span>
+            <span class="block text-sm font-medium text-black">Avisar al cliente cuando su carga se devuelve al proveedor</span>
+            <span class="block text-xs text-zinc-500">Se envia al registrar la devolucion (completa o parcial), con los bultos devueltos y el motivo.</span>
+        </span>
+    </label>
+
     <p class="text-xs text-zinc-500">No se envia nada a los clientes con correo provisional (<code>sincorreo…@importado.local</code>).</p>
 
     <div class="text-xs text-zinc-500 border-t border-slate-200 pt-3">

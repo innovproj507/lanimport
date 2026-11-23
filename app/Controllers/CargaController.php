@@ -18,6 +18,10 @@ use Courier\Carga\Application\BuscarCargas\BuscarCargasQuery;
 use Courier\Carga\Application\BuscarCargas\BuscarCargasHandler;
 use Courier\Carga\Application\EliminarCarga\EliminarCargaCommand;
 use Courier\Carga\Application\EliminarCarga\EliminarCargaHandler;
+use Courier\Carga\Application\AdjuntarDocumentoDevolucion\AdjuntarDocumentoDevolucionHandler;
+use Courier\Carga\Application\DevolverCargaProveedor\DevolverCargaProveedorCommand;
+use Courier\Carga\Application\DevolverCargaProveedor\DevolverCargaProveedorHandler;
+use Courier\Carga\Domain\DevolucionProveedorRepositoryInterface;
 use Courier\Carga\Application\ConsultarTrackingPorNumero\ConsultarTrackingPorNumeroHandler;
 use Courier\Carga\Application\RegistrarCarga\RegistrarCargaCommand;
 use Courier\Carga\Application\RegistrarCarga\RegistrarCargaHandler;
@@ -353,7 +357,7 @@ final class CargaController extends BaseController
     {
         $vista = (string) ($this->request->getGet('vista') ?? '');
 
-        return in_array($vista, [BuscarCargasQuery::VISTA_EN_SALIDA, BuscarCargasQuery::VISTA_TODAS], true)
+        return in_array($vista, [BuscarCargasQuery::VISTA_EN_SALIDA, BuscarCargasQuery::VISTA_TODAS, BuscarCargasQuery::VISTA_DEVUELTAS], true)
             ? $vista
             : BuscarCargasQuery::VISTA_BODEGA;
     }
@@ -421,6 +425,8 @@ final class CargaController extends BaseController
             'correos' => $this->correosVisibles($this->container()->get(NotificacionRepositoryInterface::class)->listarPorCarga($carga->id())),
             'whatsapp' => $this->datosWhatsapp($carga),
             'fotos' => $this->fotosDeCarga($carga->id()),
+            'devoluciones' => $this->container()->get(DevolucionProveedorRepositoryInterface::class)->listarPorCarga($carga->id()),
+            'puedeDevolver' => $this->puedeDevolverAlProveedor($carga),
             'aviso' => $this->tomarAviso(),
             'modal' => $this->tomarModal(),
             'error' => $error,
@@ -634,6 +640,162 @@ final class CargaController extends BaseController
         }
 
         return redirect()->to($volver);
+    }
+
+    private const ROLES_DEVOLUCION = ['inventario', 'operaciones', 'gerente', 'admin'];
+
+    /** Rol con permiso, carga aun en bodega y con algo que devolver (bultos en bodega, o sin etiquetas). */
+    private function puedeDevolverAlProveedor(Carga $carga): bool
+    {
+        if (!in_array($_SESSION['usuario_rol'] ?? null, self::ROLES_DEVOLUCION, true) || !$carga->estado()->permiteDevolucionProveedor()) {
+            return false;
+        }
+
+        $lpns = $this->container()->get(LpnRepositoryInterface::class)->findByCargaId($carga->id());
+
+        return $lpns === [] || array_filter($lpns, static fn ($l) => $l->estado()->devolvible()) !== [];
+    }
+
+    /** Pantalla para devolver la carga (toda o algunos bultos) al proveedor: bultos, motivo y documentos. */
+    public function devolverProveedorForm(string $id): string|RedirectResponse
+    {
+        $carga = $this->container()->get(CargaRepositoryInterface::class)->findById($id);
+
+        if ($carga === null || !$this->cargaDeMiBodega($carga)) {
+            $this->response->setStatusCode(404);
+
+            return 'Carga no encontrada.';
+        }
+
+        if (!$carga->estado()->permiteDevolucionProveedor()) {
+            $_SESSION['carga_aviso'] = ['tipo' => 'error', 'texto' => "La carga esta {$carga->estado()->label()}: ya no se puede devolver al proveedor."];
+
+            return redirect()->to('/cargas/' . $id);
+        }
+
+        $lpns = $this->container()->get(LpnRepositoryInterface::class)->findByCargaId($carga->id());
+        $bultos = array_map(static fn ($l) => [
+            'id' => $l->id(),
+            'codigo' => (string) $l->codigo(),
+            'estado' => $l->estado()->value,
+            'devolvible' => $l->estado()->devolvible(),
+        ], $lpns);
+
+        $error = $_SESSION['devolucion_error'] ?? null;
+        unset($_SESSION['devolucion_error']);
+
+        return view('carga/devolver_proveedor', [
+            'carga' => $carga,
+            'bultos' => $bultos,
+            'bultosDeclarados' => (int) round(array_sum(array_map(static fn ($l) => $l->cantidad(), $carga->lineas()))),
+            'error' => $error,
+        ]);
+    }
+
+    public function devolverProveedor(string $id): RedirectResponse
+    {
+        $volverForm = redirect()->to('/cargas/' . $id . '/devolver-proveedor');
+
+        if (!Csrf::verify($this->request->getPost('_csrf'))) {
+            $_SESSION['devolucion_error'] = 'Sesion expirada, por favor intente de nuevo.';
+
+            return $volverForm;
+        }
+
+        $carga = $this->container()->get(CargaRepositoryInterface::class)->findById($id);
+        if ($carga === null || !$this->cargaDeMiBodega($carga)) {
+            return redirect()->to('/cargas/historial');
+        }
+
+        try {
+            $archivos = $this->archivosSubidos('documentos');
+            AdjuntarDocumentoDevolucionHandler::validar($archivos);
+
+            $lpnIds = $this->request->getPost('lpns');
+            $resultado = $this->container()->get(DevolverCargaProveedorHandler::class)->handle(new DevolverCargaProveedorCommand(
+                $id,
+                is_array($lpnIds) ? array_map('strval', $lpnIds) : null,
+                (string) $this->request->getPost('motivo'),
+                (string) ($_SESSION['usuario_id'] ?? ''),
+            ));
+
+            $documentos = $archivos !== []
+                ? $this->container()->get(AdjuntarDocumentoDevolucionHandler::class)->handle($resultado['devolucionId'], $archivos, $_SESSION['usuario_id'] ?? null)
+                : 0;
+        } catch (ValidationException|NotFoundException $e) {
+            $_SESSION['devolucion_error'] = $e->getMessage();
+
+            return $volverForm;
+        }
+
+        $texto = ($resultado['completa'] ? 'Carga devuelta al proveedor' : 'Devolucion parcial registrada')
+            . ": {$resultado['bultos']} bulto(s)" . ($documentos > 0 ? ", {$documentos} documento(s) adjuntos" : '') . '.';
+        $notificacion = $resultado['notificacion'];
+        $tipo = 'ok';
+        if ($notificacion !== null) {
+            $enviado = $notificacion->estadoEnvio()->value === 'enviado';
+            $texto .= $enviado ? ' Se aviso al cliente por correo.' : ' No se pudo avisar al cliente por correo: ' . rtrim($notificacion->errorMensaje() ?? 'error desconocido', '. ') . '.';
+            $tipo = $enviado ? 'ok' : 'info';
+        }
+        $_SESSION['carga_aviso'] = ['tipo' => $tipo, 'texto' => $texto];
+
+        return redirect()->to('/cargas/' . $id);
+    }
+
+    /** Agrega documentos (factura, nota de credito...) a una devolucion ya registrada. */
+    public function adjuntarDocumentosDevolucion(string $id, string $devolucionId): RedirectResponse
+    {
+        $volver = redirect()->to('/cargas/' . $id . '#devoluciones');
+        $carga = $this->container()->get(CargaRepositoryInterface::class)->findById($id);
+
+        if (!Csrf::verify($this->request->getPost('_csrf')) || $carga === null || !$this->cargaDeMiBodega($carga)
+            || $this->container()->get(DevolucionProveedorRepositoryInterface::class)->cargaIdDe($devolucionId) !== $carga->id()) {
+            $_SESSION['carga_aviso'] = ['tipo' => 'error', 'texto' => 'No se pudo adjuntar: recargue la pagina e intente de nuevo.'];
+
+            return $volver;
+        }
+
+        try {
+            $archivos = $this->archivosSubidos('documentos');
+            if ($archivos === []) {
+                throw new ValidationException('Elija al menos un documento.');
+            }
+            $n = $this->container()->get(AdjuntarDocumentoDevolucionHandler::class)->handle($devolucionId, $archivos, $_SESSION['usuario_id'] ?? null);
+            $_SESSION['carga_aviso'] = ['tipo' => 'ok', 'texto' => "{$n} documento(s) adjuntos a la devolucion."];
+        } catch (ValidationException|NotFoundException $e) {
+            $_SESSION['carga_aviso'] = ['tipo' => 'error', 'texto' => $e->getMessage()];
+        }
+
+        return $volver;
+    }
+
+    /**
+     * Archivos de un input multiple (name="campo[]"), sin los vacios.
+     *
+     * @return array<int, array{name: string, type: string, tmp_name: string, error: int, size: int}>
+     */
+    private function archivosSubidos(string $campo): array
+    {
+        $f = $_FILES[$campo] ?? null;
+        if (!is_array($f) || !is_array($f['name'] ?? null)) {
+            return [];
+        }
+
+        $archivos = [];
+        foreach ($f['name'] as $i => $nombre) {
+            if ((int) $f['error'][$i] === UPLOAD_ERR_NO_FILE || (string) $nombre === '') {
+                continue;
+            }
+            $archivos[] = [
+                'name' => (string) $nombre,
+                'type' => (string) $f['type'][$i],
+                'tmp_name' => (string) $f['tmp_name'][$i],
+                'error' => (int) $f['error'][$i],
+                'size' => (int) $f['size'][$i],
+            ];
+        }
+
+        return $archivos;
     }
 
     /** @return array{tipo: string, texto: string}|null resultado de borrar una carga, para el listado */

@@ -70,6 +70,11 @@ use Courier\Carga\Application\ActualizarDatosCarga\ActualizarDatosCargaHandler;
 use Courier\Carga\Application\ActualizarEstadoCarga\ActualizarEstadoCargaHandler;
 use Courier\Carga\Application\BuscarCargas\BuscarCargasHandler;
 use Courier\Carga\Application\EliminarCarga\EliminarCargaHandler;
+use Courier\Carga\Application\DevolverCargaProveedor\DevolverCargaProveedorHandler;
+use Courier\Carga\Application\AdjuntarDocumentoDevolucion\AdjuntarDocumentoDevolucionHandler;
+use Courier\Carga\Domain\DevolucionProveedorRepositoryInterface;
+use Courier\Carga\Infrastructure\Persistence\PdoDevolucionProveedorRepository;
+use Courier\Notificacion\Application\NotificarDevolucionProveedor\NotificarDevolucionProveedorHandler;
 use Courier\Carga\Application\ConsultarTrackingPorContenedor\ConsultarTrackingPorContenedorHandler;
 use Courier\Carga\Application\ConsultarTrackingPorNumero\ConsultarTrackingPorNumeroHandler;
 use Courier\Carga\Application\ImportarCargas\ImportarCargasHandler;
@@ -550,6 +555,31 @@ $container->set(NotificarDespachoCargaHandler::class, fn (Container $c) => new N
     $c->get(EmailServiceInterface::class),
     $c->get(NotificacionRepositoryInterface::class),
     $c->get(ConfiguracionRepositoryInterface::class),
+));
+
+$container->set(NotificarDevolucionProveedorHandler::class, fn (Container $c) => new NotificarDevolucionProveedorHandler(
+    $c->get(EmailServiceInterface::class),
+    $c->get(NotificacionRepositoryInterface::class),
+    $c->get(ConfiguracionRepositoryInterface::class),
+));
+
+// Devolucion de carga al proveedor (total o parcial), con sus documentos.
+$container->set(DevolucionProveedorRepositoryInterface::class, fn (Container $c) => new PdoDevolucionProveedorRepository($c->get(PDO::class)));
+$container->set(DevolverCargaProveedorHandler::class, fn (Container $c) => new DevolverCargaProveedorHandler(
+    $c->get(CargaRepositoryInterface::class),
+    $c->get(LpnRepositoryInterface::class),
+    $c->get(DevolucionProveedorRepositoryInterface::class),
+    $c->get(UnitOfWork::class),
+    $c->get(SincronizarEstadoCargaHandler::class),
+    $c->get(PdoHistorialEstadoRepository::class),
+    $c->get(ImagenesEtiquetasCargaInterface::class),
+    $c->get(ClienteRepositoryInterface::class),
+    $c->get(NotificarDevolucionProveedorHandler::class),
+    $c->get(BitacoraCargaInterface::class),
+));
+$container->set(AdjuntarDocumentoDevolucionHandler::class, fn (Container $c) => new AdjuntarDocumentoDevolucionHandler(
+    $c->get(DevolucionProveedorRepositoryInterface::class),
+    $c->get(CargaDocumentoStorage::class),
 ));
 
 // El estado de la carga sigue a sus bultos: recepcion de LPNs y salidas confirmadas.

@@ -95,6 +95,7 @@ $estiloBulto = [
     'reserved' => ['icono' => 'lock', 'color' => 'blue'],
     'quarantine' => ['icono' => 'shield', 'color' => 'red'],
     'consumed' => ['icono' => 'truck', 'color' => 'slate'],
+    'returned' => ['icono' => 'truck', 'color' => 'orange'],
 ];
 $formatoFecha = static fn (string $fecha): string => (new DateTimeImmutable($fecha))->format('d/m/Y');
 ?>

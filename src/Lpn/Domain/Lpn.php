@@ -148,6 +148,20 @@ final class Lpn extends AggregateRoot
         $this->updatedAt = new DateTimeImmutable();
     }
 
+    /** Se devuelve al proveedor: sale del inventario (sin ubicacion) y no vuelve a moverse. */
+    public function devolverAProveedor(): void
+    {
+        if (!$this->estado->devolvible()) {
+            throw new \Courier\Shared\Domain\Exception\ValidationException(
+                "El bulto {$this->codigo()} esta " . mb_strtolower($this->estado->label()) . ': no se puede devolver al proveedor.'
+            );
+        }
+
+        $this->estado = EstadoLpn::RETURNED;
+        $this->ubicacionId = null;
+        $this->updatedAt = new DateTimeImmutable();
+    }
+
     /** Traslado cancelado antes de salir: vuelve a estar disponible en su bodega. */
     public function cancelarTraslado(): void
     {

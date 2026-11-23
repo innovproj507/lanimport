@@ -10,6 +10,6 @@ namespace Courier\Carga\Domain;
  */
 interface ConteoBultosCargaInterface
 {
-    /** @return array{total: int, recibidos: int, despachados: int} */
+    /** @return array{total: int, recibidos: int, despachados: int, devueltos: int} devueltos = devueltos al proveedor */
     public function contar(string $cargaId): array;
 }

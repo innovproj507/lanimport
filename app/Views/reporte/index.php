@@ -14,6 +14,7 @@ $inventarioLabels = [
     'reserved' => 'Reservado',
     'quarantine' => 'En cuarentena',
     'consumed' => 'Consumido',
+    'returned' => 'Devuelto al proveedor',
 ];
 
 $inventarioColores = [
@@ -23,6 +24,7 @@ $inventarioColores = [
     'reserved' => 'blue',
     'quarantine' => 'red',
     'consumed' => 'slate',
+    'returned' => 'orange',
 ];
 ?>
 

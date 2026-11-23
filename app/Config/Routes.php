@@ -152,6 +152,10 @@ $routes->post('cargas/(:segment)/lpns/generar', 'CargaController::generarLpns/$1
 $routes->post('cargas/(:segment)/lpns/imagenes', 'LpnController::generarImagenes/$1', ['filter' => $bodegaFilter]);
 // Borrar una carga ingresada por error (solo sin etiquetas LPN): trafico, gerencia y owner.
 $routes->post('cargas/(:segment)/eliminar', 'CargaController::eliminar/$1', ['filter' => ['auth', 'role:inventario,operaciones,gerente,admin']]);
+// Devolver la carga (toda o parte) al proveedor: queda en el historial, no se borra.
+$routes->get('cargas/(:segment)/devolver-proveedor', 'CargaController::devolverProveedorForm/$1', ['filter' => ['auth', 'role:inventario,operaciones,gerente,admin']]);
+$routes->post('cargas/(:segment)/devolver-proveedor', 'CargaController::devolverProveedor/$1', ['filter' => ['auth', 'role:inventario,operaciones,gerente,admin']]);
+$routes->post('cargas/(:segment)/devoluciones/(:segment)/documentos', 'CargaController::adjuntarDocumentosDevolucion/$1/$2', ['filter' => ['auth', 'role:inventario,operaciones,gerente,admin']]);
 $routes->post('cargas/(:segment)/lpns/eliminar', 'CargaController::eliminarLpns/$1', ['filter' => ['auth', 'role:gerente,admin']]);
 // Fotos de evidencia (se suben por bodega/api/.../fotos): borrarlas, solo gerencia y owner.
 $routes->post('fotos-evidencia/(:segment)/eliminar', 'FotoEvidenciaController::eliminar/$1', ['filter' => ['auth', 'role:gerente,admin']]);

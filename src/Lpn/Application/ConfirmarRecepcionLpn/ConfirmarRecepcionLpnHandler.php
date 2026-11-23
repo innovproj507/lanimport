@@ -54,6 +54,10 @@ final class ConfirmarRecepcionLpnHandler implements CommandHandlerInterface
             throw new ValidationException("El LPN {$codigo} es de otra bodega: se recibe en esa bodega.");
         }
 
+        if ($lpn->estado() === EstadoLpn::RETURNED) {
+            throw new ValidationException("El LPN {$codigo} fue devuelto al proveedor: no se recibe.");
+        }
+
         if ($lpn->estado() !== EstadoLpn::RECEIVING) {
             throw new ValidationException("El LPN {$codigo} ya fue recibido (estado: {$lpn->estado()->label()}).");
         }

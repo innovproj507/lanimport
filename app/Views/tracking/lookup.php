@@ -30,6 +30,7 @@ $bultoEstadoClases = [
     'quarantine' => 'bg-red-500/10 text-red-600',
     'consumed' => 'bg-slate-500/10 text-slate-600',
     'in_transfer' => 'bg-indigo-500/10 text-indigo-700',
+    'returned' => 'bg-orange-500/10 text-orange-700',
 ];
 $bultoEstadoLabel = [
     'receiving' => 'Por recibir',
@@ -39,6 +40,7 @@ $bultoEstadoLabel = [
     'quarantine' => 'En cuarentena',
     'consumed' => 'Despachado / consumido',
     'in_transfer' => 'En traslado a otra bodega',
+    'returned' => 'Devuelto al proveedor',
 ];
 /** Estado de una OS/DO para mostrar. */
 $ordenEstado = static function (string $estado, bool $esOs): array {
@@ -56,6 +58,7 @@ $colorMovimiento = static fn (string $tipo): string => match ($tipo) {
     'salida_confirmada' => 'bg-emerald-500',
     'devuelta_bodega', 'orden_cancelada', 'etiquetas_eliminadas', 'carga_eliminada' => 'bg-red-500',
     'reempaque', 'traslado' => 'bg-indigo-500',
+    'devuelta_proveedor' => 'bg-orange-500',
     default => 'bg-slate-400',
 };
 $lineaTiempo = static function (array $eventos) use ($h, $fecha, $colorMovimiento): void {

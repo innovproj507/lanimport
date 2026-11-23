@@ -194,6 +194,7 @@ function color_estado_carga(string $estado): string
     return [
         'ingresado' => 'blue', 'en_bodega' => 'amber', 'en_transito' => 'indigo', 'en_aduana' => 'violet',
         'liberado' => 'teal', 'listo_entrega' => 'emerald', 'entregado' => 'slate', 'retenido' => 'red',
+        'devuelto_proveedor' => 'orange',
     ][$estado] ?? 'slate';
 }
 
@@ -207,7 +208,7 @@ function color_estado_lpn(string $estado): string
 {
     return [
         'receiving' => 'amber', 'available' => 'emerald', 'in_repack' => 'indigo',
-        'reserved' => 'blue', 'quarantine' => 'red', 'consumed' => 'slate',
+        'reserved' => 'blue', 'quarantine' => 'red', 'consumed' => 'slate', 'returned' => 'orange',
     ][$estado] ?? 'slate';
 }
 
