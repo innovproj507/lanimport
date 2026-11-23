@@ -104,6 +104,7 @@ final class ReempaqueController extends BaseController
                 $lpnIds,
                 (string) $sessionManager->currentUsuarioId(),
                 $instrucciones !== '' ? $instrucciones : null,
+                (string) ($this->request->getPost('cliente_destino_id') ?? '') ?: null,
             ));
 
             $_SESSION['reempaque_mensaje'] = 'Orden enviada a bodega con ' . count($lpnIds) . ' bultos. Bodega la ve en la app (Reempaque).';
@@ -138,6 +139,7 @@ final class ReempaqueController extends BaseController
         return view('reempaque/detalle', [
             'orden' => $orden,
             'cliente' => $this->container()->get(ClienteRepositoryInterface::class)->findById($orden->clienteId()),
+            'clienteCajas' => $orden->clienteDestinoId() !== null ? $this->container()->get(ClienteRepositoryInterface::class)->findById($orden->clienteDestinoId()) : null,
             'lpnsPorId' => $lpnsPorId,
             'mensaje' => $mensaje,
         ]);

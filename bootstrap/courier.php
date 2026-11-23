@@ -384,6 +384,7 @@ $container->set(IniciarReempaqueHandler::class, fn (Container $c) => new Iniciar
     $c->get(ReempaqueOrdenRepositoryInterface::class),
     $c->get(UnitOfWork::class),
     $c->get(BitacoraCargaInterface::class),
+    $c->get(ClienteRepositoryInterface::class),
 ));
 // Bodega ejecuta la orden caja por caja (app de bodega).
 $container->set(AbrirCajaReempaqueHandler::class, fn (Container $c) => new AbrirCajaReempaqueHandler(

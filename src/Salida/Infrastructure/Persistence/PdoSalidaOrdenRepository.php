@@ -496,10 +496,10 @@ final class PdoSalidaOrdenRepository implements SalidaOrdenRepositoryInterface
         // En las lineas el peso, el valor y el cubicaje (p3) son totales de la linea.
         // Las cajas reempacadas se abren (genealogia) hasta sus bultos originales, que son los que tienen carga.
         $stmt = $this->connection->prepare(
-            "WITH RECURSIVE contenido (lpn_id) AS (
-                 SELECT sl.lpn_id FROM salida_lineas sl WHERE sl.salida_orden_id = :orden
+            "WITH RECURSIVE contenido (raiz_id, lpn_id) AS (
+                 SELECT sl.lpn_id, sl.lpn_id FROM salida_lineas sl WHERE sl.salida_orden_id = :orden
                  UNION
-                 SELECT g.lpn_origen_id FROM contenido x JOIN lpn_genealogia g ON g.lpn_destino_id = x.lpn_id
+                 SELECT x.raiz_id, g.lpn_origen_id FROM contenido x JOIN lpn_genealogia g ON g.lpn_destino_id = x.lpn_id
              )
              SELECT ca.tracking_numero, ca.proveedor, ca.fecha_ingreso, ca.aduanero_nombre, c.nombre AS cliente_nombre,
                     COUNT(*) AS bultos_salida,
@@ -509,7 +509,9 @@ final class PdoSalidaOrdenRepository implements SalidaOrdenRepositoryInterface
              FROM contenido x
              JOIN lpns l ON l.id = x.lpn_id AND l.carga_id IS NOT NULL
              JOIN cargas ca ON ca.id = l.carga_id
-             JOIN clientes c ON c.id = l.cliente_id
+             -- Cliente de lo que sale: la caja reempacada (puede estar a nombre de otro cliente) o el bulto mismo.
+             JOIN lpns raiz ON raiz.id = x.raiz_id
+             JOIN clientes c ON c.id = raiz.cliente_id
              LEFT JOIN (
                  SELECT carga_id, SUM(peso) AS kilos, SUM(valor) AS valor,
                         SUM(COALESCE(cubicaje_p3, ancho * alto * largo * cantidad / 28316.846592)) AS pies3,

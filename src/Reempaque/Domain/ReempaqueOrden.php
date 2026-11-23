@@ -33,7 +33,20 @@ final class ReempaqueOrden extends AggregateRoot
         private ?string $codigo = null,
         private ?int $secuencia = null,
         private readonly ?string $instrucciones = null,
+        // Cliente a cuyo nombre quedan las cajas nuevas (null = el de las cargas). Las cargas no cambian.
+        private readonly ?string $clienteDestinoId = null,
     ) {
+    }
+
+    public function clienteDestinoId(): ?string
+    {
+        return $this->clienteDestinoId;
+    }
+
+    /** Cliente de las cajas nuevas: el destino si cambia de cliente, si no el de las cargas. */
+    public function clienteCajas(): string
+    {
+        return $this->clienteDestinoId ?? $this->clienteId;
     }
 
     /** @param array<int, string> $origenLpnIds */
@@ -44,6 +57,7 @@ final class ReempaqueOrden extends AggregateRoot
         array $origenLpnIds,
         string $usuarioId,
         ?string $instrucciones = null,
+        ?string $clienteDestinoId = null,
     ): self {
         if ($origenLpnIds === []) {
             throw new ValidationException('La orden de reempaque debe tener al menos un bulto.');
@@ -64,6 +78,7 @@ final class ReempaqueOrden extends AggregateRoot
             null,
             null,
             $instrucciones !== '' ? mb_substr((string) $instrucciones, 0, 500) : null,
+            $clienteDestinoId !== null && $clienteDestinoId !== '' && $clienteDestinoId !== $clienteId ? $clienteDestinoId : null,
         );
     }
 

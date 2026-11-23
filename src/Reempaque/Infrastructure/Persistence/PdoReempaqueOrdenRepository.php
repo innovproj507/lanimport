@@ -45,9 +45,9 @@ final class PdoReempaqueOrdenRepository implements ReempaqueOrdenRepositoryInter
     {
         $stmt = $this->connection->prepare(
             'INSERT INTO reempaque_ordenes (
-                id, tipo, cliente_id, estado, instrucciones, creado_por_usuario_id, created_at, completed_at
+                id, tipo, cliente_id, cliente_destino_id, estado, instrucciones, creado_por_usuario_id, created_at, completed_at
             ) VALUES (
-                :id, :tipo, :cliente_id, :estado, :instrucciones, :creado_por_usuario_id, :created_at, :completed_at
+                :id, :tipo, :cliente_id, :cliente_destino_id, :estado, :instrucciones, :creado_por_usuario_id, :created_at, :completed_at
             )'
         );
 
@@ -55,6 +55,7 @@ final class PdoReempaqueOrdenRepository implements ReempaqueOrdenRepositoryInter
             ':id' => $orden->id(),
             ':tipo' => $orden->tipo()->value,
             ':cliente_id' => $orden->clienteId(),
+            ':cliente_destino_id' => $orden->clienteDestinoId(),
             ':estado' => $orden->estado()->value,
             ':instrucciones' => $orden->instrucciones(),
             ':creado_por_usuario_id' => $orden->creadoPorUsuarioId(),
@@ -242,6 +243,7 @@ final class PdoReempaqueOrdenRepository implements ReempaqueOrdenRepositoryInter
             $row['codigo'] !== null ? (string) $row['codigo'] : null,
             $row['secuencia'] !== null ? (int) $row['secuencia'] : null,
             isset($row['instrucciones']) ? (string) $row['instrucciones'] : null,
+            !empty($row['cliente_destino_id']) ? (string) $row['cliente_destino_id'] : null,
         );
     }
 }

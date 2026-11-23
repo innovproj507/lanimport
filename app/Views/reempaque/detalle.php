@@ -36,6 +36,9 @@ foreach ($sinEmpacar as $id) {
         </div>
         <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-sm">
             <div><dt class="text-zinc-500">Cliente</dt><dd class="text-black font-medium"><?= htmlspecialchars($cliente?->nombreCompleto() ?? '—') ?></dd></div>
+            <?php if (!empty($clienteCajas)): ?>
+                <div><dt class="text-zinc-500">Cajas nuevas a nombre de</dt><dd class="text-orange-700 font-semibold"><?= htmlspecialchars($clienteCajas->nombreCompleto()) ?></dd></div>
+            <?php endif; ?>
             <div><dt class="text-zinc-500">Tipo</dt><dd class="text-black font-medium"><?= htmlspecialchars($orden->tipo()->label()) ?></dd></div>
             <div class="sm:col-span-2"><dt class="text-zinc-500">Instruccion</dt><dd class="text-black"><?= htmlspecialchars($orden->instrucciones() ?? 'Sin instruccion') ?></dd></div>
             <div><dt class="text-zinc-500">Ordenada</dt><dd class="text-black"><?= htmlspecialchars($orden->createdAt()->format('d/m/Y H:i')) ?></dd></div>

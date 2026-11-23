@@ -23,6 +23,7 @@ final class IniciarReempaqueHandler implements CommandHandlerInterface
         private readonly ReempaqueOrdenRepositoryInterface $ordenes,
         private readonly UnitOfWork $unitOfWork,
         private readonly ?BitacoraCargaInterface $bitacora = null,
+        private readonly ?\Courier\Cliente\Domain\ClienteRepositoryInterface $clientes = null,
     ) {
     }
 
@@ -39,6 +40,11 @@ final class IniciarReempaqueHandler implements CommandHandlerInterface
         if ($tipo === null || !in_array($tipo, TipoReempaque::seleccionables(), true)) {
             throw new ValidationException('Seleccione el tipo de reempaque.');
         }
+        if ($command->clienteDestinoId !== null && $command->clienteDestinoId !== '' && $command->clienteDestinoId !== $command->clienteId
+            && $this->clientes?->findById($command->clienteDestinoId) === null) {
+            throw new ValidationException('El cliente a cuyo nombre quedan las cajas no existe.');
+        }
+
         $origenes = [];
 
         foreach ($command->origenLpnIds as $lpnId) {
@@ -67,6 +73,7 @@ final class IniciarReempaqueHandler implements CommandHandlerInterface
                 array_map(fn ($lpn) => $lpn->id(), $origenes),
                 $command->usuarioId,
                 $command->instrucciones,
+                $command->clienteDestinoId,
             );
 
             $this->ordenes->save($orden);

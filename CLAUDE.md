@@ -238,6 +238,7 @@ The paper delivery form (empresa de transporte, chofer, placa, entregado por, ce
 - **Ordering (web):** Trafico (operaciones/gerente/admin) orders it at `GET /reempaques` (`reempaque/ordenar.php`).
   - Always one client. Trafico checks cargas (their scanned, free LPNs), picks a type (Consolidar / Dividir / Cambiar caja, `TipoReempaque::seleccionables()`), and writes an instruction (migration 058).
   - Origin LPNs go to `in_repack`.
+  - **Change of client** (migration 072): "Las cajas nuevas quedan a nombre de" (`reempaque_ordenes.cliente_destino_id`, `IniciarReempaqueCommand::$clienteDestinoId`). The cargas keep their client (their invoices don't change); only the new boxes get the other client (`ReempaqueOrden::clienteCajas()` in `AbrirCajaReempaqueHandler`). Salidas, the manifest and the reporte de salida show the client of what ships (the box: `manifiesto()` joins the root LPN of each salida line).
 - **Execution (PDA):** Bodega runs it in the PDA app (`#/reempaques`, `bodega/api/reempaques/{id}/{abrir-caja|empacar|quitar|cerrar-caja|descartar-caja|terminar}`).
   - The `ReempaqueOrden` aggregate holds the rules: one open box at a time; a bulto in only one box unless Dividir; finish only when everything is in closed boxes.
   - Boxes are new LPNs `LPN-R<orden>-N`, `in_repack` until the order finishes. Each box's contents live in `lpn_genealogia`, and `reempaque_lpns.cerrada_at` marks it closed.
