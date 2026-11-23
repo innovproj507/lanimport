@@ -18,19 +18,22 @@ enum EstadoLpn: string
     case IN_TRANSFER = 'in_transfer';
     /** Se le devolvio al proveedor (el cliente ya no la quiere): sale del inventario, queda en el historial. */
     case RETURNED = 'returned';
+    /** En una orden de devolucion al proveedor que aun no sale (bodega lo escanea al subirlo al camion). */
+    case IN_RETURN = 'in_return';
 
     /** @return array<int, self> */
     private static function transitions(self $estado): array
     {
         return match ($estado) {
-            self::RECEIVING => [self::AVAILABLE, self::QUARANTINE, self::RETURNED],
-            self::AVAILABLE => [self::IN_REPACK, self::RESERVED, self::QUARANTINE, self::CONSUMED, self::IN_TRANSFER, self::RETURNED],
+            self::RECEIVING => [self::AVAILABLE, self::QUARANTINE],
+            self::AVAILABLE => [self::IN_REPACK, self::RESERVED, self::QUARANTINE, self::CONSUMED, self::IN_TRANSFER, self::IN_RETURN],
             self::IN_REPACK => [self::CONSUMED, self::AVAILABLE],
             self::RESERVED => [self::CONSUMED, self::AVAILABLE],
-            self::QUARANTINE => [self::AVAILABLE, self::CONSUMED, self::RETURNED],
+            self::QUARANTINE => [self::AVAILABLE, self::CONSUMED],
             self::CONSUMED => [],
             self::IN_TRANSFER => [self::AVAILABLE],
             self::RETURNED => [],
+            self::IN_RETURN => [self::RETURNED, self::AVAILABLE],
         };
     }
 
@@ -48,12 +51,6 @@ enum EstadoLpn: string
         }
     }
 
-    /** Se puede devolver al proveedor: esta en bodega (o por recibir) y no en una OS/DO, reempaque o traslado. */
-    public function devolvible(): bool
-    {
-        return $this->canTransitionTo(self::RETURNED);
-    }
-
     public function label(): string
     {
         return match ($this) {
@@ -65,6 +62,7 @@ enum EstadoLpn: string
             self::CONSUMED => 'Consumido',
             self::IN_TRANSFER => 'En traslado',
             self::RETURNED => 'Devuelto al proveedor',
+            self::IN_RETURN => 'En devolucion',
         };
     }
 }

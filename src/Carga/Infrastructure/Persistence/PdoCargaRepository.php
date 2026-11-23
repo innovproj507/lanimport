@@ -336,7 +336,10 @@ final class PdoCargaRepository implements CargaRepositoryInterface
         }
 
         if ($soloConDevolucion) {
-            $where .= ' AND EXISTS (SELECT 1 FROM devoluciones_proveedor dp WHERE dp.carga_id = ca.id)';
+            $where .= " AND EXISTS (SELECT 1 FROM devoluciones_proveedor dp
+                LEFT JOIN devolucion_proveedor_lpns dl ON dl.devolucion_id = dp.id
+                LEFT JOIN lpns dlp ON dlp.id = dl.lpn_id
+                WHERE dp.estado = 'despachada' AND (dp.carga_id = ca.id OR dlp.carga_id = ca.id))";
         }
 
         // Uno o varios aduaneros / clientes (vacio = todos).

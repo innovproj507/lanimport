@@ -86,6 +86,7 @@ require_once __DIR__ . '/view_helpers.php';
                             <?= nav_item('/traslados', 'truck', 'Traslados', $currentPath, false, 'text-indigo-300') ?>
                         <?php endif; ?>
                         <?= nav_item('/salidas/historial', 'truck', 'Contenedor', $currentPath, false, 'text-orange-400') ?>
+                        <?= nav_item('/devoluciones', 'truck', 'Devoluciones', $currentPath, false, 'text-orange-300') ?>
                         <?= nav_item(!$esTrafico ? '/reempaques/historial' : '/reempaques', 'box', 'Reempaque', $currentPath, false, 'text-violet-400') ?>
                     <?php endif; ?>
                     <?php if (!$esBodega): ?>

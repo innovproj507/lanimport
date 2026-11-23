@@ -10,15 +10,13 @@ use App\Libraries\Csrf;
 /** @var array{clienteId: string, telefono: ?string, telefonoValido: ?string, despachada: bool} $whatsapp */
 /** @var array{tipo: string, texto: string}|null $aviso */
 /** @var array{titulo: string, texto: string}|null $modal alerta en ventana (p.ej. por que no se generaron los LPN) */
-/** @var array<int, array<string, mixed>> $devoluciones devoluciones al proveedor (ver DevolucionProveedorRepositoryInterface) */
-/** @var bool $puedeDevolver */
+/** @var array<int, array<string, mixed>> $devoluciones ordenes de devolucion al proveedor con esta carga (OrdenDevolucionRepositoryInterface::porCarga) */
 require_once __DIR__ . '/../partials/view_helpers.php';
 $pageTitle = 'Carga registrada';
 $pageSubtitle = 'Tracking: ' . $view->trackingNumero;
 $backHref = '/cargas/ingreso';
 $headerActions = (puede_imprimir() ? header_button('/cargas/' . $view->cargaId . '/comprobante', 'printer', 'Imprimir comprobante', 'blue') : '')
-    . header_button('/cargas/' . $view->cargaId . '/editar', 'pencil', 'Editar', 'amber')
-    . (!empty($puedeDevolver) ? header_button('/cargas/' . $view->cargaId . '/devolver-proveedor', 'truck', 'Devolver al proveedor', 'orange') : '');
+    . header_button('/cargas/' . $view->cargaId . '/editar', 'pencil', 'Editar', 'amber');
 require __DIR__ . '/../partials/header.php';
 ?>
 
@@ -87,7 +85,7 @@ require __DIR__ . '/../partials/header.php';
                     <span class="text-sm font-medium text-zinc-700 bg-zinc-100 rounded-full px-2.5 py-0.5" title="Tipo de envio al cliente">Envio: <?= htmlspecialchars($view->tipoEnvio) ?></span>
                 <?php endif; ?>
                 <?php
-                $bultoEstadoColores = ['receiving' => 'amber', 'available' => 'emerald', 'in_repack' => 'indigo', 'reserved' => 'blue', 'quarantine' => 'red', 'consumed' => 'slate', 'returned' => 'orange'];
+                $bultoEstadoColores = ['receiving' => 'amber', 'available' => 'emerald', 'in_repack' => 'indigo', 'reserved' => 'blue', 'quarantine' => 'red', 'consumed' => 'slate', 'returned' => 'orange', 'in_return' => 'orange'];
                 ?>
                 <?php foreach ($view->bultosPorEstado as $grupo): ?>
                     <?= badge($grupo['cantidad'] . ' ' . $grupo['estadoLabel'], $bultoEstadoColores[$grupo['estado']] ?? 'slate') ?>
@@ -299,46 +297,27 @@ document.addEventListener('DOMContentLoaded', function () {
 <?php endif; ?>
 
 <?php if (!empty($devoluciones)): ?>
-<?php $extDevolucion = implode(',', array_map(static fn ($e) => '.' . $e, \Courier\Carga\Application\AdjuntarDocumentoDevolucion\AdjuntarDocumentoDevolucionHandler::EXTENSIONES)); ?>
 <div id="devoluciones" class="bg-white rounded-xl shadow p-6 mt-6">
     <?= card_header('truck', 'Devoluciones al proveedor', 'orange') ?>
     <ul class="divide-y divide-slate-100">
-        <?php foreach ($devoluciones as $dev): ?>
-            <li class="py-4 first:pt-0 space-y-2">
+        <?php foreach ($devoluciones as $dev): $estDev = \Courier\Devolucion\Domain\EstadoDevolucion::from($dev['estado']); ?>
+            <li class="py-3 first:pt-0 space-y-1.5">
                 <div class="flex flex-wrap items-center gap-2">
-                    <?= badge($dev['completa'] ? 'Toda la carga' : 'Parcial', $dev['completa'] ? 'orange' : 'amber') ?>
-                    <span class="text-sm font-medium text-black"><?= (int) $dev['bultos'] ?> bulto(s)</span>
+                    <a href="/devoluciones/<?= htmlspecialchars($dev['id']) ?>" class="font-semibold text-blue-700 underline"><?= htmlspecialchars($dev['codigo']) ?></a>
+                    <?= badge($estDev->label(), $estDev->color()) ?>
+                    <span class="text-sm font-medium text-black"><?= (int) $dev['bultos'] ?> bulto(s) de esta carga</span>
                     <span class="text-xs text-zinc-500"><?= htmlspecialchars((new DateTimeImmutable($dev['fecha']))->format('d/m/Y H:i')) ?> · <?= htmlspecialchars($dev['usuario'] ?? '—') ?></span>
                 </div>
                 <p class="text-sm text-zinc-700"><strong>Motivo:</strong> <?= htmlspecialchars($dev['motivo']) ?></p>
-                <?php if ($dev['etiquetas'] !== []): ?>
-                    <details class="text-xs text-zinc-600">
-                        <summary class="cursor-pointer select-none">Etiquetas devueltas (<?= count($dev['etiquetas']) ?>)</summary>
-                        <p class="font-mono mt-1 leading-relaxed"><?= htmlspecialchars(implode(', ', $dev['etiquetas'])) ?></p>
-                    </details>
-                <?php endif; ?>
-                <div class="flex flex-wrap items-center gap-2">
-                    <?php foreach ($dev['documentos'] as $doc): ?>
-                        <a href="/<?= htmlspecialchars($doc['ruta']) ?>" target="_blank" data-doc-ver data-doc-titulo="<?= htmlspecialchars($doc['nombre']) ?>"
-                           title="Subido <?= htmlspecialchars((new DateTimeImmutable($doc['fecha']))->format('d/m/Y H:i')) ?><?= $doc['usuario'] ? ' por ' . htmlspecialchars($doc['usuario']) : '' ?>"
-                           class="inline-flex items-center gap-1.5 text-xs bg-slate-100 hover:bg-orange-100 text-zinc-800 rounded-full px-3 py-1">
-                            <?= icon_small('receipt', 'w-3.5 h-3.5') ?><?= htmlspecialchars($doc['nombre']) ?>
-                        </a>
-                    <?php endforeach; ?>
-                    <?php if ($dev['documentos'] === []): ?>
-                        <span class="text-xs text-zinc-500">Sin documentos.</span>
-                    <?php endif; ?>
-                </div>
-                <?php if (in_array($rolActual, ['inventario', 'operaciones', 'gerente', 'admin'], true)): ?>
-                    <form method="post" action="/cargas/<?= htmlspecialchars($view->cargaId) ?>/devoluciones/<?= htmlspecialchars($dev['id']) ?>/documentos" enctype="multipart/form-data"
-                          class="flex flex-wrap items-center gap-2">
-                        <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
-                        <input type="file" name="documentos[]" multiple required accept="<?= htmlspecialchars($extDevolucion) ?>"
-                               class="text-xs text-zinc-700 file:mr-2 file:rounded-lg file:border-0 file:bg-slate-100 file:px-3 file:py-1.5 file:text-zinc-800 hover:file:bg-slate-200">
-                        <button type="submit" class="inline-flex items-center gap-1.5 bg-white border border-orange-300 text-orange-700 rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-orange-50 transition">
-                            <?= icon_small('plus', 'w-3.5 h-3.5') ?><span>Adjuntar documentos</span>
-                        </button>
-                    </form>
+                <?php if ($dev['documentos'] !== []): ?>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <?php foreach ($dev['documentos'] as $doc): ?>
+                            <a href="/<?= htmlspecialchars($doc['ruta']) ?>" target="_blank" data-doc-ver data-doc-titulo="<?= htmlspecialchars($doc['nombre']) ?>"
+                               class="inline-flex items-center gap-1.5 text-xs bg-slate-100 hover:bg-orange-100 text-zinc-800 rounded-full px-3 py-1">
+                                <?= icon_small('receipt', 'w-3.5 h-3.5') ?><?= htmlspecialchars($doc['nombre']) ?>
+                            </a>
+                        <?php endforeach; ?>
+                    </div>
                 <?php endif; ?>
             </li>
         <?php endforeach; ?>

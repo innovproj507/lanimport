@@ -273,16 +273,6 @@ final class Carga extends AggregateRoot
         return $alcanzados;
     }
 
-    /** Carga sin etiquetas (LPN) que se devuelve completa al proveedor. */
-    public function devolverAProveedor(string $usuarioId, string $comentario): void
-    {
-        if (!$this->estado->permiteDevolucionProveedor()) {
-            throw new ValidationException("La carga esta {$this->estado->label()}: ya no se puede devolver al proveedor.");
-        }
-
-        $this->cambiarEstado(CargaStatus::DEVUELTO_PROVEEDOR, $usuarioId, mb_substr($comentario, 0, 255));
-    }
-
     private function assertDetalleCoincideConTipoServicio(?TipoServicio $tipo, ?DetalleServicioInterface $detalle): void
     {
         if ($tipo === null) {

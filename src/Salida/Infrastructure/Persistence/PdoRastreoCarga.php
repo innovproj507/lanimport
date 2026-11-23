@@ -153,6 +153,7 @@ final class PdoRastreoCarga implements RastreoCargaInterface
         'salida_ajuste' => 'Ajuste de bultos',
         'devuelta_bodega' => 'Devuelta a bodega',
         'devuelta_proveedor' => 'Devuelta al proveedor',
+        'devolucion_orden' => 'Orden de devolucion',
         'orden_cancelada' => 'Orden cancelada',
         'salida_movida' => 'Movida a otra orden',
         'do_generado' => 'DO generado',

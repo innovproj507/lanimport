@@ -65,7 +65,11 @@ final class FotoEvidenciaApiController extends BaseApiController
 
     private static function tipo(string $recurso): TipoEvidencia
     {
-        return $recurso === 'salidas' ? TipoEvidencia::Salida : TipoEvidencia::Recepcion;
+        return match ($recurso) {
+            'salidas' => TipoEvidencia::Salida,
+            'devoluciones' => TipoEvidencia::Devolucion,
+            default => TipoEvidencia::Recepcion,
+        };
     }
 
     private function carga(): ?string

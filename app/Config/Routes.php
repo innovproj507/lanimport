@@ -152,10 +152,6 @@ $routes->post('cargas/(:segment)/lpns/generar', 'CargaController::generarLpns/$1
 $routes->post('cargas/(:segment)/lpns/imagenes', 'LpnController::generarImagenes/$1', ['filter' => $bodegaFilter]);
 // Borrar una carga ingresada por error (solo sin etiquetas LPN): trafico, gerencia y owner.
 $routes->post('cargas/(:segment)/eliminar', 'CargaController::eliminar/$1', ['filter' => ['auth', 'role:inventario,operaciones,gerente,admin']]);
-// Devolver la carga (toda o parte) al proveedor: queda en el historial, no se borra.
-$routes->get('cargas/(:segment)/devolver-proveedor', 'CargaController::devolverProveedorForm/$1', ['filter' => ['auth', 'role:inventario,operaciones,gerente,admin']]);
-$routes->post('cargas/(:segment)/devolver-proveedor', 'CargaController::devolverProveedor/$1', ['filter' => ['auth', 'role:inventario,operaciones,gerente,admin']]);
-$routes->post('cargas/(:segment)/devoluciones/(:segment)/documentos', 'CargaController::adjuntarDocumentosDevolucion/$1/$2', ['filter' => ['auth', 'role:inventario,operaciones,gerente,admin']]);
 $routes->post('cargas/(:segment)/lpns/eliminar', 'CargaController::eliminarLpns/$1', ['filter' => ['auth', 'role:gerente,admin']]);
 // Fotos de evidencia (se suben por bodega/api/.../fotos): borrarlas, solo gerencia y owner.
 $routes->post('fotos-evidencia/(:segment)/eliminar', 'FotoEvidenciaController::eliminar/$1', ['filter' => ['auth', 'role:gerente,admin']]);
@@ -181,8 +177,8 @@ $routes->group('bodega/api', ['filter' => array_merge($bodegaFilter, ['csrfheade
     // Confirmar la salida es manual y de inventario/gerencia (cuando el contenedor sale), no de bodega.
     $routes->post('salidas/(:segment)/finalizar', 'Api\BodegaApiController::salidaFinalizar/$1', ['filter' => 'role:inventario,gerente,admin']);
     // Fotos de evidencia: de recepcion (por carga) y de salida (por orden). Tambien las usa la web.
-    $routes->get('(cargas|salidas)/(:segment)/fotos', 'Api\FotoEvidenciaApiController::listar/$1/$2');
-    $routes->post('(cargas|salidas)/(:segment)/fotos', 'Api\FotoEvidenciaApiController::subir/$1/$2');
+    $routes->get('(cargas|salidas|devoluciones)/(:segment)/fotos', 'Api\FotoEvidenciaApiController::listar/$1/$2');
+    $routes->post('(cargas|salidas|devoluciones)/(:segment)/fotos', 'Api\FotoEvidenciaApiController::subir/$1/$2');
     // Reempaque: bodega ejecuta la orden de trafico caja por caja.
     $routes->get('reempaques', 'Api\BodegaApiController::reempaques');
     $routes->get('reempaques/(:segment)', 'Api\BodegaApiController::reempaque/$1');
@@ -202,6 +198,16 @@ $confirmaSalida = ['auth', 'role:inventario,gerente,admin'];
 $planificaSalida = ['auth', 'role:operaciones,gerente,admin'];
 
 // Traslados entre bodegas: Inventario/Trafico los arman y cancelan; bodega escanea, despacha y recibe.
+// Ordenes de devolucion al proveedor: se arman como una salida, bodega escanea al subir al camion,
+// fotos por carga, documentos y nota; confirma quien confirma las salidas.
+$routes->get('devoluciones', 'DevolucionController::index', ['filter' => $bodegaFilter]);
+$routes->get('devoluciones/nueva', 'DevolucionController::nueva', ['filter' => $armaSalida]);
+$routes->post('devoluciones', 'DevolucionController::store', ['filter' => $armaSalida]);
+$routes->get('devoluciones/(:segment)', 'DevolucionController::show/$1', ['filter' => $bodegaFilter]);
+$routes->post('devoluciones/(:segment)/(escanear)', 'DevolucionController::accion/$1/$2', ['filter' => $bodegaFilter]);
+$routes->post('devoluciones/(:segment)/(datos|quitar|cancelar)', 'DevolucionController::accion/$1/$2', ['filter' => $armaSalida]);
+$routes->post('devoluciones/(:segment)/(confirmar)', 'DevolucionController::accion/$1/$2', ['filter' => $confirmaSalida]);
+$routes->post('devoluciones/(:segment)/documentos', 'DevolucionController::documentos/$1', ['filter' => $armaSalida]);
 $routes->get('traslados', 'TrasladoController::index', ['filter' => $bodegaFilter]);
 $routes->get('traslados/nuevo', 'TrasladoController::nuevo', ['filter' => $armaSalida]);
 $routes->post('traslados', 'TrasladoController::store', ['filter' => $armaSalida]);

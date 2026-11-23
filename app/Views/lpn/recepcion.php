@@ -22,6 +22,7 @@ $estadoColores = [
     'quarantine' => 'red',
     'consumed' => 'slate',
     'returned' => 'orange',
+    'in_return' => 'orange',
 ];
 ?>
 

@@ -27,6 +27,7 @@ $estados = [
     'quarantine' => 'En cuarentena',
     'consumed' => 'Consumido',
     'returned' => 'Devuelto al proveedor',
+    'in_return' => 'En devolucion',
 ];
 
 $estadoColores = [
@@ -37,6 +38,7 @@ $estadoColores = [
     'quarantine' => 'red',
     'consumed' => 'slate',
     'returned' => 'orange',
+    'in_return' => 'orange',
 ];
 
 $mostrarDetalle = $filtros['carga_codigo'] !== '';

@@ -22,7 +22,18 @@ final class FotoEvidencia
         private readonly string $rutaArchivo,
         private readonly ?string $usuarioId,
         private readonly DateTimeImmutable $createdAt,
+        private readonly ?string $devolucionId = null,
     ) {
+    }
+
+    public static function deDevolucion(Uuid $id, string $devolucionId, string $cargaId, string $rutaArchivo, ?string $usuarioId): self
+    {
+        return new self($id, TipoEvidencia::Devolucion, $cargaId, null, $rutaArchivo, $usuarioId, new DateTimeImmutable(), $devolucionId);
+    }
+
+    public function devolucionId(): ?string
+    {
+        return $this->devolucionId;
     }
 
     public static function deRecepcion(Uuid $id, string $cargaId, string $rutaArchivo, ?string $usuarioId): self
@@ -43,8 +54,9 @@ final class FotoEvidencia
         string $rutaArchivo,
         ?string $usuarioId,
         DateTimeImmutable $createdAt,
+        ?string $devolucionId = null,
     ): self {
-        return new self(new Uuid($id), TipoEvidencia::from($tipo), $cargaId, $salidaOrdenId, $rutaArchivo, $usuarioId, $createdAt);
+        return new self(new Uuid($id), TipoEvidencia::from($tipo), $cargaId, $salidaOrdenId, $rutaArchivo, $usuarioId, $createdAt, $devolucionId);
     }
 
     public function id(): string

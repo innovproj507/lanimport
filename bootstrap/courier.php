@@ -70,10 +70,11 @@ use Courier\Carga\Application\ActualizarDatosCarga\ActualizarDatosCargaHandler;
 use Courier\Carga\Application\ActualizarEstadoCarga\ActualizarEstadoCargaHandler;
 use Courier\Carga\Application\BuscarCargas\BuscarCargasHandler;
 use Courier\Carga\Application\EliminarCarga\EliminarCargaHandler;
-use Courier\Carga\Application\DevolverCargaProveedor\DevolverCargaProveedorHandler;
-use Courier\Carga\Application\AdjuntarDocumentoDevolucion\AdjuntarDocumentoDevolucionHandler;
-use Courier\Carga\Domain\DevolucionProveedorRepositoryInterface;
-use Courier\Carga\Infrastructure\Persistence\PdoDevolucionProveedorRepository;
+use Courier\Devolucion\Application\AdjuntarDocumentoDevolucion\AdjuntarDocumentoDevolucionHandler;
+use Courier\Devolucion\Application\CrearOrdenDevolucion\CrearOrdenDevolucionHandler;
+use Courier\Devolucion\Application\MoverOrdenDevolucion\MoverOrdenDevolucionHandler;
+use Courier\Devolucion\Domain\OrdenDevolucionRepositoryInterface;
+use Courier\Devolucion\Infrastructure\Persistence\PdoOrdenDevolucionRepository;
 use Courier\Notificacion\Application\NotificarDevolucionProveedor\NotificarDevolucionProveedorHandler;
 use Courier\Carga\Application\ConsultarTrackingPorContenedor\ConsultarTrackingPorContenedorHandler;
 use Courier\Carga\Application\ConsultarTrackingPorNumero\ConsultarTrackingPorNumeroHandler;
@@ -488,6 +489,7 @@ $container->set(SubirFotoEvidenciaHandler::class, fn (Container $c) => new Subir
     $c->get(AlmacenFotosInterface::class),
     $c->get(CargaRepositoryInterface::class),
     $c->get(SalidaOrdenRepositoryInterface::class),
+    $c->get(OrdenDevolucionRepositoryInterface::class),
 ));
 $container->set(EliminarFotoEvidenciaHandler::class, fn (Container $c) => new EliminarFotoEvidenciaHandler(
     $c->get(FotoEvidenciaRepositoryInterface::class),
@@ -563,22 +565,27 @@ $container->set(NotificarDevolucionProveedorHandler::class, fn (Container $c) =>
     $c->get(ConfiguracionRepositoryInterface::class),
 ));
 
-// Devolucion de carga al proveedor (total o parcial), con sus documentos.
-$container->set(DevolucionProveedorRepositoryInterface::class, fn (Container $c) => new PdoDevolucionProveedorRepository($c->get(PDO::class)));
-$container->set(DevolverCargaProveedorHandler::class, fn (Container $c) => new DevolverCargaProveedorHandler(
-    $c->get(CargaRepositoryInterface::class),
+// Ordenes de devolucion al proveedor (camion que viene a buscar la mercancia).
+$container->set(OrdenDevolucionRepositoryInterface::class, fn (Container $c) => new PdoOrdenDevolucionRepository($c->get(PDO::class)));
+$container->set(CrearOrdenDevolucionHandler::class, fn (Container $c) => new CrearOrdenDevolucionHandler(
+    $c->get(OrdenDevolucionRepositoryInterface::class),
     $c->get(LpnRepositoryInterface::class),
-    $c->get(DevolucionProveedorRepositoryInterface::class),
+    $c->get(UnitOfWork::class),
+    $c->get(BitacoraCargaInterface::class),
+));
+$container->set(MoverOrdenDevolucionHandler::class, fn (Container $c) => new MoverOrdenDevolucionHandler(
+    $c->get(OrdenDevolucionRepositoryInterface::class),
+    $c->get(LpnRepositoryInterface::class),
     $c->get(UnitOfWork::class),
     $c->get(SincronizarEstadoCargaHandler::class),
-    $c->get(PdoHistorialEstadoRepository::class),
-    $c->get(ImagenesEtiquetasCargaInterface::class),
+    $c->get(CargaRepositoryInterface::class),
     $c->get(ClienteRepositoryInterface::class),
     $c->get(NotificarDevolucionProveedorHandler::class),
+    $c->get(BodegaActivaInterface::class),
     $c->get(BitacoraCargaInterface::class),
 ));
 $container->set(AdjuntarDocumentoDevolucionHandler::class, fn (Container $c) => new AdjuntarDocumentoDevolucionHandler(
-    $c->get(DevolucionProveedorRepositoryInterface::class),
+    $c->get(OrdenDevolucionRepositoryInterface::class),
     $c->get(CargaDocumentoStorage::class),
 ));
 

@@ -31,6 +31,7 @@ final class SubirFotoEvidenciaHandler implements CommandHandlerInterface
         private readonly AlmacenFotosInterface $almacen,
         private readonly CargaRepositoryInterface $cargas,
         private readonly SalidaOrdenRepositoryInterface $salidas,
+        private readonly ?\Courier\Devolucion\Domain\OrdenDevolucionRepositoryInterface $devoluciones = null,
     ) {
     }
 
@@ -62,6 +63,15 @@ final class SubirFotoEvidenciaHandler implements CommandHandlerInterface
             }
         }
 
+        if ($tipo === TipoEvidencia::Devolucion) {
+            $orden = $this->devoluciones?->findById($command->referenciaId) ?? throw new NotFoundException('Orden de devolucion no encontrada.');
+
+            // Por carga, como en las salidas: una carga que va en esa devolucion.
+            if ($command->cargaId === null || $command->cargaId === '' || !array_key_exists($command->cargaId, $orden->lpnsPorCarga())) {
+                throw new ValidationException('Esa carga no va en esta devolucion.');
+            }
+        }
+
         if ($command->tamano <= 0 || !is_file($command->archivoTemporal)) {
             throw new ValidationException('No llego la foto. Intente de nuevo.');
         }
@@ -80,9 +90,11 @@ final class SubirFotoEvidenciaHandler implements CommandHandlerInterface
         $id = Uuid::generate();
         $ruta = $this->almacen->guardar($command->archivoTemporal, (string) $id, $extension);
 
-        $foto = $tipo === TipoEvidencia::Recepcion
-            ? FotoEvidencia::deRecepcion($id, $command->referenciaId, $ruta, $command->usuarioId)
-            : FotoEvidencia::deSalida($id, $command->referenciaId, (string) $command->cargaId, $ruta, $command->usuarioId);
+        $foto = match ($tipo) {
+            TipoEvidencia::Recepcion => FotoEvidencia::deRecepcion($id, $command->referenciaId, $ruta, $command->usuarioId),
+            TipoEvidencia::Salida => FotoEvidencia::deSalida($id, $command->referenciaId, (string) $command->cargaId, $ruta, $command->usuarioId),
+            TipoEvidencia::Devolucion => FotoEvidencia::deDevolucion($id, $command->referenciaId, (string) $command->cargaId, $ruta, $command->usuarioId),
+        };
 
         try {
             $this->fotos->save($foto);

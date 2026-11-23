@@ -2,16 +2,16 @@
 
 declare(strict_types=1);
 
-namespace Courier\Carga\Application\AdjuntarDocumentoDevolucion;
+namespace Courier\Devolucion\Application\AdjuntarDocumentoDevolucion;
 
-use Courier\Carga\Domain\DevolucionProveedorRepositoryInterface;
 use Courier\Carga\Infrastructure\Storage\CargaDocumentoStorage;
+use Courier\Devolucion\Domain\OrdenDevolucionRepositoryInterface;
 use Courier\Shared\Domain\Exception\NotFoundException;
 use Courier\Shared\Domain\Exception\ValidationException;
 
 /**
- * Adjunta documentos a una devolucion al proveedor (factura, nota de credito, guia, fotos...).
- * Solo tipos de documento conocidos, para que nada ejecutable quede en public/uploads.
+ * Adjunta documentos a una orden de devolucion (factura, nota de credito, guia, fotos...), abierta
+ * o ya despachada. Solo tipos de documento conocidos, para que nada ejecutable quede en public/uploads.
  */
 final class AdjuntarDocumentoDevolucionHandler
 {
@@ -19,7 +19,7 @@ final class AdjuntarDocumentoDevolucionHandler
     public const MAX_BYTES = 10 * 1024 * 1024;
 
     public function __construct(
-        private readonly DevolucionProveedorRepositoryInterface $devoluciones,
+        private readonly OrdenDevolucionRepositoryInterface $ordenes,
         private readonly CargaDocumentoStorage $storage,
     ) {
     }
@@ -51,17 +51,21 @@ final class AdjuntarDocumentoDevolucionHandler
      * @param array<int, array{name: string, type: string, tmp_name: string, error: int, size: int}> $archivos
      * @return int documentos guardados
      */
-    public function handle(string $devolucionId, array $archivos, ?string $usuarioId): int
+    public function handle(string $ordenId, array $archivos, ?string $usuarioId): int
     {
-        if ($this->devoluciones->cargaIdDe($devolucionId) === null) {
-            throw new NotFoundException('Devolucion no encontrada.');
+        if ($this->ordenes->findById($ordenId) === null) {
+            throw new NotFoundException('Orden de devolucion no encontrada.');
+        }
+
+        if ($archivos === []) {
+            throw new ValidationException('Elija al menos un documento.');
         }
 
         self::validar($archivos);
 
         foreach ($archivos as $archivo) {
             $guardado = $this->storage->store($archivo);
-            $this->devoluciones->agregarDocumento($devolucionId, $guardado['nombre_archivo'], $guardado['ruta_archivo'], $usuarioId);
+            $this->ordenes->agregarDocumento($ordenId, $guardado['nombre_archivo'], $guardado['ruta_archivo'], $usuarioId);
         }
 
         return count($archivos);

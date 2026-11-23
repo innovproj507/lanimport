@@ -262,6 +262,8 @@ $listas = count(array_filter($cargas, static fn (array $c) => $c['listos'] > 0))
                                         <a href="/cargas/<?= htmlspecialchars($c['cargaId']) ?>/recepcion" class="text-xs text-blue-700 underline ml-1" onclick="event.stopPropagation()">Recepcion</a>
                                     <?php elseif ($c['enOtraSalida'] > 0): ?>
                                         <?= badge('En otra salida', 'blue') ?>
+                                    <?php elseif (($c['enDevolucion'] ?? 0) > 0): ?>
+                                        <?= badge('En devolucion', 'orange') ?>
                                     <?php elseif ($c['enReempaque'] > 0): ?>
                                         <?= badge('En reempaque', 'indigo') ?>
                                     <?php elseif ($c['enCaja'] > 0): ?>

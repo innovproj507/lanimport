@@ -36,7 +36,7 @@ final class PdoCargasParaSalida implements CargasParaSalidaInterface
                     COALESCE(li.valor, 0) AS valor, COALESCE(li.pies3, 0) AS pies3,
                     COALESCE(lp.etiquetas, 0) AS etiquetas, COALESCE(lp.listos, 0) AS listos,
                     COALESCE(lp.por_escanear, 0) AS por_escanear, COALESCE(lp.en_otra_salida, 0) AS en_otra_salida,
-                    COALESCE(lp.en_reempaque, 0) AS en_reempaque, COALESCE(lp.en_caja, 0) AS en_caja, COALESCE(lp.devueltos, 0) AS devueltos
+                    COALESCE(lp.en_reempaque, 0) AS en_reempaque, COALESCE(lp.en_caja, 0) AS en_caja, COALESCE(lp.devueltos, 0) AS devueltos, COALESCE(lp.en_devolucion, 0) AS en_devolucion
              FROM cargas c
              JOIN clientes cl ON cl.id = c.cliente_id
              LEFT JOIN (SELECT carga_id, MAX(marca) AS marca, SUM(cantidad) AS bultos, SUM(peso) AS peso,
@@ -50,6 +50,7 @@ final class PdoCargasParaSalida implements CargasParaSalidaInterface
                                SUM(estado = 'reserved') AS en_otra_salida,
                                SUM(estado = 'in_repack') AS en_reempaque,
                                SUM(estado = 'returned') AS devueltos,
+                               SUM(estado = 'in_return') AS en_devolucion,
                                -- Reempacados en una caja que todavia no sale.
                                SUM(estado = 'consumed' AND EXISTS (SELECT 1 FROM lpn_genealogia g WHERE g.lpn_origen_id = lpns.id)) AS en_caja
                         FROM lpns WHERE 1=1" . $this->enBodega('bodega_id') . " GROUP BY carga_id) lp ON lp.carga_id = c.id
@@ -82,6 +83,7 @@ final class PdoCargasParaSalida implements CargasParaSalidaInterface
                 'enReempaque' => (int) $f['en_reempaque'],
                 'enCaja' => (int) $f['en_caja'],
                 'devueltos' => (int) $f['devueltos'],
+                'enDevolucion' => (int) $f['en_devolucion'],
                 'peso' => round((float) $f['peso'] * $proporcion, 2),
                 'valor' => round((float) $f['valor'] * $proporcion, 2),
                 'm3' => round((float) $f['pies3'] * self::PIE3_A_M3 * $proporcion, 3),

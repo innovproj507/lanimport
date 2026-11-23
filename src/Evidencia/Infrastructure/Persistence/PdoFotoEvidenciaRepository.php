@@ -19,8 +19,8 @@ final class PdoFotoEvidenciaRepository implements FotoEvidenciaRepositoryInterfa
     public function save(FotoEvidencia $foto): void
     {
         $stmt = $this->connection->prepare(
-            'INSERT INTO fotos_evidencia (id, tipo, carga_id, salida_orden_id, ruta_archivo, usuario_id, created_at)
-             VALUES (:id, :tipo, :carga_id, :salida_orden_id, :ruta_archivo, :usuario_id, :created_at)'
+            'INSERT INTO fotos_evidencia (id, tipo, carga_id, salida_orden_id, devolucion_id, ruta_archivo, usuario_id, created_at)
+             VALUES (:id, :tipo, :carga_id, :salida_orden_id, :devolucion_id, :ruta_archivo, :usuario_id, :created_at)'
         );
 
         $stmt->execute([
@@ -28,6 +28,7 @@ final class PdoFotoEvidenciaRepository implements FotoEvidenciaRepositoryInterfa
             ':tipo' => $foto->tipo()->value,
             ':carga_id' => $foto->cargaId(),
             ':salida_orden_id' => $foto->salidaOrdenId(),
+            ':devolucion_id' => $foto->devolucionId(),
             ':ruta_archivo' => $foto->rutaArchivo(),
             ':usuario_id' => $foto->usuarioId(),
             ':created_at' => $foto->createdAt()->format('Y-m-d H:i:s'),
@@ -52,6 +53,7 @@ final class PdoFotoEvidenciaRepository implements FotoEvidenciaRepositoryInterfa
             (string) $row['ruta_archivo'],
             $row['usuario_id'] !== null ? (string) $row['usuario_id'] : null,
             new DateTimeImmutable((string) $row['created_at']),
+            isset($row['devolucion_id']) ? (string) $row['devolucion_id'] : null,
         );
     }
 
@@ -70,11 +72,15 @@ final class PdoFotoEvidenciaRepository implements FotoEvidenciaRepositoryInterfa
 
     public function listar(TipoEvidencia $tipo, string $referenciaId, ?string $cargaId = null): array
     {
-        $columna = $tipo === TipoEvidencia::Recepcion ? 'carga_id' : 'salida_orden_id';
+        $columna = match ($tipo) {
+            TipoEvidencia::Recepcion => 'carga_id',
+            TipoEvidencia::Salida => 'salida_orden_id',
+            TipoEvidencia::Devolucion => 'devolucion_id',
+        };
         $parametros = [':tipo' => $tipo->value, ':referencia' => $referenciaId];
         $filtroCarga = '';
 
-        if ($tipo === TipoEvidencia::Salida && $cargaId !== null) {
+        if ($tipo !== TipoEvidencia::Recepcion && $cargaId !== null) {
             $filtroCarga = ' AND f.carga_id = :carga';
             $parametros[':carga'] = $cargaId;
         }

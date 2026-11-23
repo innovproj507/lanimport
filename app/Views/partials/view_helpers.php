@@ -208,7 +208,7 @@ function color_estado_lpn(string $estado): string
 {
     return [
         'receiving' => 'amber', 'available' => 'emerald', 'in_repack' => 'indigo',
-        'reserved' => 'blue', 'quarantine' => 'red', 'consumed' => 'slate', 'returned' => 'orange',
+        'reserved' => 'blue', 'quarantine' => 'red', 'consumed' => 'slate', 'returned' => 'orange', 'in_return' => 'orange',
     ][$estado] ?? 'slate';
 }
 
