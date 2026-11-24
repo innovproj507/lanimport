@@ -183,16 +183,17 @@ $claseInput = 'w-full rounded-lg border border-zinc-300 bg-white text-black px-3
                 <?php // Una OS no se confirma: se confirma el DO, en Contenedor. ?>
             <?php elseif ($confirmaSalida): ?>
             <?php // Manual: terminar de escanear NO confirma. Inventario confirma cuando el contenedor sale (con DO). ?>
-            <form method="post" action="/salidas/<?= htmlspecialchars($orden->id()) ?>/finalizar"
-                  onsubmit="return confirm('¿El contenedor de <?= htmlspecialchars($orden->etiquetaDo()) ?> YA SALIO?\n\nAl confirmar:\n- Sus cargas pasan a En transito y salen del inventario.\n- Se avisa al cliente por correo que su carga fue despachada.\n\nSi el contenedor todavia no sale, pulse Cancelar.');">
+            <?php // Al pulsar: si faltan bultos (o no hay DO) un modal explica por que; si no, pide confirmar que salio. ?>
+            <form method="post" action="/salidas/<?= htmlspecialchars($orden->id()) ?>/finalizar" id="salida-confirmar-form"
+                  data-etiqueta="<?= htmlspecialchars($orden->etiquetaDo()) ?>" onsubmit="return validarConfirmarSalida(this);">
                 <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
                 <?php // Comentario del cierre: obligatorio (queda en el DO y en el historial de cada carga). ?>
-                <textarea name="comentario_cierre" required maxlength="500" rows="2"
+                <textarea name="comentario_cierre" maxlength="500" rows="2"
                           placeholder="Comentario del cierre (obligatorio): hora de salida, sello, chofer, novedades..."
                           class="block w-full md:w-[28rem] mb-2 rounded-lg border border-zinc-300 bg-white text-black text-sm px-3 py-2 focus:ring-2 focus:ring-emerald-400 focus:outline-none"></textarea>
-                <button type="submit" id="salida-confirmar-btn" <?= $progreso['escaneadas'] < $progreso['total'] || $sinDo ? 'disabled' : '' ?> <?= $sinDo ? 'data-sin-do' : '' ?>
+                <button type="submit" id="salida-confirmar-btn" <?= $sinDo ? 'data-sin-do' : '' ?>
                         title="<?= $sinDo ? 'Falta que trafico genere el DO' : 'Pulse solo cuando el contenedor haya salido' ?>"
-                        class="inline-flex items-center gap-2 bg-emerald-500 text-black rounded-lg px-4 py-2 text-sm font-medium hover:bg-emerald-400 transition disabled:opacity-40 disabled:cursor-not-allowed">
+                        class="inline-flex items-center gap-2 bg-emerald-500 text-black rounded-lg px-4 py-2 text-sm font-medium hover:bg-emerald-400 transition <?= $progreso['escaneadas'] < $progreso['total'] || $sinDo ? 'opacity-50' : '' ?>">
                     <?= icon_small('check') ?><span>Confirmar salida (el contenedor salio)</span>
                 </button>
             </form>
@@ -285,7 +286,7 @@ $opcionSalida = static fn (array $s): string => $s['etiqueta']
             </thead>
             <tbody id="salida-tbody" data-vivo-region="<?= htmlspecialchars($vivoDo) ?>">
                 <?php foreach ($avance as $grupo): $completa = $grupo['escaneadas'] >= $grupo['total']; ?>
-                    <tr class="border-b border-slate-200 <?= $completa ? 'bg-emerald-50' : 'bg-slate-50' ?>" data-grupo-carga="<?= htmlspecialchars($grupo['cargaId']) ?>">
+                    <tr class="border-b border-slate-200 <?= $completa ? 'bg-emerald-50' : 'bg-slate-50' ?>" data-grupo-carga="<?= htmlspecialchars($grupo['cargaId']) ?>" data-tracking="<?= htmlspecialchars($grupo['tracking'] . ($grupo['cliente'] !== '' ? ' · ' . $grupo['cliente'] : '')) ?>">
                         <td class="py-2 pr-4 font-mono font-semibold text-black">
                             <?php // + / - : muestra u oculta los LPN de esta carga (ocultos al abrir). ?>
                             <button type="button" class="salida-toggle inline-flex items-center justify-center w-6 h-6 mr-2 rounded border border-zinc-300 bg-white text-zinc-700 font-sans font-bold leading-none hover:bg-slate-100 align-middle"
@@ -598,5 +599,101 @@ if (!empty($fotosPorCarga[''])) {
 $fotosVolver = '/salidas/' . $orden->id();
 require __DIR__ . '/../evidencia/_fotos.php';
 ?>
+
+<div id="modal-confirmar-salida" class="hidden fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="mcs-titulo">
+    <div class="bg-white rounded-xl shadow-xl max-w-lg w-full p-6 max-h-[90vh] overflow-y-auto">
+        <div class="flex items-start gap-3">
+            <span id="mcs-icono" class="w-10 h-10 rounded-full flex items-center justify-center shrink-0"></span>
+            <div class="min-w-0 flex-1">
+                <h2 id="mcs-titulo" class="font-semibold text-black text-lg"></h2>
+                <div id="mcs-cuerpo" class="text-sm text-zinc-700 mt-2 space-y-2"></div>
+            </div>
+        </div>
+        <div class="flex justify-end gap-2 mt-6">
+            <button type="button" id="mcs-cerrar" class="inline-flex items-center gap-2 bg-slate-200 text-zinc-800 rounded-lg px-4 py-2 text-sm font-medium hover:bg-slate-300 transition">Cerrar</button>
+            <button type="button" id="mcs-aceptar" class="hidden inline-flex items-center gap-2 bg-emerald-500 text-black rounded-lg px-4 py-2 text-sm font-medium hover:bg-emerald-400 transition">Si, el contenedor salio</button>
+        </div>
+    </div>
+</div>
+<script>
+// "Confirmar salida": si faltan bultos por escanear (o falta el DO) explica en un modal por que no se
+// puede; si esta todo, pide en el mismo modal confirmar que el contenedor salio.
+(function () {
+    var modal = document.getElementById('modal-confirmar-salida');
+    var formPendiente = null;
+    var esc = function (t) { var d = document.createElement('div'); d.textContent = t; return d.innerHTML; };
+
+    function abrir(tipo, titulo, html) {
+        var icono = document.getElementById('mcs-icono');
+        icono.className = 'w-10 h-10 rounded-full flex items-center justify-center shrink-0 text-xl font-bold '
+            + (tipo === 'error' ? 'bg-red-100 text-red-600' : 'bg-emerald-100 text-emerald-700');
+        icono.textContent = tipo === 'error' ? '!' : '?';
+        document.getElementById('mcs-titulo').textContent = titulo;
+        document.getElementById('mcs-cuerpo').innerHTML = html;
+        document.getElementById('mcs-aceptar').classList.toggle('hidden', tipo === 'error');
+        modal.classList.remove('hidden');
+        document.getElementById(tipo === 'error' ? 'mcs-cerrar' : 'mcs-aceptar').focus();
+    }
+    function cerrar() { modal.classList.add('hidden'); formPendiente = null; }
+
+    document.getElementById('mcs-cerrar').addEventListener('click', cerrar);
+    modal.addEventListener('click', function (e) { if (e.target === modal) { cerrar(); } });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !modal.classList.contains('hidden')) { cerrar(); } });
+    document.getElementById('mcs-aceptar').addEventListener('click', function () {
+        var f = formPendiente;
+        cerrar();
+        if (f) { f.submit(); }
+    });
+
+    window.validarConfirmarSalida = function (form) {
+        var boton = form.querySelector('#salida-confirmar-btn');
+        if (boton && boton.hasAttribute('data-sin-do')) {
+            abrir('error', 'No se puede confirmar todavia', '<p>Esta orden aun no tiene <strong>DO</strong>. Trafico debe generar el DO y ordenar el contenedor antes de confirmar la salida.</p>');
+            return false;
+        }
+
+        // Bultos sin escanear, agrupados por carga (se leen de la tabla, que se actualiza al escanear).
+        var grupos = {};
+        var faltan = 0;
+        document.querySelectorAll('#salida-tbody tr[data-codigo]').forEach(function (tr) {
+            if (tr.getAttribute('data-escaneado') === '1') { return; }
+            var carga = tr.getAttribute('data-carga');
+            if (!grupos[carga]) {
+                var cab = document.querySelector('#salida-tbody tr[data-grupo-carga="' + carga + '"]');
+                grupos[carga] = { nombre: cab ? cab.getAttribute('data-tracking') : carga, codigos: [] };
+            }
+            grupos[carga].codigos.push(tr.getAttribute('data-codigo'));
+            faltan++;
+        });
+
+        if (faltan > 0) {
+            var lista = Object.keys(grupos).map(function (k) {
+                var g = grupos[k];
+                return '<li class="border border-red-200 bg-red-50 rounded-lg px-3 py-2"><strong>' + esc(g.nombre) + '</strong>: faltan ' + g.codigos.length
+                    + '<span class="block font-mono text-xs text-zinc-600 mt-1 break-words">' + esc(g.codigos.join(', ')) + '</span></li>';
+            }).join('');
+            abrir('error', 'No se puede confirmar la salida',
+                '<p>Faltan <strong>' + faltan + ' bulto(s) por escanear</strong>. Solo se confirma cuando todos los bultos del DO estan escaneados.</p>'
+                + '<ul class="space-y-2">' + lista + '</ul>'
+                + '<p class="text-xs text-zinc-500">Si esos bultos van en el contenedor, escanealos. Si no subieron, quitelos del DO con <strong>Sacar</strong> o <strong>Ajustar bultos</strong> en la tabla de cargas.</p>');
+            return false;
+        }
+
+        var comentario = form.querySelector('[name="comentario_cierre"]');
+        if (comentario && comentario.value.trim() === '') {
+            abrir('error', 'Falta el comentario del cierre', '<p>Escriba el <strong>comentario del cierre</strong> (hora de salida, sello, chofer, novedades...). Queda en el DO y en el historial de cada carga.</p>');
+            comentario.classList.add('border-red-400');
+            return false;
+        }
+
+        formPendiente = form;
+        abrir('ok', '¿El contenedor de ' + form.getAttribute('data-etiqueta') + ' ya salio?',
+            '<p>Al confirmar:</p><ul class="list-disc pl-5 space-y-1"><li>Sus cargas pasan a <strong>En transito</strong> y salen del inventario.</li>'
+            + '<li>Se avisa al cliente por correo que su carga fue despachada.</li></ul>'
+            + '<p class="text-xs text-zinc-500">Si el contenedor todavia no sale, pulse Cerrar.</p>');
+        return false;
+    };
+})();
+</script>
 
 <?php require __DIR__ . '/../partials/footer.php'; ?>

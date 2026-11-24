@@ -519,7 +519,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
                 if (confirmarBtn) {
                     // Sin DO no se confirma aunque este todo escaneado (trafico debe generarlo).
-                    confirmarBtn.disabled = data.progreso.escaneadas < data.progreso.total || confirmarBtn.hasAttribute('data-sin-do');
+                    // No se deshabilita: al pulsarlo, si falta algo, un modal explica por que.
+                    confirmarBtn.classList.toggle('opacity-50', data.progreso.escaneadas < data.progreso.total || confirmarBtn.hasAttribute('data-sin-do'));
                 }
 
                 mensaje.textContent = 'LPN ' + data.codigo + ' escaneado.';
