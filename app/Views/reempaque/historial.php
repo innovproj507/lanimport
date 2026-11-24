@@ -79,7 +79,12 @@ $estadoColores = ['pendiente' => 'amber', 'completado' => 'emerald', 'cancelado'
                             </a>
                         </td>
                         <td class="py-2 pr-4 text-zinc-700"><?= htmlspecialchars($orden->tipo()->label()) ?></td>
-                        <td class="py-2 pr-4 text-zinc-700"><?= htmlspecialchars($mapaClientes[$orden->clienteId()] ?? '—') ?></td>
+                        <td class="py-2 pr-4 text-zinc-700">
+                            <?= htmlspecialchars($mapaClientes[$orden->clienteId()] ?? '—') ?>
+                            <?php if ($orden->clienteDestinoId() !== null): ?>
+                                <span class="block text-xs text-orange-700 font-medium">Cajas a nombre de: <?= htmlspecialchars($mapaClientes[$orden->clienteDestinoId()] ?? '—') ?></span>
+                            <?php endif; ?>
+                        </td>
                         <td class="py-2 pr-4"><?= badge($orden->estado()->label(), $estadoColores[$orden->estado()->value] ?? 'slate') ?></td>
                         <td class="py-2 text-zinc-700"><?= htmlspecialchars($orden->createdAt()->format('Y-m-d H:i')) ?></td>
                     </tr>

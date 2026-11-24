@@ -334,12 +334,15 @@ final class BodegaApiController extends BaseApiController
     /** @return array<string, mixed> */
     private function resumenReempaque(ReempaqueOrden $orden): array
     {
-        $cliente = $this->container()->get(ClienteRepositoryInterface::class)->findById($orden->clienteId());
+        $clientes = $this->container()->get(ClienteRepositoryInterface::class);
+        $cliente = $clientes->findById($orden->clienteId());
+        // Si las cajas salen a nombre de otro cliente, bodega lo ve al armarlas.
+        $destino = $orden->clienteDestinoId() !== null ? $clientes->findById($orden->clienteDestinoId()) : null;
 
         return [
             'id' => $orden->id(),
             'codigo' => $orden->codigo(),
-            'cliente' => $cliente?->nombreCompleto(),
+            'cliente' => $cliente?->nombreCompleto() . ($destino !== null ? ' → cajas a nombre de ' . $destino->nombreCompleto() : ''),
             'tipo' => $orden->tipo()->label(),
             'instrucciones' => $orden->instrucciones(),
             'estado' => $orden->estado()->value,

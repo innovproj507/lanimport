@@ -171,8 +171,10 @@ final class PdoReempaqueOrdenRepository implements ReempaqueOrdenRepositoryInter
         }
 
         if (!empty($filtros['clienteId'])) {
-            $where[] = 'cliente_id = :cliente_id';
+            // El cliente de las cargas o el de las cajas (reempaque que cambia de cliente).
+            $where[] = '(cliente_id = :cliente_id OR cliente_destino_id = :cliente_destino)';
             $params[':cliente_id'] = $filtros['clienteId'];
+            $params[':cliente_destino'] = $filtros['clienteId'];
         }
 
         if (($bodega = $this->bodegaActiva?->id()) !== null) {
