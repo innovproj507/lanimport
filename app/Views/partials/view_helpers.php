@@ -177,7 +177,8 @@ function puede_ordenar_contenedor(): bool
 /** Confirmar la salida cuando el contenedor sale (inventario). */
 function puede_confirmar_salida(): bool
 {
-    return in_array($_SESSION['usuario_rol'] ?? null, ['inventario', 'gerente', 'admin'], true);
+    // Confirman la salida (el contenedor salio): Trafico, Gerencia y Owner. Inventario no.
+    return in_array($_SESSION['usuario_rol'] ?? null, ['operaciones', 'gerente', 'admin'], true);
 }
 
 function url_archivo_publico(string $ruta): string

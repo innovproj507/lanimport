@@ -17,7 +17,7 @@ $backHref = !$orden->tieneDo() && $orden->estado()->value === 'pendiente' ? '/sa
 // Bodega escanea desde la PDA mientras trafico mira: la pantalla revisa cambios cada 8 s (vivo.js).
 $vivoSegundos = 8;
 // Bodega escanea. Inventario (y trafico) arma la orden: agregar, ajustar, devolver, cancelar.
-// Trafico ordena el contenedor: genera el DO, embarque, unir y mover. Inventario confirma la salida.
+// Trafico ordena el contenedor: genera el DO, embarque, unir y mover. Trafico confirma la salida.
 $armaSalida = puede_armar_salida();
 $ordenaContenedor = puede_ordenar_contenedor();
 $confirmaSalida = puede_confirmar_salida();
@@ -182,7 +182,7 @@ $claseInput = 'w-full rounded-lg border border-zinc-300 bg-white text-black px-3
             <?php if ($sinDo): ?>
                 <?php // Una OS no se confirma: se confirma el DO, en Contenedor. ?>
             <?php elseif ($confirmaSalida): ?>
-            <?php // Manual: terminar de escanear NO confirma. Inventario confirma cuando el contenedor sale (con DO). ?>
+            <?php // Manual: terminar de escanear NO confirma. Trafico confirma cuando el contenedor sale (con DO). ?>
             <?php // Al pulsar: si faltan bultos (o no hay DO) un modal explica por que; si no, pide confirmar que salio. ?>
             <form method="post" action="/salidas/<?= htmlspecialchars($orden->id()) ?>/finalizar" id="salida-confirmar-form"
                   data-etiqueta="<?= htmlspecialchars($orden->etiquetaDo()) ?>" onsubmit="return validarConfirmarSalida(this);">
@@ -199,7 +199,7 @@ $claseInput = 'w-full rounded-lg border border-zinc-300 bg-white text-black px-3
             </form>
             <?php if ($sinDo): ?><span class="text-xs text-amber-700">Se puede confirmar cuando trafico genere el DO.</span><?php endif; ?>
             <?php elseif ($progreso['total'] > 0 && $progreso['escaneadas'] >= $progreso['total']): ?>
-                <p class="text-sm text-emerald-700 font-medium">Escaneo completo. Inventario confirma la salida cuando el contenedor salga.</p>
+                <p class="text-sm text-emerald-700 font-medium">Escaneo completo. Trafico confirma la salida cuando el contenedor salga.</p>
             <?php endif; ?>
             <?php if ($armaSalida): ?>
             <form method="post" action="/salidas/<?= htmlspecialchars($orden->id()) ?>/cancelar"

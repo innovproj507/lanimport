@@ -333,7 +333,7 @@ final class SalidaController extends BaseController
                 ));
                 $_SESSION['salida_mensaje'] = $teniaDo
                     ? 'Datos del embarque guardados.'
-                    : 'DO generado: ' . ($repositorio->findById($id)?->etiquetaDo() ?? '') . '. Inventario confirma la salida cuando el contenedor salga.';
+                    : 'DO generado: ' . ($repositorio->findById($id)?->etiquetaDo() ?? '') . '. Trafico confirma la salida cuando el contenedor salga.';
             } catch (ValidationException|NotFoundException $e) {
                 $_SESSION['salida_error'] = $e->getMessage();
             }
@@ -1054,7 +1054,7 @@ final class SalidaController extends BaseController
         }
 
         $do = $repositorio->findById($destino->id());
-        $_SESSION['salida_mensaje'] = 'DO creado: ' . ($do?->etiquetaDo() ?? '') . ' con ' . count($osIds) . ' OS. Inventario confirma la salida cuando el contenedor salga.';
+        $_SESSION['salida_mensaje'] = 'DO creado: ' . ($do?->etiquetaDo() ?? '') . ' con ' . count($osIds) . ' OS. Trafico confirma la salida cuando el contenedor salga.';
 
         if ($errores !== []) {
             $_SESSION['salida_error'] = 'No se pudieron unir: ' . implode(' · ', $errores);

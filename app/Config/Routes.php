@@ -175,7 +175,7 @@ $routes->group('bodega/api', ['filter' => array_merge($bodegaFilter, ['csrfheade
     $routes->get('salidas/(:segment)', 'Api\BodegaApiController::salida/$1');
     $routes->post('salidas/(:segment)/escanear', 'Api\BodegaApiController::salidaEscanear/$1');
     // Confirmar la salida es manual y de inventario/gerencia (cuando el contenedor sale), no de bodega.
-    $routes->post('salidas/(:segment)/finalizar', 'Api\BodegaApiController::salidaFinalizar/$1', ['filter' => 'role:inventario,gerente,admin']);
+    $routes->post('salidas/(:segment)/finalizar', 'Api\BodegaApiController::salidaFinalizar/$1', ['filter' => 'role:operaciones,gerente,admin']);
     // Fotos de evidencia: de recepcion (por carga) y de salida (por orden). Tambien las usa la web.
     $routes->get('(cargas|salidas|devoluciones)/(:segment)/fotos', 'Api\FotoEvidenciaApiController::listar/$1/$2');
     $routes->post('(cargas|salidas|devoluciones)/(:segment)/fotos', 'Api\FotoEvidenciaApiController::subir/$1/$2');
@@ -192,9 +192,9 @@ $routes->post('recepcion/escanear', 'LpnController::escanearRecepcion', ['filter
 $routes->get('inventario', 'InventarioController::index', ['filter' => $bodegaFilter]);
 
 // Salidas — bodega ve, escanea y toma fotos. Inventario (y trafico) arma la orden de salida; trafico
-// ordena el contenedor (genera el DO, embarque, unir/mover); inventario confirma cuando el contenedor sale.
+// ordena el contenedor (genera el DO, embarque, unir/mover); trafico confirma cuando el contenedor sale.
 $armaSalida = ['auth', 'role:inventario,operaciones,gerente,admin'];
-$confirmaSalida = ['auth', 'role:inventario,gerente,admin'];
+$confirmaSalida = ['auth', 'role:operaciones,gerente,admin'];
 $planificaSalida = ['auth', 'role:operaciones,gerente,admin'];
 
 // Traslados entre bodegas: Inventario/Trafico los arman y cancelan; bodega escanea, despacha y recibe.
