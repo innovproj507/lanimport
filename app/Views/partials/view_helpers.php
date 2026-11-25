@@ -195,7 +195,7 @@ function color_estado_carga(string $estado): string
     return [
         'ingresado' => 'blue', 'en_bodega' => 'amber', 'en_transito' => 'indigo', 'en_aduana' => 'violet',
         'liberado' => 'teal', 'listo_entrega' => 'emerald', 'entregado' => 'slate', 'retenido' => 'red',
-        'devuelto_proveedor' => 'orange',
+        'devuelto_proveedor' => 'orange', 'reempacada' => 'violet',
     ][$estado] ?? 'slate';
 }
 

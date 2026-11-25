@@ -331,7 +331,7 @@ final class PdoCargaRepository implements CargaRepositoryInterface
 
             // Ingreso de Carga: la devuelta completa al proveedor ya no esta en bodega.
             if (!$enSalida) {
-                $where .= " AND ca.estado <> 'devuelto_proveedor'";
+                $where .= " AND ca.estado NOT IN ('devuelto_proveedor', 'reempacada')";
             }
         }
 

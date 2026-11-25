@@ -499,7 +499,9 @@ final class PdoSalidaOrdenRepository implements SalidaOrdenRepositoryInterface
             "WITH RECURSIVE contenido (raiz_id, lpn_id) AS (
                  SELECT sl.lpn_id, sl.lpn_id FROM salida_lineas sl WHERE sl.salida_orden_id = :orden
                  UNION
-                 SELECT x.raiz_id, g.lpn_origen_id FROM contenido x JOIN lpn_genealogia g ON g.lpn_destino_id = x.lpn_id
+                 SELECT x.raiz_id, g.lpn_origen_id FROM contenido x
+                 JOIN lpns p ON p.id = x.lpn_id AND p.carga_id IS NULL
+                 JOIN lpn_genealogia g ON g.lpn_destino_id = x.lpn_id
              )
              SELECT ca.tracking_numero, ca.proveedor, ca.fecha_ingreso, ca.aduanero_nombre, c.nombre AS cliente_nombre,
                     COUNT(*) AS bultos_salida,

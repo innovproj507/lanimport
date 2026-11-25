@@ -259,6 +259,8 @@ $routes->post('reempaques', 'ReempaqueController::store', ['filter' => $ordenaRe
 $routes->get('reempaques/(:segment)', 'ReempaqueController::show/$1', ['filter' => $bodegaFilter]);
 $routes->post('reempaques/(:segment)/cancelar', 'ReempaqueController::cancelar/$1', ['filter' => $ordenaReempaque]);
 $routes->post('reempaques/(:segment)/cliente-cajas', 'ReempaqueController::clienteCajas/$1', ['filter' => $ordenaReempaque]);
+// Nuevo ingreso (tracking nuevo) con las medidas de las cajas de un reempaque terminado.
+$routes->post('reempaques/(:segment)/nuevo-ingreso', 'ReempaqueController::nuevoIngreso/$1', ['filter' => ['auth', 'role:inventario,operaciones,gerente,admin']]);
 
 // Impresoras — trafico/gerencia/owner (bodega no configura impresoras)
 $routes->get('impresoras', 'ImpresoraController::index', ['filter' => ['auth', 'role:inventario,operaciones,gerente,admin']]);

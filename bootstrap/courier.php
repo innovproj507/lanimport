@@ -393,6 +393,17 @@ $container->set(\Courier\Reempaque\Application\CambiarClienteCajas\CambiarClient
     $c->get(UnitOfWork::class),
     $c->get(BitacoraCargaInterface::class),
 ));
+// Nuevo ingreso de un reempaque terminado: las cajas pasan a una carga nueva con sus medidas.
+$container->set(\Courier\Reempaque\Application\GenerarIngresoReempaque\GenerarIngresoReempaqueHandler::class, fn (Container $c) => new \Courier\Reempaque\Application\GenerarIngresoReempaque\GenerarIngresoReempaqueHandler(
+    $c->get(ReempaqueOrdenRepositoryInterface::class),
+    $c->get(LpnRepositoryInterface::class),
+    $c->get(CargaRepositoryInterface::class),
+    $c->get(RegistrarCargaHandler::class),
+    $c->get(GenerarLpnsParaCargaHandler::class),
+    $c->get(PdoHistorialEstadoRepository::class),
+    $c->get(UnitOfWork::class),
+    $c->get(BitacoraCargaInterface::class),
+));
 // Bodega ejecuta la orden caja por caja (app de bodega).
 $container->set(AbrirCajaReempaqueHandler::class, fn (Container $c) => new AbrirCajaReempaqueHandler(
     $c->get(ReempaqueOrdenRepositoryInterface::class),

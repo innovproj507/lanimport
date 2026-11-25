@@ -21,4 +21,15 @@ interface ReempaqueOrdenRepositoryInterface
      * cargas) y pasa sus cajas ya armadas a $clienteCajasId.
      */
     public function cambiarClienteCajas(string $ordenId, ?string $clienteDestinoId, string $clienteCajasId): void;
+
+    /** Carga (nuevo ingreso) que se genero con las cajas de esta orden, o null. */
+    public function cargaGenerada(string $ordenId): ?string;
+
+    /**
+     * Guarda el nuevo ingreso de la orden y enlaza cada caja con el bulto de la carga nueva
+     * que la reemplaza (lpn_genealogia caja -> bulto, sin orden de reempaque).
+     *
+     * @param array<string, string> $cajaABulto cajaLpnId => lpnId nuevo
+     */
+    public function registrarIngresoGenerado(string $ordenId, string $cargaId, array $cajaABulto): void;
 }

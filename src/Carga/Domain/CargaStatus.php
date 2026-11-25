@@ -18,13 +18,15 @@ enum CargaStatus: string
     case RETENIDO = 'retenido';
     /** Todos sus bultos se devolvieron al proveedor (el cliente ya no la quiso). No se borra: queda en el historial. */
     case DEVUELTO_PROVEEDOR = 'devuelto_proveedor';
+    /** Todos sus bultos se reempacaron en cajas que pasaron a un nuevo ingreso (otra carga, otro tracking). */
+    case REEMPACADA = 'reempacada';
 
     /** @return array<int, self> */
     private static function transitions(self $estado): array
     {
         return match ($estado) {
-            self::INGRESADO => [self::EN_BODEGA, self::DEVUELTO_PROVEEDOR],
-            self::EN_BODEGA => [self::EN_TRANSITO, self::RETENIDO, self::DEVUELTO_PROVEEDOR],
+            self::INGRESADO => [self::EN_BODEGA, self::DEVUELTO_PROVEEDOR, self::REEMPACADA],
+            self::EN_BODEGA => [self::EN_TRANSITO, self::RETENIDO, self::DEVUELTO_PROVEEDOR, self::REEMPACADA],
             self::EN_TRANSITO => [self::EN_ADUANA],
             self::EN_ADUANA => [self::LIBERADO, self::RETENIDO],
             self::LIBERADO => [self::LISTO_ENTREGA],
@@ -32,6 +34,7 @@ enum CargaStatus: string
             self::RETENIDO => [self::EN_ADUANA, self::DEVUELTO_PROVEEDOR],
             self::ENTREGADO => [],
             self::DEVUELTO_PROVEEDOR => [],
+            self::REEMPACADA => [],
         };
     }
 
@@ -82,6 +85,7 @@ enum CargaStatus: string
             self::ENTREGADO => 'Entregado',
             self::RETENIDO => 'Retenido',
             self::DEVUELTO_PROVEEDOR => 'Devuelta al proveedor',
+            self::REEMPACADA => 'Reempacada (nuevo ingreso)',
         };
     }
 }

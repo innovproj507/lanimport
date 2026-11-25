@@ -273,6 +273,12 @@ final class Carga extends AggregateRoot
         return $alcanzados;
     }
 
+    /** Todos sus bultos quedaron en cajas de un reempaque que pasaron a un nuevo ingreso. */
+    public function marcarReempacada(string $usuarioId, string $comentario): void
+    {
+        $this->cambiarEstado(CargaStatus::REEMPACADA, $usuarioId, mb_substr($comentario, 0, 255));
+    }
+
     private function assertDetalleCoincideConTipoServicio(?TipoServicio $tipo, ?DetalleServicioInterface $detalle): void
     {
         if ($tipo === null) {

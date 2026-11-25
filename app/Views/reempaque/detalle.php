@@ -124,6 +124,122 @@ foreach ($sinEmpacar as $id) {
     <?php endif; ?>
 </div>
 
+<?php
+// Nuevo ingreso: las cajas pasan a una carga nueva (tracking nuevo) con sus propias medidas.
+$puedeIngreso = in_array($_SESSION['usuario_rol'] ?? '', ['inventario', 'operaciones', 'gerente', 'admin'], true);
+$formIngreso = $_SESSION['reempaque_ingreso_form'] ?? [];
+unset($_SESSION['reempaque_ingreso_form']);
+$valorForm = static fn (string $cajaId, string $campo): string => htmlspecialchars((string) ($formIngreso['caja'][$cajaId][$campo] ?? ''));
+?>
+<?php if (!empty($ingreso['generada'])): $nueva = $ingreso['generada']; ?>
+    <div id="nuevo-ingreso" class="bg-violet-50 border border-violet-200 rounded-xl p-5 mb-6 flex flex-wrap items-center gap-3">
+        <?= icon_small('box', 'w-5 h-5 text-violet-700') ?>
+        <p class="text-sm text-violet-900">Las cajas de este reempaque pasaron al nuevo ingreso
+            <a href="/cargas/<?= htmlspecialchars($nueva->id()) ?>" class="font-semibold underline"><?= htmlspecialchars((string) $nueva->trackingNumero()) ?></a>
+            (<?= htmlspecialchars($nueva->estado()->label()) ?>), con sus propias medidas.</p>
+    </div>
+<?php elseif ($orden->estado()->value === 'completado' && $puedeIngreso && $orden->cajas() !== []): ?>
+    <form id="nuevo-ingreso" method="post" action="/reempaques/<?= htmlspecialchars($orden->id()) ?>/nuevo-ingreso" class="bg-white rounded-xl shadow-sm p-6 mb-6 space-y-4"
+          onsubmit="return confirm('Se creara un nuevo ingreso (tracking nuevo) con estas cajas y sus medidas. Luego se imprimen sus etiquetas y bodega las escanea en Recepcion. ¿Continuar?');">
+        <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
+        <div>
+            <h2 class="font-semibold text-black">Nuevo ingreso con las medidas de las cajas</h2>
+            <p class="text-xs text-zinc-500 mt-1">Para enviar las cajas como una carga nueva (p.ej. aereo, sin paleta): se crea un tracking nuevo a nombre de
+                <strong><?= htmlspecialchars(!empty($clienteCajas) ? $clienteCajas->nombreCompleto() : ($cliente?->nombreCompleto() ?? '—')) ?></strong>, una linea por caja con su ancho, alto, largo, peso y P3.
+                Las cargas originales que queden sin bultos pasan a "Reempacada" y la salida se arma con la carga nueva.</p>
+        </div>
+
+        <div class="flex flex-wrap gap-2">
+            <?php foreach (\Courier\Carga\Domain\TipoEnvio::cases() as $te): $marcado = ($formIngreso['tipo_envio'] ?? $ingreso['tipoEnvio']) === $te->value; ?>
+                <label class="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm cursor-pointer has-[:checked]:border-amber-500 has-[:checked]:bg-amber-50">
+                    <input type="radio" name="tipo_envio" value="<?= $te->value ?>" <?= $marcado ? 'checked' : '' ?> required> <?= $te->icono() ?> <?= htmlspecialchars($te->label()) ?>
+                </label>
+            <?php endforeach; ?>
+        </div>
+
+        <div class="grid gap-3 md:grid-cols-3">
+            <label class="block md:col-span-2">
+                <span class="block text-sm font-medium text-zinc-700 mb-1">Descripcion de la mercancia</span>
+                <input type="text" name="descripcion" required maxlength="190" value="<?= htmlspecialchars($formIngreso['descripcion'] ?? $ingreso['descripcion']) ?>"
+                       class="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:ring-2 focus:ring-amber-400 focus:outline-none">
+            </label>
+            <label class="block">
+                <span class="block text-sm font-medium text-zinc-700 mb-1">Valor total</span>
+                <input type="number" name="valor" min="0" step="0.01" required value="<?= htmlspecialchars((string) ($formIngreso['valor'] ?? number_format($ingreso['valor'], 2, '.', ''))) ?>"
+                       class="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-right focus:ring-2 focus:ring-amber-400 focus:outline-none">
+            </label>
+        </div>
+
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="text-left text-xs text-zinc-500 uppercase border-b border-slate-200">
+                        <th class="py-2 pr-3">Caja</th>
+                        <th class="py-2 pr-3 text-right">Ancho (W) cm</th>
+                        <th class="py-2 pr-3 text-right">Alto (H) cm</th>
+                        <th class="py-2 pr-3 text-right">Largo (L) cm</th>
+                        <th class="py-2 pr-3 text-right">Peso kg</th>
+                        <th class="py-2 text-right">P3</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($orden->cajas() as $cajaId => $caja): $cId = htmlspecialchars($cajaId); ?>
+                        <tr class="border-b border-slate-100 ingreso-caja">
+                            <td class="py-2 pr-3"><span class="font-mono font-semibold"><?= htmlspecialchars($codigo($cajaId)) ?></span>
+                                <span class="block text-xs text-zinc-500"><?= count($caja['contenido']) ?> bulto(s)</span></td>
+                            <?php foreach (['ancho', 'alto', 'largo', 'peso'] as $campo): ?>
+                                <td class="py-2 pr-3 text-right"><input type="number" name="caja[<?= $cId ?>][<?= $campo ?>]" min="0.01" step="0.01" required value="<?= $valorForm($cajaId, $campo) ?>"
+                                       data-medida="<?= $campo ?>" class="w-24 rounded-lg border border-zinc-300 px-2 py-1 text-right"></td>
+                            <?php endforeach; ?>
+                            <td class="py-2 text-right"><input type="number" name="caja[<?= $cId ?>][p3]" min="0" step="0.0001" value="<?= $valorForm($cajaId, 'p3') ?>" data-medida="p3"
+                                   placeholder="auto" class="w-24 rounded-lg border border-zinc-300 px-2 py-1 text-right"></td>
+                        </tr>
+                    <?php endforeach; ?>
+                </tbody>
+                <tfoot>
+                    <tr class="font-semibold text-black">
+                        <td class="py-2 pr-3">Total</td><td colspan="3"></td>
+                        <td class="py-2 pr-3 text-right" id="ingreso-total-peso">0</td>
+                        <td class="py-2 text-right" id="ingreso-total-p3">0</td>
+                    </tr>
+                </tfoot>
+            </table>
+            <p class="text-xs text-zinc-500 mt-1">El P3 se calcula solo (W x H x L / 28,316.85) mientras no se escriba a mano.</p>
+        </div>
+
+        <label class="block">
+            <span class="block text-sm font-medium text-zinc-700 mb-1">Notas (opcional)</span>
+            <textarea name="notas" rows="2" maxlength="1000" class="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:ring-2 focus:ring-amber-400 focus:outline-none"><?= htmlspecialchars($formIngreso['notas'] ?? '') ?></textarea>
+        </label>
+
+        <button type="submit" class="inline-flex items-center gap-2 bg-violet-600 text-white rounded-lg px-5 py-2.5 text-sm font-medium hover:bg-violet-500"><?= icon_small('check') ?>Generar nuevo ingreso</button>
+    </form>
+    <script>
+    (function () {
+        var form = document.getElementById('nuevo-ingreso');
+        function recalcular() {
+            var peso = 0, p3 = 0;
+            form.querySelectorAll('.ingreso-caja').forEach(function (tr) {
+                var v = function (m) { return parseFloat(tr.querySelector('[data-medida="' + m + '"]').value) || 0; };
+                var campoP3 = tr.querySelector('[data-medida="p3"]');
+                var auto = v('ancho') * v('alto') * v('largo') / 28316.846592;
+                if (!campoP3.dataset.manual) { campoP3.value = auto > 0 ? auto.toFixed(4) : ''; }
+                peso += v('peso');
+                p3 += parseFloat(campoP3.value) || 0;
+            });
+            document.getElementById('ingreso-total-peso').textContent = peso.toFixed(2);
+            document.getElementById('ingreso-total-p3').textContent = p3.toFixed(4);
+        }
+        form.addEventListener('input', function (e) {
+            if (e.target.getAttribute('data-medida') === 'p3') { e.target.dataset.manual = e.target.value !== '' ? '1' : ''; }
+            recalcular();
+        });
+        form.querySelectorAll('[data-medida="p3"]').forEach(function (c) { if (c.value !== '') { c.dataset.manual = '1'; } });
+        recalcular();
+    })();
+    </script>
+<?php endif; ?>
+
 <?php if ($pendiente && $pendientesPorMarca !== []): ?>
     <div class="bg-white rounded-xl shadow-sm p-6">
         <h2 class="font-semibold text-black mb-3">Bultos por empacar (<?= count($sinEmpacar) ?>)</h2>

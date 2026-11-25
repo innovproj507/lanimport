@@ -141,11 +141,99 @@ final class ReempaqueController extends BaseController
             'orden' => $orden,
             'cliente' => $this->container()->get(ClienteRepositoryInterface::class)->findById($orden->clienteId()),
             'clientes' => $this->container()->get(ListarClientesHandler::class)->handle(new ListarClientesQuery()),
+            'ingreso' => $this->datosNuevoIngreso($orden, $lpnsPorId),
             'clienteCajas' => $orden->clienteDestinoId() !== null ? $this->container()->get(ClienteRepositoryInterface::class)->findById($orden->clienteDestinoId()) : null,
             'lpnsPorId' => $lpnsPorId,
             'mensaje' => $mensaje,
             'error' => $error,
         ]);
+    }
+
+    /**
+     * Datos para "Nuevo ingreso con las medidas de las cajas": la carga ya generada, o los valores
+     * por defecto del formulario (descripcion y valor de las cargas originales).
+     *
+     * @param array<string, \Courier\Lpn\Domain\Lpn|null> $lpnsPorId
+     * @return array{generada: ?\Courier\Carga\Domain\Carga, descripcion: string, valor: float, tipoEnvio: string}
+     */
+    private function datosNuevoIngreso(\Courier\Reempaque\Domain\ReempaqueOrden $orden, array $lpnsPorId): array
+    {
+        $cargas = $this->container()->get(\Courier\Carga\Domain\CargaRepositoryInterface::class);
+        $generadaId = $this->container()->get(\Courier\Reempaque\Domain\ReempaqueOrdenRepositoryInterface::class)->cargaGenerada($orden->id());
+
+        $originales = [];
+        foreach ($orden->origenLpnIds() as $id) {
+            $cargaId = $lpnsPorId[$id]?->cargaId();
+            if ($cargaId !== null && !isset($originales[$cargaId])) {
+                $originales[$cargaId] = $cargas->findById($cargaId);
+            }
+        }
+
+        $descripciones = [];
+        $valor = 0.0;
+        $tipoEnvio = 'aereo';
+        foreach (array_filter($originales) as $c) {
+            foreach ($c->lineas() as $l) {
+                $descripciones[mb_strtoupper(trim($l->descripcion()))] = true;
+                $valor += $l->valor();
+            }
+        }
+
+        return [
+            'generada' => $generadaId !== null ? $cargas->findById($generadaId) : null,
+            'descripcion' => implode(', ', array_filter(array_keys($descripciones))),
+            'valor' => round($valor, 2),
+            'tipoEnvio' => $tipoEnvio,
+        ];
+    }
+
+    /** Genera el nuevo ingreso (tracking nuevo) con las medidas de cada caja. */
+    public function nuevoIngreso(string $id): RedirectResponse
+    {
+        if (!Csrf::verify($this->request->getPost('_csrf'))) {
+            $_SESSION['reempaque_error'] = 'Sesion expirada, intente de nuevo.';
+
+            return redirect()->to('/reempaques/' . $id . '#nuevo-ingreso');
+        }
+
+        $num = static fn ($v): float => (float) str_replace(',', '.', trim((string) $v));
+        $medidas = [];
+        foreach ((array) ($this->request->getPost('caja') ?? []) as $cajaId => $m) {
+            $m = (array) $m;
+            $medidas[(string) $cajaId] = [
+                'ancho' => $num($m['ancho'] ?? 0),
+                'alto' => $num($m['alto'] ?? 0),
+                'largo' => $num($m['largo'] ?? 0),
+                'peso' => $num($m['peso'] ?? 0),
+                'p3' => trim((string) ($m['p3'] ?? '')) !== '' ? $num($m['p3']) : null,
+            ];
+        }
+        $_SESSION['reempaque_ingreso_form'] = $_POST;
+
+        try {
+            $r = $this->container()->get(\Courier\Reempaque\Application\GenerarIngresoReempaque\GenerarIngresoReempaqueHandler::class)
+                ->handle(new \Courier\Reempaque\Application\GenerarIngresoReempaque\GenerarIngresoReempaqueCommand(
+                    $id,
+                    $medidas,
+                    (string) $this->request->getPost('tipo_envio'),
+                    (string) $this->request->getPost('descripcion'),
+                    $num($this->request->getPost('valor')),
+                    (string) $this->request->getPost('notas'),
+                    (string) ($_SESSION['usuario_id'] ?? ''),
+                ));
+        } catch (ValidationException|NotFoundException $e) {
+            $_SESSION['reempaque_error'] = $e->getMessage();
+
+            return redirect()->to('/reempaques/' . $id . '#nuevo-ingreso');
+        }
+
+        unset($_SESSION['reempaque_ingreso_form']);
+        // A la recepcion de la carga nueva: imprimir sus etiquetas (una por caja) y escanearlas.
+        $_SESSION['carga_aviso'] = ['tipo' => 'ok', 'texto' => "Nuevo ingreso {$r['tracking']} creado con las cajas del reempaque"
+            . ($r['reempacadas'] !== [] ? '; ' . implode(', ', $r['reempacadas']) . ' quedan como Reempacada' : '')
+            . '. Imprima las etiquetas, peguelas en las cajas y escanéelas en Recepcion.'];
+
+        return redirect()->to('/cargas/' . $r['cargaId']);
     }
 
     /** Cambia a nombre de que cliente quedan las cajas (las cargas no cambian). */

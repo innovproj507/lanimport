@@ -101,6 +101,26 @@ final class PdoReempaqueOrdenRepository implements ReempaqueOrdenRepositoryInter
         )->execute([$clienteCajasId, $ordenId]);
     }
 
+    public function cargaGenerada(string $ordenId): ?string
+    {
+        $stmt = $this->connection->prepare('SELECT carga_generada_id FROM reempaque_ordenes WHERE id = ?');
+        $stmt->execute([$ordenId]);
+        $id = $stmt->fetchColumn();
+
+        return $id !== false && $id !== null ? (string) $id : null;
+    }
+
+    public function registrarIngresoGenerado(string $ordenId, string $cargaId, array $cajaABulto): void
+    {
+        $this->connection->prepare('UPDATE reempaque_ordenes SET carga_generada_id = ? WHERE id = ?')->execute([$cargaId, $ordenId]);
+        $enlace = $this->connection->prepare(
+            'INSERT INTO lpn_genealogia (id, lpn_origen_id, lpn_destino_id, reempaque_orden_id, created_at) VALUES (?, ?, ?, NULL, NOW())'
+        );
+        foreach ($cajaABulto as $cajaId => $lpnId) {
+            $enlace->execute([(string) Uuid::generate(), $cajaId, $lpnId]);
+        }
+    }
+
     /** Sincroniza las cajas (destino) y su contenido (genealogia) con el estado de la orden. */
     private function guardarCajas(ReempaqueOrden $orden): void
     {

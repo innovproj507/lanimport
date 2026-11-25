@@ -103,7 +103,7 @@ final class ObtenerFlujoCargasHandler implements QueryHandlerInterface
                 continue;
             }
 
-            if ($c['estado'] === CargaStatus::DEVUELTO_PROVEEDOR->value) {
+            if (in_array($c['estado'], [CargaStatus::DEVUELTO_PROVEEDOR->value, CargaStatus::REEMPACADA->value], true)) {
                 continue;
             }
 
