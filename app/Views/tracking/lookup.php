@@ -1,7 +1,7 @@
 <?php
 use App\Libraries\Csrf;
 /** @var \Courier\Carga\Application\ConsultarTrackingPorNumero\TrackingView|null $view */
-/** @var array<string, mixed>|null $rastreo detalle interno (solo inventario/trafico/gerencia/owner) */
+/** @var array<string, mixed>|null $rastreo detalle (interno completo; cliente/aduanero ven donde esta y sus OS/DO, sin lo interno) */
 $pageTitle = 'Rastreo de carga';
 $pageSubtitle = 'Consulte el estado de una carga por su numero de tracking';
 $numero = $numero ?? '';
@@ -45,11 +45,13 @@ $bultoEstadoLabel = [
     'returned' => 'Devuelto al proveedor',
     'in_return' => 'En orden de devolucion al proveedor (aun en bodega)',
 ];
-/** Estado de una OS/DO para mostrar. */
-$ordenEstado = static function (string $estado, bool $esOs): array {
+/** Estado de una OS/DO para mostrar (al cliente/aduanero en palabras simples). */
+$ordenEstado = static function (string $estado, bool $esOs) use ($interno): array {
     return match ($estado) {
-        'pendiente' => $esOs ? ['OS pendiente (sin DO)', 'bg-amber-500/10 text-amber-700'] : ['DO pendiente (cargando)', 'bg-blue-500/10 text-blue-700'],
-        'confirmada' => ['Salio (confirmada)', 'bg-emerald-500/10 text-emerald-700'],
+        'pendiente' => $esOs
+            ? [$interno ? 'OS pendiente (sin DO)' : 'Preparando la salida', 'bg-amber-500/10 text-amber-700']
+            : [$interno ? 'DO pendiente (cargando)' : 'Cargando en contenedor', 'bg-blue-500/10 text-blue-700'],
+        'confirmada' => [$interno ? 'Salio (confirmada)' : 'Salio', 'bg-emerald-500/10 text-emerald-700'],
         default => ['Cancelada', 'bg-slate-500/10 text-slate-500'],
     };
 };
@@ -249,7 +251,7 @@ $lineaTiempo = static function (array $eventos) use ($h, $fecha, $colorMovimient
 <?php endif; ?>
 
 <?php if ($view): ?>
-    <div class="bg-white rounded-xl shadow p-6 <?= $interno ? 'max-w-6xl' : 'max-w-2xl' ?> space-y-4">
+    <div class="bg-white rounded-xl shadow p-6 <?= $interno || $rastreo !== null ? 'max-w-6xl' : 'max-w-2xl' ?> space-y-4">
         <div class="flex items-start justify-between gap-3 flex-wrap">
             <div>
                 <p class="text-2xl font-bold text-black tracking-tight"><?= $h($view->trackingNumero) ?></p>
@@ -306,21 +308,30 @@ $lineaTiempo = static function (array $eventos) use ($h, $fecha, $colorMovimient
                         <?php $o = $ordenesPorId[$ordenId] ?? null; [$lbl, $cls] = $ordenEstado((string) $d['estado'], $o['esOs'] ?? false); ?>
                         <li class="flex items-center gap-2 flex-wrap">
                             <strong><?= $d['bultos'] ?> bulto(s)</strong> en
-                            <a href="/salidas/<?= $h($ordenId) ?>" class="font-semibold text-blue-700 underline"><?= $h($d['orden']) ?></a>
+                            <?php if ($interno): ?>
+                                <a href="/salidas/<?= $h($ordenId) ?>" class="font-semibold text-blue-700 underline"><?= $h($d['orden']) ?></a>
+                            <?php else: ?>
+                                <strong><?= $h($d['orden']) ?></strong>
+                            <?php endif; ?>
                             <span class="px-2 py-0.5 rounded-full text-xs font-medium <?= $cls ?>"><?= $h($lbl) ?></span>
                             <?php if ($o !== null && $o['contenedor'] !== null): ?>
                                 <span class="text-zinc-600">· contenedor <?= $h($o['contenedor']) ?></span>
                             <?php endif; ?>
-                            <span class="<?= $d['escaneados'] < $d['bultos'] ? 'text-red-600' : 'text-emerald-700' ?>">
-                                · <?= $d['escaneados'] ?>/<?= $d['bultos'] ?> escaneados
-                            </span>
+                            <?php if (!$interno && $o !== null && $o['etd'] !== null): ?>
+                                <span class="text-zinc-600">· ETD <?= $h($fecha($o['etd'])) ?></span>
+                            <?php endif; ?>
+                            <?php if ($interno): ?>
+                                <span class="<?= $d['escaneados'] < $d['bultos'] ? 'text-red-600' : 'text-emerald-700' ?>">
+                                    · <?= $d['escaneados'] ?>/<?= $d['bultos'] ?> escaneados
+                                </span>
+                            <?php endif; ?>
                         </li>
                     <?php endforeach; ?>
                     <?php foreach ($sinOrden['bodega'] as $nombreBodega => $n): ?>
                         <li><strong><?= $n ?> bulto(s)</strong> en <?= hay_varias_bodegas() && $nombreBodega !== '' ? '<strong>' . $h($nombreBodega) . '</strong>' : 'bodega' ?>, sin orden de salida</li>
                     <?php endforeach; ?>
                     <?php foreach ($sinOrden['otros'] as $label => $n): ?>
-                        <li><strong><?= $n ?> bulto(s)</strong>: <?= preg_replace_callback('/LPN-R\d+-\d+/', static fn ($m) => '<a href="/tracking?numero=' . rawurlencode($m[0]) . '" class="font-mono text-blue-700 underline">' . $m[0] . '</a>', $h($label)) ?></li>
+                        <li><strong><?= $n ?> bulto(s)</strong>: <?= !$interno ? $h($label) : preg_replace_callback('/LPN-R\d+-\d+/', static fn ($m) => '<a href="/tracking?numero=' . rawurlencode($m[0]) . '" class="font-mono text-blue-700 underline">' . $m[0] . '</a>', $h($label)) ?></li>
                     <?php endforeach; ?>
                     <?php if ($rastreo['bultos'] === []): ?>
                         <li class="text-zinc-600">La carga aun no tiene etiquetas (LPN) generadas.</li>
@@ -334,15 +345,16 @@ $lineaTiempo = static function (array $eventos) use ($h, $fecha, $colorMovimient
                     'Aduanero' => $rastreo['carga']['aduanero'],
                     'Proveedor' => $rastreo['carga']['proveedor'],
                     'Ingreso' => $fecha($rastreo['carga']['fechaIngreso'], true),
+                ] + ($interno ? [
                     'Registrado por' => $rastreo['carga']['registradoPor'],
                     'Contenedor de llegada' => $rastreo['carga']['contenedor'],
-                ] + (hay_varias_bodegas() ? ['Bodega de ingreso' => $rastreo['carga']['bodega'] ?? null] : []) as $k => $v): ?>
+                ] : []) + ($interno && hay_varias_bodegas() ? ['Bodega de ingreso' => $rastreo['carga']['bodega'] ?? null] : []) as $k => $v): ?>
                     <div>
                         <dt class="text-xs text-zinc-500 uppercase"><?= $h($k) ?></dt>
                         <dd class="text-black font-medium break-words"><?= $h(($v ?? '') !== '' ? $v : '—') ?></dd>
                     </div>
                 <?php endforeach; ?>
-                <?php if ($rastreo['carga']['notas'] !== null): ?>
+                <?php if ($interno && $rastreo['carga']['notas'] !== null): ?>
                     <div class="col-span-2">
                         <dt class="text-xs text-zinc-500 uppercase">Notas</dt>
                         <dd class="text-black"><?= $h($rastreo['carga']['notas']) ?></dd>
@@ -408,9 +420,13 @@ $lineaTiempo = static function (array $eventos) use ($h, $fecha, $colorMovimient
         <?php endif; ?>
 
         <?php if ($rastreo !== null): ?>
+            <?php
+            // El cliente/aduanero no ve las ordenes canceladas (son internas).
+            $ordenesVisibles = $interno ? $rastreo['ordenes'] : array_values(array_filter($rastreo['ordenes'], static fn ($o) => $o['estado'] !== 'cancelada'));
+            ?>
             <h2 class="font-semibold text-black pt-4 border-t border-slate-200">Ordenes de salida (OS / DO)</h2>
-            <?php if ($rastreo['ordenes'] === []): ?>
-                <p class="text-sm text-zinc-500">Esta carga no ha estado en ninguna orden de salida.</p>
+            <?php if ($ordenesVisibles === []): ?>
+                <p class="text-sm text-zinc-500"><?= $interno ? 'Esta carga no ha estado en ninguna orden de salida.' : 'Esta carga aun no esta en ninguna orden de salida.' ?></p>
             <?php else: ?>
                 <div class="overflow-x-auto">
                     <table class="w-full text-sm">
@@ -423,15 +439,15 @@ $lineaTiempo = static function (array $eventos) use ($h, $fecha, $colorMovimient
                                 <th class="py-2 pr-3">Cargue / ETD</th>
                                 <th class="py-2 pr-3">Destino</th>
                                 <th class="py-2 pr-3 text-right">Bultos</th>
-                                <th class="py-2 text-right">Escaneados</th>
+                                <?php if ($interno): ?><th class="py-2 text-right">Escaneados</th><?php endif; ?>
                             </tr>
                         </thead>
                         <tbody>
-                            <?php foreach ($rastreo['ordenes'] as $o): ?>
+                            <?php foreach ($ordenesVisibles as $o): ?>
                                 <?php [$lbl, $cls] = $ordenEstado($o['estado'], $o['esOs']); ?>
                                 <tr class="border-b border-slate-200 align-top <?= $o['estado'] === 'cancelada' ? 'text-zinc-400' : '' ?>">
                                     <td class="py-2 pr-3">
-                                        <?php if ($o['estado'] !== 'cancelada'): ?>
+                                        <?php if ($interno && $o['estado'] !== 'cancelada'): ?>
                                             <a href="/salidas/<?= $h($o['id']) ?>" class="font-semibold text-blue-700 underline"><?= $h($o['etiqueta']) ?></a>
                                         <?php else: ?>
                                             <span class="font-semibold"><?= $h($o['etiqueta']) ?></span>
@@ -443,7 +459,7 @@ $lineaTiempo = static function (array $eventos) use ($h, $fecha, $colorMovimient
                                         <?php if ($o['confirmada'] !== null): ?>
                                             <div class="text-xs text-zinc-500"><?= $h($fecha($o['confirmada'], true)) ?></div>
                                         <?php endif; ?>
-                                        <?php if ($o['nota'] !== null): ?>
+                                        <?php if ($interno && $o['nota'] !== null): ?>
                                             <div class="text-xs text-zinc-500"><?= $h($o['nota']) ?></div>
                                         <?php endif; ?>
                                     </td>
@@ -452,7 +468,9 @@ $lineaTiempo = static function (array $eventos) use ($h, $fecha, $colorMovimient
                                     <td class="py-2 pr-3"><?= $h($fecha($o['fechaCargue'])) ?><div class="text-xs text-zinc-500">ETD <?= $h($fecha($o['etd'])) ?></div></td>
                                     <td class="py-2 pr-3"><?= $h($o['destino'] ?? '—') ?></td>
                                     <td class="py-2 pr-3 text-right"><?= $o['bultos'] ?></td>
-                                    <td class="py-2 text-right <?= $o['estado'] !== 'cancelada' && $o['escaneados'] < $o['bultos'] ? 'text-red-600 font-semibold' : '' ?>"><?= $o['escaneados'] ?>/<?= $o['bultos'] ?></td>
+                                    <?php if ($interno): ?>
+                                        <td class="py-2 text-right <?= $o['estado'] !== 'cancelada' && $o['escaneados'] < $o['bultos'] ? 'text-red-600 font-semibold' : '' ?>"><?= $o['escaneados'] ?>/<?= $o['bultos'] ?></td>
+                                    <?php endif; ?>
                                 </tr>
                             <?php endforeach; ?>
                         </tbody>
@@ -460,7 +478,7 @@ $lineaTiempo = static function (array $eventos) use ($h, $fecha, $colorMovimient
                 </div>
             <?php endif; ?>
 
-            <?php if ($rastreo['bultos'] !== []): ?>
+            <?php if ($interno && $rastreo['bultos'] !== []): ?>
                 <details class="pt-4 border-t border-slate-200" <?= count($rastreo['bultos']) <= 20 ? 'open' : '' ?>>
                     <summary class="font-semibold text-black cursor-pointer select-none">Bultos (<?= count($rastreo['bultos']) ?> etiquetas)</summary>
                     <div class="overflow-x-auto mt-2">
