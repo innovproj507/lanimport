@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Courier\Reempaque\Application\TerminarReempaque;
 
+use Courier\Lpn\Domain\LpnBarcodeGeneratorInterface;
 use Courier\Lpn\Domain\LpnRepositoryInterface;
 use Courier\Reempaque\Domain\Exception\ReempaqueOrdenNotFoundException;
 use Courier\Reempaque\Domain\ReempaqueOrdenRepositoryInterface;
@@ -23,7 +24,31 @@ final class TerminarReempaqueHandler implements CommandHandlerInterface
         private readonly LpnRepositoryInterface $lpns,
         private readonly UnitOfWork $unitOfWork,
         private readonly ?BitacoraCargaInterface $bitacora = null,
+        private readonly ?LpnBarcodeGeneratorInterface $etiquetas = null,
     ) {
+    }
+
+    /**
+     * Etiqueta de cada caja: marca y su numero entre las cajas del reempaque ("1/4"), en el orden
+     * de su codigo (LPN-R00002-1, -2...). Mismo archivo, asi se reimprime desde la orden.
+     */
+    public function dibujarEtiquetas(\Courier\Reempaque\Domain\ReempaqueOrden $orden): void
+    {
+        if ($this->etiquetas === null) {
+            return;
+        }
+
+        $cajas = array_values(array_filter(array_map(fn ($id) => $this->lpns->findById($id), $orden->destinoLpnIds())));
+        usort($cajas, static fn ($a, $b) => strnatcmp((string) $a->codigo(), (string) $b->codigo()));
+        $total = count($cajas);
+
+        foreach ($cajas as $i => $caja) {
+            try {
+                $this->etiquetas->generate((string) $caja->codigo(), $caja->marca(), null, null, $i + 1, $total, true);
+            } catch (\Throwable $e) {
+                error_log('Etiqueta de caja ' . $caja->codigo() . ': ' . $e->getMessage());
+            }
+        }
     }
 
     public function handle(CommandInterface $command): mixed
@@ -57,6 +82,8 @@ final class TerminarReempaqueHandler implements CommandHandlerInterface
 
             $this->ordenes->save($orden);
         });
+
+        $this->dibujarEtiquetas($orden);
 
         $this->bitacora?->registrarPorLpns($orden->origenLpnIds(), 'reempaque', "{n} bulto(s) reempacados en caja(s): reempaque {$orden->codigo()} terminado");
 

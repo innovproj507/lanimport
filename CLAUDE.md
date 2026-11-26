@@ -245,7 +245,7 @@ The paper delivery form (empresa de transporte, chofer, placa, entregado por, ce
 - **Execution (PDA):** Bodega runs it in the PDA app (`#/reempaques`, `bodega/api/reempaques/{id}/{abrir-caja|empacar|quitar|cerrar-caja|descartar-caja|terminar}`).
   - The `ReempaqueOrden` aggregate holds the rules: one open box at a time; a bulto in only one box unless Dividir; finish only when everything is in closed boxes.
   - Boxes are new LPNs `LPN-R<orden>-N`, `in_repack` until the order finishes. Each box's contents live in `lpn_genealogia`, and `reempaque_lpns.cerrada_at` marks it closed.
-  - Closing a box generates its label (marca and "REEMPAQUE"; no "CONTIENE N BULTOS" line), printed from the web order page. Finishing consumes the origins and makes the boxes `available`.
+  - Closing a box generates its label (only the marca). Finishing redraws every box label with marca and its number "n/total" in codigo order (`TerminarReempaqueHandler::dibujarEtiquetas()`, same file), printed from the web order page. Finishing consumes the origins and makes the boxes `available`.
 - **Boxes in salidas:** a box has no `carga_id`. Contents are resolved recursively through the genealogy:
   - `LpnRepositoryInterface::bultosContenidos()` / `cargasContenidas()`;
   - `PdoCargasParaSalida::cajasListas()` (rows in Armar salida);

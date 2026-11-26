@@ -59,12 +59,9 @@ final class CerrarCajaReempaqueHandler implements CommandHandlerInterface
             $this->ordenes->save($orden);
 
             if ($caja !== null) {
-                // Marca y "REEMPAQUE" (sin "CONTIENE N BULTOS": bodega no lo quiere en la caja).
-                $ruta = $this->etiquetas->generate(
-                    (string) $caja->codigo(),
-                    $caja->marca(),
-                    'REEMPAQUE',
-                );
+                // Solo la marca: el numero de caja (1/4, 2/4...) se pone al terminar el reempaque,
+                // cuando se sabe cuantas cajas son (TerminarReempaqueHandler).
+                $ruta = $this->etiquetas->generate((string) $caja->codigo(), $caja->marca());
                 $this->etiquetaRepositorio->saveParaLpn($caja->id(), $ruta);
             }
         });
