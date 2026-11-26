@@ -91,11 +91,7 @@ final class TrackingController extends BaseController
     private function render(?object $view, ?string $error, string $numero, ?array $eliminada = null): string
     {
         $interno = in_array($_SESSION['usuario_rol'] ?? null, self::ROLES_INTERNOS, true);
-        // Cliente y aduanero tambien ven donde esta su carga y en que contenedor va (la vista oculta
-        // lo interno: escaneos, enlaces, OS canceladas, bultos y movimientos). AlcanceRastreo ya
-        // garantizo que la carga es suya.
-        $externo = AlcanceRastreo::limitado($_SESSION['usuario_rol'] ?? null);
-        $rastreo = $interno || $externo ? $this->container()->get(RastreoCargaInterface::class) : null;
+        $rastreo = $interno ? $this->container()->get(RastreoCargaInterface::class) : null;
 
         return view('tracking/lookup', [
             'view' => $view,
@@ -103,7 +99,7 @@ final class TrackingController extends BaseController
             'numero' => $numero,
             'interno' => $interno,
             'rastreo' => $view !== null && $rastreo !== null ? $rastreo->detalle($view->cargaId) : null,
-            'movimientos' => $view !== null && $interno && $rastreo !== null ? $rastreo->movimientos($view->cargaId) : null,
+            'movimientos' => $view !== null && $rastreo !== null ? $rastreo->movimientos($view->cargaId) : null,
             'eliminada' => $eliminada,
         ]);
     }
