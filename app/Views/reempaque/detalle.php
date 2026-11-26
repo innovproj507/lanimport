@@ -109,7 +109,10 @@ foreach ($sinEmpacar as $id) {
                     </div>
                     <?php if ($caja['cerrada']): ?>
                         <div class="flex items-center gap-2">
-                            <img src="/uploads/lpns/<?= htmlspecialchars($codigoCaja) ?>.png?v=<?= time() ?>" alt="Etiqueta" class="h-12 border border-slate-200 rounded">
+                            <a href="/uploads/lpns/<?= htmlspecialchars($codigoCaja) ?>.png?v=<?= time() ?>" data-doc-ver
+                               data-doc-titulo="Etiqueta · <?= htmlspecialchars($codigoCaja) ?>" title="Ver etiqueta en grande" class="cursor-zoom-in">
+                                <img src="/uploads/lpns/<?= htmlspecialchars($codigoCaja) ?>.png?v=<?= time() ?>" alt="Etiqueta" class="h-12 border border-slate-200 rounded hover:ring-2 hover:ring-amber-400">
+                            </a>
                             <?php if (puede_imprimir()): ?>
                             <button type="button" class="reempaque-imprimir inline-flex items-center gap-2 bg-white border border-zinc-300 text-zinc-700 rounded-lg px-3 py-2 text-sm font-medium hover:bg-slate-100 transition"
                                     data-etiqueta="/uploads/lpns/<?= htmlspecialchars($codigoCaja) ?>.png">
