@@ -428,6 +428,7 @@ $container->set(TerminarReempaqueHandler::class, fn (Container $c) => new Termin
     $c->get(UnitOfWork::class),
     $c->get(BitacoraCargaInterface::class),
     $c->get(LpnBarcodeGeneratorInterface::class),
+    $c->get(CargaRepositoryInterface::class),
 ));
 $container->set(CancelarReempaqueHandler::class, fn (Container $c) => new CancelarReempaqueHandler(
     $c->get(ReempaqueOrdenRepositoryInterface::class),

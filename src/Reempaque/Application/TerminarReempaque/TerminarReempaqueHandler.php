@@ -25,12 +25,14 @@ final class TerminarReempaqueHandler implements CommandHandlerInterface
         private readonly UnitOfWork $unitOfWork,
         private readonly ?BitacoraCargaInterface $bitacora = null,
         private readonly ?LpnBarcodeGeneratorInterface $etiquetas = null,
+        private readonly ?\Courier\Carga\Domain\CargaRepositoryInterface $cargas = null,
     ) {
     }
 
     /**
-     * Etiqueta de cada caja: marca y su numero entre las cajas del reempaque ("1/4"), en el orden
-     * de su codigo (LPN-R00002-1, -2...). Mismo archivo, asi se reimprime desde la orden.
+     * Etiqueta de cada caja: marca, proveedor (de las cargas cuyos bultos lleva; varios con " / ")
+     * y su numero entre las cajas del reempaque ("1/4"), en el orden de su codigo
+     * (LPN-R00002-1, -2...). Mismo archivo, asi se reimprime desde la orden.
      */
     public function dibujarEtiquetas(\Courier\Reempaque\Domain\ReempaqueOrden $orden): void
     {
@@ -42,9 +44,17 @@ final class TerminarReempaqueHandler implements CommandHandlerInterface
         usort($cajas, static fn ($a, $b) => strnatcmp((string) $a->codigo(), (string) $b->codigo()));
         $total = count($cajas);
 
+        $proveedorDeCarga = [];
         foreach ($cajas as $i => $caja) {
             try {
-                $this->etiquetas->generate((string) $caja->codigo(), $caja->marca(), null, null, $i + 1, $total, true, 0.35);
+                $proveedores = [];
+                foreach ($this->cargas !== null ? $this->lpns->cargasContenidas($caja->id()) : [] as $cargaId) {
+                    $proveedorDeCarga[$cargaId] ??= trim((string) $this->cargas->findById($cargaId)?->proveedor());
+                    $proveedores[] = $proveedorDeCarga[$cargaId];
+                }
+                $proveedor = implode(' / ', array_unique(array_filter($proveedores)));
+
+                $this->etiquetas->generate((string) $caja->codigo(), $caja->marca(), null, $proveedor !== '' ? $proveedor : null, $i + 1, $total, true, 0.35, 0.4);
             } catch (\Throwable $e) {
                 error_log('Etiqueta de caja ' . $caja->codigo() . ': ' . $e->getMessage());
             }
