@@ -55,15 +55,15 @@ final class CerrarCajaReempaqueHandler implements CommandHandlerInterface
         $caja = $this->lpns->findById($lpnId);
         $bultos = count($orden->cajas()[$lpnId]['contenido']);
 
-        $this->unitOfWork->run(function () use ($orden, $caja, $bultos) {
+        $this->unitOfWork->run(function () use ($orden, $caja) {
             $this->ordenes->save($orden);
 
             if ($caja !== null) {
+                // Marca y "REEMPAQUE" (sin "CONTIENE N BULTOS": bodega no lo quiere en la caja).
                 $ruta = $this->etiquetas->generate(
                     (string) $caja->codigo(),
                     $caja->marca(),
                     'REEMPAQUE',
-                    'CONTIENE ' . $bultos . ' BULTO' . ($bultos === 1 ? '' : 'S'),
                 );
                 $this->etiquetaRepositorio->saveParaLpn($caja->id(), $ruta);
             }
