@@ -327,7 +327,11 @@ final class PdoCargaRepository implements CargaRepositoryInterface
                     JOIN salida_lineas sl ON sl.lpn_id = g.lpn_destino_id
                     JOIN salida_ordenes so ON so.id = sl.salida_orden_id AND so.estado <> 'cancelada'
                     WHERE l.carga_id = ca.id))";
-            $where .= $enSalida ? " AND {$condicion}" : " AND NOT {$condicion}";
+            // Una carga parcial (parte en una DO, parte aun en bodega sin orden) sale en las dos
+            // pestañas: en Ingreso por los bultos que le quedan en bodega.
+            $quedanEnBodega = "(ca.estado NOT IN ({$despachadas})
+                AND EXISTS (SELECT 1 FROM lpns lq WHERE lq.carga_id = ca.id AND lq.estado IN ('receiving', 'available')))";
+            $where .= $enSalida ? " AND {$condicion}" : " AND (NOT {$condicion} OR {$quedanEnBodega})";
 
             // Ingreso de Carga: la devuelta completa al proveedor ya no esta en bodega.
             if (!$enSalida) {
