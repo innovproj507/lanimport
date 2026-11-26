@@ -51,4 +51,23 @@ interface RastreoCargaInterface
      *     ordenes: array<int, array{id: string, etiqueta: string, esOs: bool, estado: string, contenedor: ?string, escaneado: bool}>}|null
      */
     public function caja(string $codigo): ?array;
+
+    /**
+     * Clientes (nombre, apellido, empresa o codigo) y aduaneros (nombre o identificador) que
+     * coinciden con el texto, con cuantas cargas tiene cada uno. Hasta 20 de cada uno.
+     *
+     * @return array{clientes: array<int, array{id: string, nombre: string, codigo: ?string, cargas: int}>,
+     *     aduaneros: array<int, array{id: string, nombre: string, cargas: int}>}
+     */
+    public function buscarClientesYAduaneros(string $texto): array;
+
+    /**
+     * Cargas de un cliente o de un aduanero (identificador), las mas recientes primero. Sin $todas,
+     * solo las que siguen en la operacion: les queda algun bulto en bodega o en una OS/DO
+     * pendiente (no las que ya salieron completas, devueltas o reempacadas).
+     *
+     * @return array{nombre: ?string, total: int, cargaIds: array<int, string>, trackings: array<int, string>,
+     *     bultos: array<string, int>} bultos = conteo por estado de LPN de TODAS las cargas filtradas
+     */
+    public function cargasDe(?string $clienteId, ?string $aduanero, bool $todas, int $pagina, int $porPagina): array;
 }

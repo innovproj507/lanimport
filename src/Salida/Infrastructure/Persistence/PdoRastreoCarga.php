@@ -479,6 +479,93 @@ final class PdoRastreoCarga implements RastreoCargaInterface
     }
 
     /** @param array<string, mixed> $r */
+    public function buscarClientesYAduaneros(string $texto): array
+    {
+        $like = '%' . trim($texto) . '%';
+
+        $stmt = $this->connection->prepare(
+            "SELECT cl.id, TRIM(CONCAT(COALESCE(cl.nombre, ''), ' ', COALESCE(cl.apellido, ''))) AS nombre, cl.codigo,
+                    (SELECT COUNT(*) FROM cargas c WHERE c.cliente_id = cl.id) AS cargas
+             FROM clientes cl
+             WHERE CONCAT_WS(' ', cl.nombre, cl.apellido) LIKE :t1 OR cl.empresa LIKE :t2 OR cl.codigo LIKE :t3
+             ORDER BY cargas DESC, nombre
+             LIMIT 20"
+        );
+        $stmt->execute([':t1' => $like, ':t2' => $like, ':t3' => $like]);
+        $clientes = array_map(static fn (array $r) => [
+            'id' => (string) $r['id'],
+            'nombre' => (string) $r['nombre'],
+            'codigo' => $r['codigo'] ?: null,
+            'cargas' => (int) $r['cargas'],
+        ], $stmt->fetchAll());
+
+        $stmt = $this->connection->prepare(
+            "SELECT a.identificador, a.nombre,
+                    (SELECT COUNT(*) FROM cargas c WHERE c.aduanero_identificador = a.identificador) AS cargas
+             FROM aduaneros a
+             WHERE a.nombre LIKE :t1 OR a.identificador LIKE :t2
+             ORDER BY cargas DESC, a.nombre
+             LIMIT 20"
+        );
+        $stmt->execute([':t1' => $like, ':t2' => $like]);
+        $aduaneros = array_map(static fn (array $r) => [
+            'id' => (string) $r['identificador'],
+            'nombre' => (string) $r['nombre'],
+            'cargas' => (int) $r['cargas'],
+        ], $stmt->fetchAll());
+
+        return ['clientes' => $clientes, 'aduaneros' => $aduaneros];
+    }
+
+    public function cargasDe(?string $clienteId, ?string $aduanero, bool $todas, int $pagina, int $porPagina): array
+    {
+        $where = $clienteId !== null ? 'c.cliente_id = :d' : 'c.aduanero_identificador = :d';
+        $params = [':d' => $clienteId ?? (string) $aduanero];
+
+        if (!$todas) {
+            // Sigue en la operacion: algun bulto por recibir, en bodega, en reempaque/traslado/
+            // devolucion pendiente, o en una OS/DO que aun no sale. Sin etiquetas: si no salio aun.
+            $where .= " AND (EXISTS (SELECT 1 FROM lpns l WHERE l.carga_id = c.id
+                        AND l.estado IN ('receiving', 'available', 'reserved', 'in_repack', 'in_transfer', 'in_return', 'quarantine'))
+                    OR (c.estado IN ('ingresado', 'en_bodega') AND NOT EXISTS (SELECT 1 FROM lpns l2 WHERE l2.carga_id = c.id)))";
+        }
+
+        $stmt = $this->connection->prepare("SELECT COUNT(*) FROM cargas c WHERE {$where}");
+        $stmt->execute($params);
+        $total = (int) $stmt->fetchColumn();
+
+        $stmt = $this->connection->prepare(
+            "SELECT l.estado, COUNT(*) AS n FROM lpns l JOIN cargas c ON c.id = l.carga_id WHERE {$where} GROUP BY l.estado"
+        );
+        $stmt->execute($params);
+        $bultos = array_map('intval', $stmt->fetchAll(PDO::FETCH_KEY_PAIR));
+
+        $stmt = $this->connection->prepare(
+            "SELECT c.id, c.tracking_numero FROM cargas c WHERE {$where}
+             ORDER BY c.fecha_ingreso DESC, c.created_at DESC LIMIT :lim OFFSET :off"
+        );
+        foreach ($params as $k => $v) {
+            $stmt->bindValue($k, $v);
+        }
+        $stmt->bindValue(':lim', max(1, $porPagina), PDO::PARAM_INT);
+        $stmt->bindValue(':off', (max(1, $pagina) - 1) * max(1, $porPagina), PDO::PARAM_INT);
+        $stmt->execute();
+        $filas = $stmt->fetchAll();
+
+        $stmt = $this->connection->prepare($clienteId !== null
+            ? "SELECT TRIM(CONCAT(COALESCE(nombre, ''), ' ', COALESCE(apellido, ''))) FROM clientes WHERE id = :d"
+            : 'SELECT nombre FROM aduaneros WHERE identificador = :d');
+        $stmt->execute($params);
+
+        return [
+            'nombre' => ($n = $stmt->fetchColumn()) !== false ? (string) $n : null,
+            'total' => $total,
+            'cargaIds' => array_map(static fn ($r) => (string) $r['id'], $filas),
+            'trackings' => array_map(static fn ($r) => (string) $r['tracking_numero'], $filas),
+            'bultos' => $bultos,
+        ];
+    }
+
     private static function etiqueta(array $r): string
     {
         return $r['do_numero'] !== null ? "DO.{$r['do_numero']} / {$r['do_anio']}" : (string) $r['codigo'];
