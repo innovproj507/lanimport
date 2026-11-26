@@ -44,7 +44,7 @@ final class TerminarReempaqueHandler implements CommandHandlerInterface
 
         foreach ($cajas as $i => $caja) {
             try {
-                $this->etiquetas->generate((string) $caja->codigo(), $caja->marca(), null, null, $i + 1, $total, true);
+                $this->etiquetas->generate((string) $caja->codigo(), $caja->marca(), null, null, $i + 1, $total, true, 0.35);
             } catch (\Throwable $e) {
                 error_log('Etiqueta de caja ' . $caja->codigo() . ': ' . $e->getMessage());
             }

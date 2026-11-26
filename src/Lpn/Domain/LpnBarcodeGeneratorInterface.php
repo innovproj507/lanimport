@@ -14,6 +14,7 @@ interface LpnBarcodeGeneratorInterface
         ?int $ordenEnCarga = null,
         ?int $totalEnCarga = null,
         bool $mostrarSerie = false,
+        ?float $pesoSerie = null,
     ): string;
 
     public function eliminar(string $codigo): void;

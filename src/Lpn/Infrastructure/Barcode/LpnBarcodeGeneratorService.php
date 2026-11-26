@@ -32,8 +32,9 @@ final class LpnBarcodeGeneratorService implements LpnBarcodeGeneratorInterface
         ?int $ordenEnCarga = null,
         ?int $totalEnCarga = null,
         bool $mostrarSerie = false,
+        ?float $pesoSerie = null,
     ): string {
-        $etiqueta = $this->componerEtiqueta($codigo, $marca, $descripcion, $proveedorNombre, $ordenEnCarga, $totalEnCarga, $mostrarSerie);
+        $etiqueta = $this->componerEtiqueta($codigo, $marca, $descripcion, $proveedorNombre, $ordenEnCarga, $totalEnCarga, $mostrarSerie, $pesoSerie);
 
         $dir = $this->publicPath . '/' . self::RELATIVE_DIR;
 
@@ -103,6 +104,7 @@ final class LpnBarcodeGeneratorService implements LpnBarcodeGeneratorInterface
         ?int $ordenEnCarga,
         ?int $totalEnCarga,
         bool $mostrarSerie,
+        ?float $pesoSerie = null,
     ) {
         $lienzo = imagecreatetruecolor(self::ANCHO_PX, self::ALTO_PX);
         $blanco = imagecolorallocate($lienzo, 255, 255, 255);
@@ -134,7 +136,8 @@ final class LpnBarcodeGeneratorService implements LpnBarcodeGeneratorInterface
         }
 
         if ($mostrarSerie && $ordenEnCarga !== null && $totalEnCarga !== null) {
-            $lineas[] = ["{$ordenEnCarga}/{$totalEnCarga}", 0.9, true, 28];
+            // Peso propio (p.ej. las cajas de reempaque, donde solo van marca y numero): mas chico.
+            $lineas[] = ["{$ordenEnCarga}/{$totalEnCarga}", $pesoSerie ?? 0.9, true, 28];
         }
 
         if ($descripcion !== null && $descripcion !== '') {
